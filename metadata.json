@@ -1,0 +1,6 @@
+{
+  "name": "Career Vault Jobs",
+  "description": "India's trusted job portal for freshers, internship seekers, entry-level professionals, and work-from-home careers with direct official company applications.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

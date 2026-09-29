@@ -1,0 +1,17 @@
+<svg viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <circle cx="50" cy="50" r="48" fill="#ffffff" stroke="#0284c7" stroke-width="4"/>
+  <!-- M in Blue -->
+  <path d="M 22 74 L 22 36 L 36 56 L 46 36 L 46 74" stroke="#0284c7" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
+  <!-- N in Orange -->
+  <path d="M 52 74 L 52 38 L 74 68 L 74 24" stroke="#f97316" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M 66 28 L 74 18 L 82 28 Z" fill="#f97316"/>
+  <!-- Cap -->
+  <path d="M 24 24 L 34 18 L 44 24 L 34 30 Z" fill="#0369a1"/>
+  <path d="M 24 24 L 21 29" stroke="#eab308" stroke-width="2.5" stroke-linecap="round"/>
+  <!-- Briefcase -->
+  <rect x="40" y="54" width="20" height="15" rx="3" fill="#0f172a" stroke="#38bdf8" stroke-width="1.5"/>
+  <circle cx="50" cy="61" r="1.5" fill="#f8fafc"/>
+  <!-- Tricolor -->
+  <path d="M 18 84 Q 50 78 82 84" stroke="#f97316" stroke-width="2.5" stroke-linecap="round" fill="none"/>
+  <path d="M 18 88 Q 50 82 82 88" stroke="#10b981" stroke-width="2.5" stroke-linecap="round" fill="none"/>
+</svg>
