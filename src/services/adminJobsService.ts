@@ -219,8 +219,10 @@ export const adminJobsService = {
         return;
       }
 
-      const result = await res.json();
-      console.log('[JobAlertService] Broadcast completed result:', result);
+      if (res.headers.get('content-type')?.includes('application/json')) {
+        const result = await res.json();
+        console.log('[JobAlertService] Broadcast completed result:', result);
+      }
     } catch (err) {
       console.error('[JobAlertService] Broadcast exception (non-blocking):', err);
     }
@@ -232,9 +234,9 @@ export const adminJobsService = {
   async getAlertDeliveryStats(): Promise<any> {
     try {
       const res = await fetch('/api/alerts/delivery-stats');
-      if (res.ok) {
+      if (res.ok && res.headers.get('content-type')?.includes('application/json')) {
         const json = await res.json();
-        return json.data;
+        return json.data || json.stats;
       }
       return null;
     } catch (err) {

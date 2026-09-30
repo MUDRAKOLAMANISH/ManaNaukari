@@ -3,6 +3,7 @@ import {
   MessageSquare, X, Send, Sparkles, Bot, User,
   FileText, HelpCircle, ChevronDown, RotateCcw, AlertCircle, ExternalLink
 } from 'lucide-react';
+import { queryChatbotRag } from '../../services/knowledgeService';
 
 interface Citation {
   source: string;
@@ -82,19 +83,18 @@ export const FloatingChatbot: React.FC<FloatingChatbotProps> = ({ onNavigate }) 
           content: m.text,
         }));
 
-      const res = await fetch('/api/knowledge/chat', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: query, history }),
-      });
-
-      const data = await res.json();
+      console.log('[FloatingChatbot] Asking RAG knowledge assistant:', query);
+      const data = await queryChatbotRag(query, history);
 
       const assistantMsg: ChatMessage = {
         id: `assistant-${Date.now()}`,
         sender: 'assistant',
         text: data.answer || 'I could not find this information in the Mana Naukari Knowledge Base.',
-        citations: data.citations || [],
+        citations: (data.citations || []).map((c) => ({
+          source: c.source,
+          type: 'document' as const,
+          snippet: c.snippet,
+        })),
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       };
 

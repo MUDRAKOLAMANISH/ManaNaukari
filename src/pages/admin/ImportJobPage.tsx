@@ -52,13 +52,41 @@ export const ImportJobPage: React.FC<ImportJobPageProps> = ({ onNavigate }) => {
     setIsFallbackMode(false);
 
     try {
-      const response = await fetch('/api/ai/extract-job', {
+      let response = await fetch('/api/ai/extract-job', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({ url: trimmedUrl }),
       });
+
+      let contentType = response.headers.get('content-type') || '';
+
+      // If /api returned non-JSON (e.g. Netlify index.html fallback or 404), try Netlify function directly
+      if (!response.ok || !contentType.includes('application/json')) {
+        console.warn('Endpoint /api/ai/extract-job returned non-JSON, attempting direct Netlify function...');
+        try {
+          const fnResponse = await fetch('/.netlify/functions/extract-job', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ url: trimmedUrl }),
+          });
+          if (fnResponse.ok && fnResponse.headers.get('content-type')?.includes('application/json')) {
+            response = fnResponse;
+            contentType = fnResponse.headers.get('content-type') || '';
+          }
+        } catch (fnErr) {
+          console.warn('Direct Netlify function attempt error:', fnErr);
+        }
+      }
+
+      if (!contentType.includes('application/json')) {
+        console.warn('No JSON response received from AI extraction endpoints, triggering fallback.');
+        triggerFallback(trimmedUrl);
+        return;
+      }
 
       const result = await response.json();
 

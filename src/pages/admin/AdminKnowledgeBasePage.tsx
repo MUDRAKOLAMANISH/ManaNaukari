@@ -7,35 +7,30 @@ import {
   Eye, Layers, BookOpen, Globe, AlignLeft, Info
 } from 'lucide-react';
 
-export const KNOWLEDGE_CATEGORIES = [
-  'Company Information',
-  'Jobs',
-  'Resume Review',
-  'Portfolio Service',
-  'Recruiter Services',
-  'FAQs',
-  'Policies',
-  'General',
-] as const;
+import {
+  KNOWLEDGE_CATEGORIES,
+  KnowledgeCategory,
+  KnowledgeDocumentRecord,
+  KnowledgeChunkRecord,
+  KnowledgeStats,
+  ExtractionPreviewData,
+  uploadKnowledgeDocument,
+  addTextKnowledgeEntry,
+  editTextKnowledgeEntry,
+  deleteKnowledgeDocument,
+  getKnowledgeStats,
+  listKnowledgeDocuments,
+  getDocumentWithChunks,
+  rebuildDocumentChunks,
+  rebuildAllKnowledgeChunks,
+  queryChatbotRag,
+  seedInitialKnowledgeIfEmpty,
+} from '../../services/knowledgeService';
 
-export type KnowledgeCategory = (typeof KNOWLEDGE_CATEGORIES)[number];
+export { KNOWLEDGE_CATEGORIES };
+export type { KnowledgeCategory };
 
-interface KnowledgeDocument {
-  id: string;
-  title: string;
-  category: string;
-  source_type: 'pdf' | 'docx' | 'txt' | 'text_entry' | 'url';
-  file_name?: string;
-  file_size?: number;
-  page_count: number;
-  char_count: number;
-  chunk_count: number;
-  content: string;
-  preview_text?: string;
-  status: 'indexed' | 'processing' | 'failed';
-  created_at: string;
-  updated_at: string;
-}
+export type KnowledgeDocument = KnowledgeDocumentRecord;
 
 interface KnowledgeFAQ {
   id: string;
@@ -44,22 +39,6 @@ interface KnowledgeFAQ {
   category: string;
   created_at: string;
   updated_at: string;
-}
-
-interface KnowledgeStats {
-  totalDocuments: number;
-  totalTextEntries: number;
-  totalChunks: number;
-  lastUpdated: string;
-  faqCount?: number;
-}
-
-interface ExtractionPreviewData {
-  fileName: string;
-  pages: number;
-  charactersExtracted: number;
-  previewText: string;
-  chunkCount?: number;
 }
 
 interface AdminKnowledgeBasePageProps {
@@ -112,7 +91,7 @@ export const AdminKnowledgeBasePage: React.FC<AdminKnowledgeBasePageProps> = ({ 
 
   // Inspect full document modal state
   const [inspectDoc, setInspectDoc] = useState<KnowledgeDocument | null>(null);
-  const [inspectChunks, setInspectChunks] = useState<any[]>([]);
+  const [inspectChunks, setInspectChunks] = useState<KnowledgeChunkRecord[]>([]);
   const [isLoadingInspect, setIsLoadingInspect] = useState(false);
 
   // FAQ modal state
@@ -123,7 +102,7 @@ export const AdminKnowledgeBasePage: React.FC<AdminKnowledgeBasePageProps> = ({ 
   const [isSavingFaq, setIsSavingFaq] = useState(false);
 
   // Delete modal state
-  const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string; type: 'doc' | 'faq' } | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<{ id: string | number; name: string; type: 'doc' | 'faq' } | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
 
   // Test Sandbox state
@@ -139,18 +118,38 @@ export const AdminKnowledgeBasePage: React.FC<AdminKnowledgeBasePageProps> = ({ 
   const loadAllData = async () => {
     setLoading(true);
     try {
-      const [statsRes, docsRes, faqsRes] = await Promise.all([
-        fetch('/api/knowledge/stats').then((r) => r.json()),
-        fetch('/api/knowledge/documents').then((r) => r.json()),
-        fetch('/api/knowledge/faqs').then((r) => r.json()),
+      console.log('[AdminKnowledgeBase] Loading knowledge base from Supabase...');
+      // If store is empty, seed initial documents
+      await seedInitialKnowledgeIfEmpty();
+
+      const [statsData, docsData] = await Promise.all([
+        getKnowledgeStats(),
+        listKnowledgeDocuments(),
       ]);
 
-      if (statsRes.success) setStats(statsRes.stats);
-      if (docsRes.success) setDocuments(docsRes.documents);
-      if (faqsRes.success) setFaqs(faqsRes.faqs);
-    } catch (err) {
+      setStats(statsData);
+      setDocuments(docsData);
+
+      // Extract FAQs from docs with category 'FAQs'
+      const faqList: KnowledgeFAQ[] = docsData
+        .filter((d) => d.category.toLowerCase() === 'faqs')
+        .map((d) => {
+          const lines = (d.extracted_text || d.content || '').split('\n');
+          const qLine = lines.find((l) => l.startsWith('Q:')) || d.title;
+          const aLines = lines.filter((l) => !l.startsWith('Q:')).join('\n').trim();
+          return {
+            id: String(d.id),
+            question: qLine.replace(/^Q:\s*/, '').trim(),
+            answer: aLines.replace(/^A:\s*/, '').trim() || d.extracted_text,
+            category: d.category,
+            created_at: d.created_at || '',
+            updated_at: d.updated_at || '',
+          };
+        });
+      setFaqs(faqList);
+    } catch (err: any) {
       console.error('[AdminKnowledgeBase] Error loading data:', err);
-      showToast('Error loading knowledge base data', 'error');
+      showToast('Error loading knowledge base data: ' + (err.message || ''), 'error');
     } finally {
       setLoading(false);
     }
@@ -169,7 +168,8 @@ export const AdminKnowledgeBasePage: React.FC<AdminKnowledgeBasePageProps> = ({ 
 
       const matchesSource =
         selectedSourceType === 'all' ||
-        doc.source_type === selectedSourceType;
+        doc.source_type === selectedSourceType ||
+        doc.file_type === selectedSourceType;
 
       const q = searchQuery.toLowerCase().trim();
       const matchesSearch =
@@ -177,7 +177,7 @@ export const AdminKnowledgeBasePage: React.FC<AdminKnowledgeBasePageProps> = ({ 
         doc.title.toLowerCase().includes(q) ||
         (doc.file_name && doc.file_name.toLowerCase().includes(q)) ||
         doc.category.toLowerCase().includes(q) ||
-        doc.content.toLowerCase().includes(q);
+        (doc.extracted_text && doc.extracted_text.toLowerCase().includes(q));
 
       return matchesCategory && matchesSource && matchesSearch;
     });
@@ -196,34 +196,21 @@ export const AdminKnowledgeBasePage: React.FC<AdminKnowledgeBasePageProps> = ({ 
 
     setIsUploading(true);
     try {
-      const formData = new FormData();
-      formData.append('file', selectedFile);
-      formData.append('category', uploadCategory);
-      if (uploadCustomTitle.trim()) {
-        formData.append('title', uploadCustomTitle.trim());
-      }
-
-      const res = await fetch('/api/knowledge/upload', {
-        method: 'POST',
-        body: formData,
-      });
-
-      const data = await res.json();
-      if (!data.success) {
-        throw new Error(
-          data.error ||
-          'Unable to extract text from this document. Please upload a readable PDF or add content manually.'
-        );
-      }
+      console.log('[AdminKnowledgeBase] Uploading document:', selectedFile.name);
+      const res = await uploadKnowledgeDocument(
+        selectedFile,
+        uploadCategory,
+        uploadCustomTitle.trim() || undefined
+      );
 
       // Show Extraction Preview Modal right after upload
-      if (data.extraction) {
+      if (res.extraction) {
         setPreviewData({
-          fileName: data.extraction.fileName || selectedFile.name,
-          pages: data.extraction.pages || 1,
-          charactersExtracted: data.extraction.charactersExtracted || 0,
-          previewText: data.extraction.previewText || '',
-          chunkCount: data.document?.chunk_count,
+          fileName: res.extraction.fileName || selectedFile.name,
+          pages: res.extraction.pages || 1,
+          charactersExtracted: res.extraction.charactersExtracted || 0,
+          previewText: res.extraction.previewText || '',
+          chunkCount: res.extraction.chunkCount,
         });
       }
 
@@ -254,29 +241,21 @@ export const AdminKnowledgeBasePage: React.FC<AdminKnowledgeBasePageProps> = ({ 
 
     setIsSavingText(true);
     try {
-      const res = await fetch('/api/knowledge/text-entry', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          title: textTitle.trim(),
-          category: textCategory,
-          content: textContent.trim(),
-        }),
-      });
-
-      const data = await res.json();
-      if (!data.success) {
-        throw new Error(data.error || 'Failed to save text knowledge entry.');
-      }
+      console.log('[AdminKnowledgeBase] Adding text knowledge:', textTitle);
+      const res = await addTextKnowledgeEntry(
+        textTitle.trim(),
+        textCategory,
+        textContent.trim()
+      );
 
       // Show Extraction Preview Modal
-      if (data.extraction) {
+      if (res.extraction) {
         setPreviewData({
           fileName: textTitle.trim(),
-          pages: data.extraction.pages || 1,
-          charactersExtracted: data.extraction.charactersExtracted || textContent.length,
-          previewText: data.extraction.previewText || textContent.slice(0, 1000),
-          chunkCount: data.document?.chunk_count,
+          pages: res.extraction.pages || 1,
+          charactersExtracted: res.extraction.charactersExtracted || textContent.length,
+          previewText: res.extraction.previewText || textContent.slice(0, 1000),
+          chunkCount: res.extraction.chunkCount,
         });
       }
 
@@ -298,7 +277,7 @@ export const AdminKnowledgeBasePage: React.FC<AdminKnowledgeBasePageProps> = ({ 
     setEditingDoc(doc);
     setEditTitle(doc.title);
     setEditCategory(doc.category);
-    setEditContent(doc.content);
+    setEditContent(doc.extracted_text || doc.content || '');
   };
 
   const handleUpdateTextKnowledge = async (e: React.FormEvent) => {
@@ -307,22 +286,14 @@ export const AdminKnowledgeBasePage: React.FC<AdminKnowledgeBasePageProps> = ({ 
 
     setIsUpdatingText(true);
     try {
-      const res = await fetch(`/api/knowledge/text-entry/${editingDoc.id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          title: editTitle.trim(),
-          category: editCategory,
-          content: editContent.trim(),
-        }),
-      });
+      await editTextKnowledgeEntry(
+        editingDoc.id,
+        editTitle.trim(),
+        editCategory,
+        editContent.trim()
+      );
 
-      const data = await res.json();
-      if (!data.success) {
-        throw new Error(data.error || 'Failed to update entry.');
-      }
-
-      showToast(`Knowledge entry "${editTitle}" updated and re-vectorized!`);
+      showToast(`Knowledge entry "${editTitle}" updated!`);
       setEditingDoc(null);
       await loadAllData();
     } catch (err: any) {
@@ -337,9 +308,11 @@ export const AdminKnowledgeBasePage: React.FC<AdminKnowledgeBasePageProps> = ({ 
     setInspectDoc(doc);
     setIsLoadingInspect(true);
     try {
-      const res = await fetch(`/api/knowledge/preview/${doc.id}`).then((r) => r.json());
-      if (res.success && res.chunks) {
-        setInspectChunks(res.chunks);
+      const data = await getDocumentWithChunks(doc.id);
+      if (data && data.chunks) {
+        setInspectChunks(data.chunks);
+      } else {
+        setInspectChunks([]);
       }
     } catch {
       setInspectChunks([]);
@@ -358,20 +331,11 @@ export const AdminKnowledgeBasePage: React.FC<AdminKnowledgeBasePageProps> = ({ 
 
     setIsSavingFaq(true);
     try {
-      const res = await fetch('/api/knowledge/faqs', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          question: faqQuestion.trim(),
-          answer: faqAnswer.trim(),
-          category: faqCategory,
-        }),
-      });
-
-      const data = await res.json();
-      if (!data.success) {
-        throw new Error(data.error || 'Failed to add FAQ');
-      }
+      await addTextKnowledgeEntry(
+        faqQuestion.trim(),
+        'FAQs',
+        `Q: ${faqQuestion.trim()}\nA: ${faqAnswer.trim()}`
+      );
 
       showToast('New FAQ added and indexed into vector store!');
       setIsFaqModalOpen(false);
@@ -391,17 +355,7 @@ export const AdminKnowledgeBasePage: React.FC<AdminKnowledgeBasePageProps> = ({ 
 
     setIsDeleting(true);
     try {
-      const endpoint = deleteTarget.type === 'doc'
-        ? `/api/knowledge/documents/${deleteTarget.id}`
-        : `/api/knowledge/faqs/${deleteTarget.id}`;
-
-      const res = await fetch(endpoint, { method: 'DELETE' });
-      const data = await res.json();
-
-      if (!data.success) {
-        throw new Error('Failed to delete item');
-      }
-
+      await deleteKnowledgeDocument(deleteTarget.id);
       showToast(`Deleted ${deleteTarget.name}`);
       setDeleteTarget(null);
       await loadAllData();
@@ -416,12 +370,9 @@ export const AdminKnowledgeBasePage: React.FC<AdminKnowledgeBasePageProps> = ({ 
   const handleRebuildIndex = async () => {
     setActionLoading(true);
     try {
-      const res = await fetch('/api/knowledge/rebuild-index', { method: 'POST' });
-      const data = await res.json();
-      if (!data.success) throw new Error(data.error || 'Failed to rebuild index');
-
+      const result = await rebuildAllKnowledgeChunks();
       showToast(
-        `Embeddings rebuilt! ${data.result.totalChunks} chunks vectorized across ${data.result.documentsReindexed} files and ${data.result.textEntriesReindexed} text entries.`
+        `Chunks rebuilt! ${result.totalChunks} chunks stored across ${result.documentsReindexed} documents.`
       );
       await loadAllData();
     } catch (err: any) {
@@ -440,14 +391,8 @@ export const AdminKnowledgeBasePage: React.FC<AdminKnowledgeBasePageProps> = ({ 
     setTestResult(null);
 
     try {
-      const res = await fetch('/api/knowledge/chat', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: testQuery.trim() }),
-      });
-
-      const data = await res.json();
-      setTestResult(data);
+      const result = await queryChatbotRag(testQuery.trim());
+      setTestResult(result);
     } catch (err: any) {
       showToast('Error testing RAG query', 'error');
     } finally {
@@ -822,7 +767,7 @@ export const AdminKnowledgeBasePage: React.FC<AdminKnowledgeBasePageProps> = ({ 
                         </td>
 
                         <td className="py-3.5 px-4 text-slate-500 whitespace-nowrap">
-                          {new Date(doc.created_at).toLocaleDateString()}
+                          {doc.created_at ? new Date(doc.created_at).toLocaleDateString() : '—'}
                         </td>
 
                         <td className="py-3.5 px-4 text-right whitespace-nowrap">

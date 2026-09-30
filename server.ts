@@ -976,7 +976,7 @@ app.post('/api/knowledge/rebuild-index', async (_req, res) => {
 // 12. AI Chatbot RAG query endpoint (strict anti-hallucination)
 app.post('/api/knowledge/chat', async (req, res) => {
   try {
-    const { message, history } = req.body;
+    const { message, history, retrievedContext } = req.body;
     if (!message || typeof message !== 'string' || !message.trim()) {
       return res.status(400).json({
         success: false,
@@ -984,7 +984,7 @@ app.post('/api/knowledge/chat', async (req, res) => {
       });
     }
 
-    const result = await queryRag(message, history || []);
+    const result = await queryRag(message, history || [], retrievedContext);
     return res.json({
       success: true,
       answer: result.answer,

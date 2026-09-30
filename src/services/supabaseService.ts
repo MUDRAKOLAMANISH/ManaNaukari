@@ -647,6 +647,11 @@ export const jobAlertSubscribersService = {
         return;
       }
 
+      if (!res.headers.get('content-type')?.includes('application/json')) {
+        console.warn('[Welcome Email Notice] Non-JSON response received, skipping parse.');
+        return;
+      }
+
       const result = await res.json();
       if (!result.success && !result.skipped) {
         console.error('[Welcome Email Error] Resend dispatch failed:', result.error || result.message);

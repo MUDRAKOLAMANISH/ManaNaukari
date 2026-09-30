@@ -242,34 +242,46 @@ export function cosineSimilarity(vecA: number[], vecB: number[]): number {
 
 /**
  * 1. Extract text from PDF buffer
- * Fixes pdf-parse v2 class constructor and includes fallback to Gemini multimodal.
+ * Uses pdfjs-dist legacy build with fallback to Gemini multimodal.
  */
 export async function extractTextFromPdf(buffer: Buffer): Promise<{ text: string; pages: number }> {
-  // Method 1: Local PDFParser v2 class
+  // Method 1: pdfjs-dist legacy build
   try {
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
-    const pdfModule = require('pdf-parse');
-    const PDFParseClass = pdfModule.PDFParse || pdfModule.default || pdfModule;
-    if (typeof PDFParseClass === 'function') {
-      const parser = new PDFParseClass({ data: buffer });
-      if (typeof parser.getText === 'function') {
-        const result = await parser.getText();
-        const text = result?.text ? result.text.trim() : '';
-        const pages = result?.total || result?.pages?.length || 1;
-        if (typeof parser.destroy === 'function') {
-          await parser.destroy();
-        }
+    const pdfjs = await import('pdfjs-dist/legacy/build/pdf.mjs');
+    const data = new Uint8Array(buffer);
+    const loadingTask = pdfjs.getDocument({
+      data,
+      useSystemFonts: true,
+    } as any);
 
-        // Remove synthetic page separator markers like "-- 1 of 5 --"
-        const cleaned = text.replace(/--\s*\d+\s+of\s+\d+\s*--/gi, '').trim();
-        if (cleaned.length >= 20) {
-          console.log(`[KnowledgeEngine] Local PDF parser successfully extracted ${cleaned.length} chars from ${pages} page(s).`);
-          return { text: cleaned, pages };
+    const doc = await loadingTask.promise;
+    const numPages = doc.numPages || 1;
+    let fullText = '';
+
+    for (let pageNum = 1; pageNum <= numPages; pageNum++) {
+      try {
+        const page = await doc.getPage(pageNum);
+        const textContent = await page.getTextContent();
+        const pageText = textContent.items
+          .map((item: any) => item.str || '')
+          .filter((s: string) => s.trim().length > 0)
+          .join(' ');
+
+        if (pageText.trim()) {
+          fullText += pageText + '\n\n';
         }
+      } catch (pageErr) {
+        console.warn(`[KnowledgeEngine] Warning extracting page ${pageNum}:`, pageErr);
       }
     }
+
+    const cleaned = fullText.replace(/--\s*\d+\s+of\s+\d+\s*--/gi, '').trim();
+    if (cleaned.length >= 10) {
+      console.log(`[KnowledgeEngine] Local PDF parser successfully extracted ${cleaned.length} chars from ${numPages} page(s).`);
+      return { text: cleaned, pages: numPages };
+    }
   } catch (parseErr) {
-    console.warn('[KnowledgeEngine] Local PDF parser attempt warning:', parseErr);
+    console.warn('[KnowledgeEngine] pdfjs-dist attempt warning:', parseErr);
   }
 
   // Method 2: Gemini 3.8 Flash multimodal extraction fallback
@@ -455,32 +467,31 @@ export async function ingestDocument(
   // Sync to Supabase tables if configured
   if (supabase) {
     try {
-      await supabase.from('knowledge_base_documents').insert([
+      const { data: dbDoc, error: docErr } = await supabase.from('knowledge_documents').insert([
         {
-          id: documentRecord.id,
           title: documentRecord.title,
-          category: documentRecord.category,
-          source_type: documentRecord.source_type,
           file_name: documentRecord.file_name,
+          file_type: documentRecord.source_type,
           file_size: documentRecord.file_size,
-          page_count: documentRecord.page_count,
-          char_count: documentRecord.char_count,
-          chunk_count: documentRecord.chunk_count,
+          category: documentRecord.category,
+          extracted_text: documentRecord.content,
           content: documentRecord.content,
-          chunks: chunks.map((c) => ({
-            id: c.id,
-            chunk_index: c.chunk_index,
-            word_count: c.word_count,
-            content: c.content,
-          })),
-          status: 'indexed',
           created_at: now,
           updated_at: now,
         },
-      ]);
+      ]).select().single();
 
-      await supabase.from('knowledge_chunks').insert(chunks);
-      console.log(`[KnowledgeEngine] Successfully persisted document and chunks to Supabase.`);
+      if (dbDoc && !docErr) {
+        documentRecord.id = String(dbDoc.id);
+        const chunkRows = chunks.map((c, idx) => ({
+          document_id: dbDoc.id,
+          chunk_text: c.content,
+          chunk_index: idx,
+          created_at: now,
+        }));
+        await supabase.from('knowledge_chunks').insert(chunkRows);
+        console.log(`[KnowledgeEngine] Successfully persisted document ${dbDoc.id} and ${chunkRows.length} chunks to Supabase.`);
+      }
     } catch (syncErr) {
       console.warn('[KnowledgeEngine] Supabase table sync notice:', syncErr);
     }
@@ -561,28 +572,30 @@ export async function addTextKnowledgeEntry(
 
   if (supabase) {
     try {
-      await supabase.from('knowledge_base_documents').insert([
+      const { data: dbDoc } = await supabase.from('knowledge_documents').insert([
         {
-          id: documentRecord.id,
           title: documentRecord.title,
+          file_name: `${cleanTitle.toLowerCase().replace(/[^a-z0-9]+/g, '_')}.txt`,
+          file_type: 'text_entry',
+          file_size: cleanContent.length,
           category: documentRecord.category,
-          source_type: documentRecord.source_type,
-          page_count: documentRecord.page_count,
-          char_count: documentRecord.char_count,
-          chunk_count: documentRecord.chunk_count,
-          content: documentRecord.content,
-          chunks: chunks.map((c) => ({
-            id: c.id,
-            chunk_index: c.chunk_index,
-            word_count: c.word_count,
-            content: c.content,
-          })),
-          status: 'indexed',
+          extracted_text: cleanContent,
+          content: cleanContent,
           created_at: now,
           updated_at: now,
         },
-      ]);
-      await supabase.from('knowledge_chunks').insert(chunks);
+      ]).select().single();
+
+      if (dbDoc?.id) {
+        documentRecord.id = String(dbDoc.id);
+        const chunkRows = chunks.map((c, idx) => ({
+          document_id: dbDoc.id,
+          chunk_text: c.content,
+          chunk_index: idx,
+          created_at: now,
+        }));
+        await supabase.from('knowledge_chunks').insert(chunkRows);
+      }
     } catch (syncErr) {
       console.warn('[KnowledgeEngine] Supabase table sync notice:', syncErr);
     }
@@ -658,16 +671,21 @@ export async function editTextKnowledgeEntry(
   if (supabase) {
     try {
       await supabase.from('knowledge_chunks').delete().eq('document_id', id);
-      await supabase.from('knowledge_base_documents').update({
+      await supabase.from('knowledge_documents').update({
         title: cleanTitle,
         category: category || 'General',
+        extracted_text: cleanContent,
         content: cleanContent,
-        char_count: cleanContent.length,
-        page_count: existing.page_count,
-        chunk_count: chunks.length,
         updated_at: now,
       }).eq('id', id);
-      await supabase.from('knowledge_chunks').insert(chunks);
+
+      const chunkRows = chunks.map((c, idx) => ({
+        document_id: id,
+        chunk_text: c.content,
+        chunk_index: idx,
+        created_at: now,
+      }));
+      await supabase.from('knowledge_chunks').insert(chunkRows);
     } catch (syncErr) {
       console.warn('[KnowledgeEngine] Supabase edit sync notice:', syncErr);
     }
@@ -845,7 +863,8 @@ export function listFaqs(): KnowledgeFAQ[] {
  */
 export async function queryRag(
   userQuestion: string,
-  history: Array<{ role: 'user' | 'model'; content: string }> = []
+  history: Array<{ role: 'user' | 'model'; content: string }> = [],
+  externalContext?: string
 ): Promise<{
   answer: string;
   citations: Citation[];
@@ -858,6 +877,54 @@ export async function queryRag(
       citations: [],
       matched: false,
     };
+  }
+
+  // If external retrieved context was provided from Supabase client
+  if (externalContext && externalContext.trim()) {
+    const systemInstruction = `You are the official Mana Naukari AI Career & Knowledge Assistant.
+Mana Naukari is India's trusted job and internship portal for freshers and early-career talent.
+
+STRICT INSTRUCTIONS TO PREVENT HALLUCINATIONS:
+1. Answer strictly and EXCLUSIVELY from the Mana Naukari Knowledge Base context provided below.
+2. DO NOT use general AI knowledge, assumptions, or information from the internet outside the provided context.
+3. If the provided context does not contain enough specific information to answer the question, or if the question is unrelated to the provided documents, you MUST reply EXACTLY with this sentence:
+"${FALLBACK_MESSAGE}"
+4. Be concise, professional, and clear. Format key details with bullet points where appropriate.
+5. Never invent contact details, fees, requirements, or policies not explicitly written in the context.`;
+
+    const prompt = `KNOWLEDGE BASE CONTEXT:
+${externalContext}
+
+USER QUESTION:
+${query}
+
+Please provide a concise answer strictly based on the Knowledge Base context:`;
+
+    const candidateModels = ['gemini-3.1-flash-lite', 'gemini-3.8-flash'];
+    for (const model of candidateModels) {
+      try {
+        const response = await ai.models.generateContent({
+          model,
+          contents: prompt,
+          config: {
+            systemInstruction,
+            temperature: 0.1,
+          },
+        });
+
+        const generatedText = response.text?.trim();
+        if (generatedText) {
+          const isRefusal = generatedText.includes(FALLBACK_MESSAGE) || generatedText.includes('could not find this information');
+          return {
+            answer: isRefusal ? FALLBACK_MESSAGE : generatedText,
+            citations: isRefusal ? [] : [{ source: 'Knowledge Base', type: 'document', snippet: externalContext.slice(0, 100) }],
+            matched: !isRefusal,
+          };
+        }
+      } catch (err: any) {
+        console.warn(`[KnowledgeEngine] Model ${model} failed:`, err?.message);
+      }
+    }
   }
 
   // Step 1: Generate Embedding for user query

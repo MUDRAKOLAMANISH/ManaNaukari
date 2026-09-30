@@ -1,0 +1,25 @@
+[build]
+  command = "npm run build"
+  publish = "dist"
+
+[functions]
+  directory = "netlify/functions"
+  node_bundler = "esbuild"
+
+# Redirects for API endpoints to Netlify Functions
+[[redirects]]
+  from = "/api/ai/extract-job"
+  to = "/.netlify/functions/extract-job"
+  status = 200
+
+[[redirects]]
+  from = "/api/alerts/*"
+  to = "/.netlify/functions/alerts"
+  status = 200
+
+# Single Page Application (SPA) redirect rule
+# Ensures direct links and page refreshes (e.g. /jobs, /admin/...) load index.html without 404
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
