@@ -6,6 +6,7 @@ import { JobCardSkeleton } from '../components/jobs/JobCardSkeleton';
 import { toSlug } from '../utils/slugUtils';
 import { generateJobUrlPath, getAbsoluteJobUrl } from '../utils/jobUrlUtils';
 import { Toast } from '../components/common/Toast';
+import { analyticsTracker } from '../services/analyticsTracker';
 import { 
   ArrowLeft, Briefcase, Layers, Sparkles, Filter, 
   Search, AlertCircle, Building2, MapPin, ChevronRight, Tag
@@ -83,6 +84,13 @@ export const CategoryDetailsPage: React.FC<CategoryDetailsPageProps> = ({
             .join(' ');
         }
         setCategoryName(matchedCatName);
+
+        // Telemetry tracking
+        analyticsTracker.trackPageView({
+          page_name: `Category: ${matchedCatName}`,
+          page_url: window.location.href,
+          page_type: 'category_details',
+        });
 
         // 2. Set dynamic document title and meta description for SEO
         document.title = `${matchedCatName} Jobs | Verified Vacancies | Mana Naukari`;

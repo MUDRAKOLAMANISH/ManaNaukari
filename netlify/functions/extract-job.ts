@@ -145,7 +145,13 @@ export const handler = async (event: any) => {
       : '';
 
     // Step 2: Call Gemini API
-    const apiKey = process.env.GEMINI_API_KEY;
+    const apiKey =
+      body.apiKeyOverride ||
+      process.env.GEMINI_API_KEY ||
+      process.env.VITE_GEMINI_API_KEY ||
+      process.env.GOOGLE_GENAI_API_KEY ||
+      process.env.API_KEY;
+
     if (!apiKey) {
       console.warn('[Netlify Function extract-job] GEMINI_API_KEY not configured in Netlify environment variables.');
       return {
@@ -155,6 +161,7 @@ export const handler = async (event: any) => {
           success: true,
           data: urlFallbackData,
           isFallback: true,
+          missingApiKey: true,
           message: 'GEMINI_API_KEY not configured in Netlify environment variables. Using URL structure.',
         }),
       };

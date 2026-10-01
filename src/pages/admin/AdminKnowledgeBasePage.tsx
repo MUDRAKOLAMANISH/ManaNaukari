@@ -71,6 +71,7 @@ export const AdminKnowledgeBasePage: React.FC<AdminKnowledgeBasePageProps> = ({ 
   const [uploadCategory, setUploadCategory] = useState<KnowledgeCategory>('General');
   const [uploadCustomTitle, setUploadCustomTitle] = useState('');
   const [isUploading, setIsUploading] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
 
   // Add Text Knowledge modal state
   const [isTextModalOpen, setIsTextModalOpen] = useState(false);
@@ -1057,12 +1058,32 @@ export const AdminKnowledgeBasePage: React.FC<AdminKnowledgeBasePageProps> = ({ 
                 />
               </div>
 
-              {/* File Drop Area */}
-              <div className="border-2 border-dashed border-slate-200 rounded-2xl p-6 text-center hover:border-blue-400 transition-colors bg-slate-50/50">
-                <FileText className="w-10 h-10 text-slate-400 mx-auto mb-2" />
+              {/* File Drop Area with Drag & Drop and Animation */}
+              <div 
+                onDragOver={(e) => {
+                  e.preventDefault();
+                  setIsDragging(true);
+                }}
+                onDragLeave={() => setIsDragging(false)}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  setIsDragging(false);
+                  if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+                    setSelectedFile(e.dataTransfer.files[0]);
+                  }
+                }}
+                className={`border-2 border-dashed rounded-2xl p-6 text-center transition-all duration-200 ${
+                  isDragging 
+                    ? 'border-blue-500 bg-blue-50/70 scale-[1.01]' 
+                    : 'border-slate-200 hover:border-blue-400 bg-slate-50/50'
+                }`}
+              >
+                <div className="w-12 h-12 rounded-2xl bg-blue-50 text-blue-600 border border-blue-100 flex items-center justify-center mx-auto mb-3 shadow-2xs transition-transform duration-200 group-hover:scale-110">
+                  <Upload className={`w-6 h-6 ${isDragging ? 'animate-bounce text-blue-600' : 'text-slate-400'}`} />
+                </div>
                 <label className="cursor-pointer block">
                   <span className="text-xs font-bold text-blue-600 hover:underline">
-                    Choose PDF, DOCX, or TXT file
+                    Click to browse or drag &amp; drop file here
                   </span>
                   <input
                     type="file"
@@ -1080,9 +1101,9 @@ export const AdminKnowledgeBasePage: React.FC<AdminKnowledgeBasePageProps> = ({ 
                 </p>
 
                 {selectedFile && (
-                  <div className="mt-3 inline-flex items-center gap-2 px-3 py-1.5 bg-blue-50 text-blue-800 rounded-xl text-xs font-semibold">
+                  <div className="mt-3.5 inline-flex items-center gap-2 px-3.5 py-1.5 bg-blue-50 text-blue-800 rounded-xl text-xs font-semibold border border-blue-200/80 animate-fadeIn">
                     <FileCheck className="w-4 h-4 text-blue-600" />
-                    <span>{selectedFile.name}</span>
+                    <span className="font-bold">{selectedFile.name}</span>
                     <span className="text-[10px] text-slate-500">
                       ({(selectedFile.size / 1024).toFixed(1)} KB)
                     </span>
@@ -1090,12 +1111,32 @@ export const AdminKnowledgeBasePage: React.FC<AdminKnowledgeBasePageProps> = ({ 
                 )}
               </div>
 
+              {/* Progress Indicator during Upload */}
+              {isUploading && (
+                <div className="bg-blue-50/70 border border-blue-200/90 rounded-2xl p-3.5 space-y-2 animate-fadeIn">
+                  <div className="flex items-center justify-between text-xs font-bold text-blue-900">
+                    <span className="flex items-center gap-1.5">
+                      <RefreshCw className="w-3.5 h-3.5 animate-spin text-blue-600" />
+                      Processing &amp; Indexing Document
+                    </span>
+                    <span className="text-blue-700">In Progress</span>
+                  </div>
+                  <div className="w-full bg-blue-200/70 rounded-full h-2 overflow-hidden">
+                    <div className="bg-blue-600 h-2 rounded-full w-3/4 animate-pulse transition-all duration-300" />
+                  </div>
+                  <div className="grid grid-cols-3 gap-1 text-[10px] font-semibold text-slate-600 pt-0.5">
+                    <span className="text-blue-700">1. Parse Text ✓</span>
+                    <span className="text-blue-700">2. Vector Chunking ✓</span>
+                    <span className="text-blue-600 animate-pulse">3. Supabase Sync...</span>
+                  </div>
+                </div>
+              )}
+
               <div className="text-[11px] text-slate-500 bg-slate-50 p-3 rounded-xl border border-slate-200 space-y-1">
                 <span className="font-bold text-slate-700 block">RAG Text Processing:</span>
-                <p>• Automatically extracts all text from PDF using modern parser.</p>
-                <p>• Splits document into 500-1000 word chunks.</p>
-                <p>• Generates vector embeddings with Gemini API.</p>
-                <p>• Persists chunks to vector store for retrieval.</p>
+                <p>• Automatically extracts text client-side without server failures.</p>
+                <p>• Splits document into 500-1000 character overlapping chunks.</p>
+                <p>• Persists directly to Supabase knowledge tables for AI RAG retrieval.</p>
               </div>
 
               <div className="flex items-center justify-end gap-2 pt-2">

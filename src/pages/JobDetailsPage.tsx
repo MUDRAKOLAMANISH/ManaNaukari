@@ -5,6 +5,7 @@ import { normalizeSkills } from '../utils/skillUtils';
 import { generateJobUrlPath, getAbsoluteJobUrl } from '../utils/jobUrlUtils';
 import { ShareModal } from '../components/common/ShareModal';
 import { Toast } from '../components/common/Toast';
+import { ApplyModal } from '../components/jobs/ApplyModal';
 import { analyticsTracker } from '../services/analyticsTracker';
 import { 
   Building2, MapPin, Briefcase, IndianRupee, Calendar, 
@@ -481,7 +482,7 @@ export const JobDetailsPage: React.FC<JobDetailsPageProps> = ({ jobId, onNavigat
           <div className="flex flex-col sm:flex-row lg:flex-col items-stretch lg:items-end justify-center gap-3 shrink-0 pt-2 lg:pt-0">
             <button
               onClick={handleApplyClick}
-              className="inline-flex items-center justify-center gap-2 py-3 px-6 text-sm font-bold text-white bg-blue-600 hover:bg-blue-700 active:bg-blue-800 rounded-xl shadow-xs transition-all cursor-pointer"
+              className="inline-flex items-center justify-center gap-2 py-3 px-7 text-sm font-bold text-white bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 active:from-blue-800 active:to-purple-800 rounded-2xl shadow-md transition-all cursor-pointer btn-glow"
             >
               <span>Apply Now</span>
               <ExternalLink className="w-4 h-4" />
@@ -772,116 +773,22 @@ export const JobDetailsPage: React.FC<JobDetailsPageProps> = ({ jobId, onNavigat
       </div>
 
       {/* Candidate Apply Modal */}
-      {isApplyModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-xs animate-fadeIn">
-          <div 
-            className="bg-white rounded-3xl max-w-md w-full p-6 sm:p-7 border border-slate-200 shadow-2xl space-y-4"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-start justify-between">
-              <div>
-                <h3 className="text-lg font-bold font-display text-slate-900">
-                  Apply for {job.title}
-                </h3>
-                <p className="text-xs text-slate-500 mt-0.5">
-                  Confirm your contact details to continue to {job.company}&apos;s official careers portal.
-                </p>
-              </div>
-              <button
-                onClick={() => setIsApplyModalOpen(false)}
-                className="text-slate-400 hover:text-slate-600 text-sm font-bold p-1 cursor-pointer"
-              >
-                ✕
-              </button>
-            </div>
-
-            {/* Error Message Box */}
-            {leadError && (
-              <div className="p-3.5 bg-rose-50 border border-rose-200 text-rose-800 rounded-2xl text-xs space-y-1 animate-fadeIn">
-                <div className="font-bold flex items-center gap-1.5 text-rose-700">
-                  <AlertCircle className="w-4 h-4 shrink-0" />
-                  <span>Submission Error</span>
-                </div>
-                <p className="leading-relaxed">{leadError}</p>
-              </div>
-            )}
-
-            {leadSuccess ? (
-              <div className="py-6 text-center space-y-2 animate-fadeIn">
-                <CheckCircle2 className="w-12 h-12 text-emerald-600 mx-auto" />
-                <h4 className="font-bold text-slate-900 text-base">Application Verified!</h4>
-                <p className="text-xs text-slate-500">Redirecting to official careers page in a new window...</p>
-              </div>
-            ) : (
-              <form onSubmit={handleSubmitLead} className="space-y-4 pt-1">
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">
-                    Full Name <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    placeholder="e.g. Rahul Sharma"
-                    value={applicantName}
-                    onChange={(e) => setApplicantName(e.target.value)}
-                    className="w-full px-3.5 py-2.5 text-xs border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-600 focus:outline-none"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">
-                    Email Address <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    type="email"
-                    required
-                    placeholder="rahul@example.com"
-                    value={applicantEmail}
-                    onChange={(e) => setApplicantEmail(e.target.value)}
-                    className="w-full px-3.5 py-2.5 text-xs border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-600 focus:outline-none"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">
-                    Mobile Number <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    type="tel"
-                    required
-                    placeholder="9876543210"
-                    value={applicantPhone}
-                    onChange={(e) => setApplicantPhone(e.target.value)}
-                    className="w-full px-3.5 py-2.5 text-xs border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-600 focus:outline-none"
-                  />
-                  <p className="text-[10px] text-slate-400 mt-1">
-                    Enter a valid 10-digit mobile number for off-campus drive notifications
-                  </p>
-                </div>
-
-                <div className="pt-2">
-                  <button
-                    type="submit"
-                    disabled={isSubmittingLead}
-                    className="w-full py-3 px-4 text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 active:bg-blue-800 disabled:opacity-60 rounded-xl shadow-xs transition-colors cursor-pointer flex items-center justify-center gap-2"
-                  >
-                    {isSubmittingLead ? (
-                      <>
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                        <span>Verifying & Saving...</span>
-                      </>
-                    ) : (
-                      <>
-                        <span>Continue to Official Apply Page</span>
-                        <ExternalLink className="w-3.5 h-3.5" />
-                      </>
-                    )}
-                  </button>
-                </div>
-              </form>
-            )}
-          </div>
-        </div>
+      {job && (
+        <ApplyModal
+          isOpen={isApplyModalOpen}
+          onClose={() => setIsApplyModalOpen(false)}
+          job={job}
+          applicantName={applicantName}
+          setApplicantName={setApplicantName}
+          applicantEmail={applicantEmail}
+          setApplicantEmail={setApplicantEmail}
+          applicantPhone={applicantPhone}
+          setApplicantPhone={setApplicantPhone}
+          isSubmittingLead={isSubmittingLead}
+          leadError={leadError}
+          leadSuccess={leadSuccess}
+          onSubmit={handleSubmitLead}
+        />
       )}
 
       {/* Share Modal for WhatsApp, Telegram, LinkedIn, Email */}

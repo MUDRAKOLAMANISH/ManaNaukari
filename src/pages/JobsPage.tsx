@@ -126,8 +126,20 @@ export const JobsPage: React.FC<JobsPageProps> = ({ onNavigate }) => {
   useEffect(() => {
     let isMounted = true;
 
-    // Record jobs listing visitor telemetry
-    analyticsTracker.trackPageView('jobs_listing');
+    // Record jobs listing / internships / WFH visitor telemetry
+    const currentPath = window.location.pathname;
+    let pageName = 'Jobs Page';
+    if (currentPath === '/internships') {
+      pageName = 'Internship Openings Page';
+    } else if (currentPath === '/work-from-home' || currentPath === '/wfh') {
+      pageName = 'Work From Home (Remote) Jobs Page';
+    }
+
+    analyticsTracker.trackPageView({
+      page_name: pageName,
+      page_url: window.location.href,
+      page_type: 'jobs_listing',
+    });
 
     const loadData = async () => {
       setLoading(true);

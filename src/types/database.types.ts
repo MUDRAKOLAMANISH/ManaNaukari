@@ -233,32 +233,57 @@ export type JobPaymentInsert = Omit<JobPayment, 'id' | 'created_at' | 'updated_a
 
 // 10. Table: visitor_analytics
 export interface VisitorAnalytic {
-  id: string;
-  session_id: string;
-  page_type: 'home' | 'jobs_listing' | 'job_details' | 'category_details' | 'other';
-  path: string;
-  referrer?: string | null;
+  id: string | number;
+  page_url: string;
+  page_name?: string | null;
+  session_id?: string | null;
+  visitor_id: string;
+  timestamp?: string | null;
+  visited_at?: string;
+  ip_address?: string | null;
   user_agent?: string | null;
-  created_at: string;
+  page_type?: string | null;
+  path?: string | null;
+  referrer?: string | null;
+  created_at?: string;
 }
 
-export type VisitorAnalyticInsert = Omit<VisitorAnalytic, 'id' | 'created_at'> & {
-  id?: string;
+export type VisitorAnalyticInsert = {
+  id?: string | number;
+  page_url: string;
+  page_name?: string | null;
+  session_id?: string | null;
+  visitor_id: string;
+  timestamp?: string | null;
+  visited_at?: string;
+  ip_address?: string | null;
+  user_agent?: string | null;
+  page_type?: string | null;
+  path?: string | null;
+  referrer?: string | null;
   created_at?: string;
 };
 
 // 11. Table: job_views
 export interface JobView {
-  id: string;
-  job_id: string;
-  session_id: string;
+  id: string | number;
+  job_id: string | number;
+  visitor_id: string;
+  session_id?: string | null;
   job_title?: string | null;
   company?: string | null;
-  created_at: string;
+  viewed_at?: string;
+  created_at?: string;
 }
 
-export type JobViewInsert = Omit<JobView, 'id' | 'created_at'> & {
-  id?: string;
+export type JobViewInsert = {
+  id?: string | number;
+  job_id: string | number;
+  visitor_id: string;
+  session_id?: string | null;
+  job_title?: string | null;
+  company?: string | null;
+  viewed_at?: string;
   created_at?: string;
 };
 

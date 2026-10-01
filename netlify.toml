@@ -17,6 +17,11 @@
   to = "/.netlify/functions/alerts"
   status = 200
 
+[[redirects]]
+  from = "/api/knowledge/chat"
+  to = "/.netlify/functions/knowledge-chat"
+  status = 200
+
 # Single Page Application (SPA) redirect rule
 # Ensures direct links and page refreshes (e.g. /jobs, /admin/...) load index.html without 404
 [[redirects]]

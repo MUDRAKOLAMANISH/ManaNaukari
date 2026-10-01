@@ -48,12 +48,12 @@ export const AdminHeader: React.FC<AdminHeaderProps> = ({
         </div>
 
         {/* Section Tabs */}
-        <div className="flex items-center gap-1 text-xs">
+        <div className="flex items-center gap-1 text-xs overflow-x-auto max-w-full pb-1 sm:pb-0 scrollbar-none">
           <button
             onClick={() => onNavigate('/admin/jobs')}
-            className={`px-3 py-1.5 font-semibold rounded-lg transition-colors cursor-pointer ${
+            className={`px-3 py-1.5 font-semibold rounded-xl transition-all cursor-pointer shrink-0 text-xs ${
               currentPath === '/admin/jobs' || currentPath === '/admin'
-                ? 'text-blue-700 bg-blue-50'
+                ? 'text-blue-700 bg-blue-50 font-bold border border-blue-200/60 shadow-2xs'
                 : 'text-slate-600 hover:text-blue-600 hover:bg-slate-100'
             }`}
           >
@@ -61,9 +61,9 @@ export const AdminHeader: React.FC<AdminHeaderProps> = ({
           </button>
           <button
             onClick={() => onNavigate('/admin/recruiters')}
-            className={`px-3 py-1.5 font-semibold rounded-lg transition-colors cursor-pointer inline-flex items-center gap-1 ${
+            className={`px-3 py-1.5 font-semibold rounded-xl transition-all cursor-pointer shrink-0 inline-flex items-center gap-1.5 text-xs ${
               currentPath === '/admin/recruiters' || currentPath === '/admin/approvals'
-                ? 'text-blue-700 bg-blue-50'
+                ? 'text-blue-700 bg-blue-50 font-bold border border-blue-200/60 shadow-2xs'
                 : 'text-slate-600 hover:text-blue-600 hover:bg-slate-100'
             }`}
           >
@@ -72,9 +72,9 @@ export const AdminHeader: React.FC<AdminHeaderProps> = ({
           </button>
           <button
             onClick={() => onNavigate('/admin/applicants')}
-            className={`px-3 py-1.5 font-semibold rounded-lg transition-colors cursor-pointer inline-flex items-center gap-1 ${
+            className={`px-3 py-1.5 font-semibold rounded-xl transition-all cursor-pointer shrink-0 inline-flex items-center gap-1.5 text-xs ${
               currentPath === '/admin/applicants'
-                ? 'text-blue-700 bg-blue-50 border border-blue-200/60 font-bold'
+                ? 'text-blue-700 bg-blue-50 border border-blue-200/60 font-bold shadow-2xs'
                 : 'text-slate-600 hover:text-blue-600 hover:bg-slate-100'
             }`}
           >
@@ -83,9 +83,9 @@ export const AdminHeader: React.FC<AdminHeaderProps> = ({
           </button>
           <button
             onClick={() => onNavigate('/admin/resume-orders')}
-            className={`px-3 py-1.5 font-semibold rounded-lg transition-colors cursor-pointer inline-flex items-center gap-1 ${
+            className={`px-3 py-1.5 font-semibold rounded-xl transition-all cursor-pointer shrink-0 inline-flex items-center gap-1.5 text-xs ${
               currentPath === '/admin/resume-orders'
-                ? 'text-blue-700 bg-blue-50 border border-blue-200/60 font-bold'
+                ? 'text-blue-700 bg-blue-50 border border-blue-200/60 font-bold shadow-2xs'
                 : 'text-slate-600 hover:text-blue-600 hover:bg-slate-100'
             }`}
           >
@@ -94,9 +94,9 @@ export const AdminHeader: React.FC<AdminHeaderProps> = ({
           </button>
           <button
             onClick={() => onNavigate('/admin/analytics')}
-            className={`px-3 py-1.5 font-semibold rounded-lg transition-colors cursor-pointer inline-flex items-center gap-1 ${
+            className={`px-3 py-1.5 font-semibold rounded-xl transition-all cursor-pointer shrink-0 inline-flex items-center gap-1.5 text-xs ${
               currentPath === '/admin/analytics'
-                ? 'text-blue-700 bg-blue-50 border border-blue-200/60 font-bold'
+                ? 'text-blue-700 bg-blue-50 border border-blue-200/60 font-bold shadow-2xs'
                 : 'text-slate-600 hover:text-blue-600 hover:bg-slate-100'
             }`}
           >
@@ -105,9 +105,9 @@ export const AdminHeader: React.FC<AdminHeaderProps> = ({
           </button>
           <button
             onClick={() => onNavigate('/admin/knowledge-base')}
-            className={`px-3 py-1.5 font-semibold rounded-lg transition-colors cursor-pointer inline-flex items-center gap-1 ${
+            className={`px-3 py-1.5 font-semibold rounded-xl transition-all cursor-pointer shrink-0 inline-flex items-center gap-1.5 text-xs ${
               currentPath === '/admin/knowledge-base'
-                ? 'text-blue-700 bg-blue-50 border border-blue-200/60 font-bold'
+                ? 'text-blue-700 bg-blue-50 border border-blue-200/60 font-bold shadow-2xs'
                 : 'text-slate-600 hover:text-blue-600 hover:bg-slate-100'
             }`}
           >

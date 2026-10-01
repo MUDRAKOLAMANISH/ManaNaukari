@@ -676,7 +676,8 @@ export const RecruiterDashboardPage: React.FC<RecruiterDashboardPageProps> = ({ 
               <img
                 src={recruiter.company_logo}
                 alt={recruiter.company_name}
-                className="w-16 h-16 rounded-2xl object-cover border border-slate-200 bg-white p-1 shrink-0"
+                referrerPolicy="no-referrer"
+                className="w-16 h-16 rounded-2xl object-contain border border-slate-200 bg-white p-1 shrink-0"
               />
             ) : (
               <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-blue-600 to-indigo-700 text-white flex items-center justify-center font-bold text-2xl font-display shrink-0 shadow-xs">
@@ -818,13 +819,13 @@ export const RecruiterDashboardPage: React.FC<RecruiterDashboardPageProps> = ({ 
             )}
 
             {/* 5. Dashboard Analytics Cards */}
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5">
               
               {/* Card 1: Active Jobs */}
-              <div className="bg-white border border-slate-200/80 rounded-2xl p-5 shadow-2xs">
+              <div className="card-modern p-5 border border-slate-200/90 shadow-2xs">
                 <div className="flex items-center justify-between text-xs text-slate-500 font-bold uppercase tracking-wider">
                   <span>Active Jobs</span>
-                  <div className="w-8 h-8 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center">
+                  <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center border border-blue-100">
                     <Briefcase className="w-4 h-4" />
                   </div>
                 </div>
@@ -837,10 +838,10 @@ export const RecruiterDashboardPage: React.FC<RecruiterDashboardPageProps> = ({ 
               </div>
 
               {/* Card 2: Total Applications */}
-              <div className="bg-white border border-indigo-200/80 rounded-2xl p-5 shadow-2xs">
+              <div className="card-modern p-5 border border-slate-200/90 shadow-2xs">
                 <div className="flex items-center justify-between text-xs text-indigo-600 font-bold uppercase tracking-wider">
                   <span>Total Applicants</span>
-                  <div className="w-8 h-8 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center">
+                  <div className="w-10 h-10 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center border border-indigo-100">
                     <Users className="w-4 h-4" />
                   </div>
                 </div>
@@ -853,10 +854,10 @@ export const RecruiterDashboardPage: React.FC<RecruiterDashboardPageProps> = ({ 
               </div>
 
               {/* Card 3: Jobs Posted This Month */}
-              <div className="bg-white border border-emerald-200/80 rounded-2xl p-5 shadow-2xs">
+              <div className="card-modern p-5 border border-slate-200/90 shadow-2xs">
                 <div className="flex items-center justify-between text-xs text-emerald-700 font-bold uppercase tracking-wider">
                   <span>Posted This Month</span>
-                  <div className="w-8 h-8 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
+                  <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center border border-emerald-100">
                     <Calendar className="w-4 h-4" />
                   </div>
                 </div>
@@ -869,10 +870,10 @@ export const RecruiterDashboardPage: React.FC<RecruiterDashboardPageProps> = ({ 
               </div>
 
               {/* Card 4: Profile & Job Views */}
-              <div className="bg-white border border-purple-200/80 rounded-2xl p-5 shadow-2xs">
+              <div className="card-modern p-5 border border-slate-200/90 shadow-2xs">
                 <div className="flex items-center justify-between text-xs text-purple-700 font-bold uppercase tracking-wider">
                   <span>Profile Impressions</span>
-                  <div className="w-8 h-8 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center">
+                  <div className="w-10 h-10 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center border border-purple-100">
                     <TrendingUp className="w-4 h-4" />
                   </div>
                 </div>
@@ -1329,7 +1330,7 @@ export const RecruiterDashboardPage: React.FC<RecruiterDashboardPageProps> = ({ 
                     <div className="p-4 bg-slate-50 border border-slate-200 rounded-2xl flex flex-col sm:flex-row items-center justify-between gap-4">
                       <div className="flex items-center gap-3">
                         {profileLogoUrl ? (
-                          <img src={profileLogoUrl} alt="Logo" className="w-12 h-12 rounded-xl object-contain bg-white border p-1" />
+                          <img src={profileLogoUrl} alt="Logo" referrerPolicy="no-referrer" className="w-12 h-12 rounded-xl object-contain bg-white border p-1" />
                         ) : (
                           <div className="w-12 h-12 rounded-xl bg-slate-200 flex items-center justify-center text-slate-400">
                             <Building2 className="w-6 h-6" />

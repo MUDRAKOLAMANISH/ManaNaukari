@@ -10,12 +10,14 @@ import { FeaturedCategories } from '../components/home/FeaturedCategories';
 import { FeaturedCompanies } from '../components/home/FeaturedCompanies';
 import { RecruiterHiringSection } from '../components/home/RecruiterHiringSection';
 import { CTASections } from '../components/home/CTASections';
+import { WhyChooseUsSection } from '../components/home/WhyChooseUsSection';
 import { SubscribeJobAlerts } from '../components/common/SubscribeJobAlerts';
 import { generateJobUrlPath, getAbsoluteJobUrl } from '../utils/jobUrlUtils';
 import { Toast } from '../components/common/Toast';
 import { analyticsTracker } from '../services/analyticsTracker';
 import { 
-  Laptop, GraduationCap, Briefcase, ChevronRight, Flame
+  Laptop, GraduationCap, Briefcase, ChevronRight, Flame, 
+  ShieldCheck, CheckCircle2, Sparkles, Building2, Users, ArrowRight
 } from 'lucide-react';
 
 interface HomePageProps {
@@ -64,7 +66,11 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
   // Load real data directly from Supabase (Zero dummy/fake numbers)
   useEffect(() => {
     let isMounted = true;
-    analyticsTracker.trackPageView('home');
+    analyticsTracker.trackPageView({
+      page_name: 'Homepage',
+      page_url: window.location.href,
+      page_type: 'home',
+    });
 
     const loadHomeData = async () => {
       setLoading(true);
@@ -133,10 +139,11 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
       const type = (j.job_type || '').toLowerCase();
       const desc = (j.description || '').toLowerCase();
       return (
-        loc.includes('remote') || 
-        loc.includes('work from home') || 
+        loc.includes('remote') ||
+        loc.includes('work from home') ||
         loc.includes('wfh') ||
         type.includes('remote') ||
+        type.includes('wfh') ||
         desc.includes('work from home')
       );
     }).slice(0, 4);
@@ -176,14 +183,17 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
   return (
     <div className="space-y-16 animate-fadeIn pb-16">
       
-      {/* 1. Redesigned Hero Section with Search, Category Filters, Popular Searches, Trust Badges */}
+      {/* 1. Split-Screen Hero Section with Professional Indian Photo & Floating Badges */}
       <HeroSection
         onSearch={handleSearch}
         onSelectCategory={handleSelectCategory}
         onNavigate={onNavigate}
+        activeJobsCount={totalActiveJobs}
+        companiesCount={totalCompanies}
+        companies={distinctCompaniesList}
       />
 
-      {/* 2. Statistics Section (Real Data Only: Active Jobs, Companies Hiring, Resume Reviews Completed, Portfolio Websites; auto-hides if empty) */}
+      {/* 2. Statistics Section (Real Data Only with Smooth Count-Up) */}
       <StatsSection
         activeJobsCount={totalActiveJobs}
         companiesCount={totalCompanies}
@@ -198,7 +208,7 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
         categoryCounts={{}}
       />
 
-      {/* 4. Latest Verified Jobs Section */}
+      {/* 4. Latest Verified Jobs Section with Workplace Imagery Banner */}
       <section className="space-y-6">
         <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-3">
           <div>
@@ -207,7 +217,7 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
               <span>Real-Time Requisitions</span>
             </div>
             <h2 className="text-2xl sm:text-3xl font-extrabold font-display text-slate-900 tracking-tight mt-0.5">
-              Latest Verified Jobs
+              Latest Verified Job Openings
             </h2>
           </div>
 
@@ -218,6 +228,35 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
             <span>View All ({totalActiveJobs}) Jobs</span>
             <ChevronRight className="w-4 h-4" />
           </button>
+        </div>
+
+        {/* Visual Storytelling Banner for Engineering Roles */}
+        <div className="bg-gradient-to-r from-blue-900 via-indigo-950 to-slate-900 text-white rounded-3xl overflow-hidden border border-blue-800/40 shadow-md">
+          <div className="grid grid-cols-1 md:grid-cols-12 gap-6 items-center p-6 sm:p-8">
+            <div className="md:col-span-8 space-y-2.5">
+              <span className="text-[11px] font-bold uppercase tracking-wider text-blue-300 inline-flex items-center gap-1.5">
+                <Building2 className="w-3.5 h-3.5" />
+                Direct Corporate Hiring · Zero Agency Fees
+              </span>
+              <h3 className="text-xl sm:text-2xl font-bold font-display text-white">
+                Software Engineering &amp; Technology Openings
+              </h3>
+              <p className="text-xs sm:text-sm text-slate-300 max-w-xl leading-relaxed">
+                Connect directly with hiring managers for full stack, backend, frontend, and trainee positions. Every requisition links to verified corporate career portals.
+              </p>
+            </div>
+            <div className="md:col-span-4 flex justify-center md:justify-end">
+              <div className="w-full max-w-[300px] aspect-[4/3] rounded-2xl overflow-hidden border-2 border-white/20 shadow-lg bg-slate-900">
+                <img
+                  src="/assets/images/young-engineer.jpg"
+                  alt="Young software engineer coding on laptop at tech workspace"
+                  className="w-full h-full object-cover object-center hover:scale-105 transition-transform duration-300"
+                  loading="lazy"
+                  referrerPolicy="no-referrer"
+                />
+              </div>
+            </div>
+          </div>
         </div>
 
         {loading ? (
@@ -248,16 +287,16 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
         )}
       </section>
 
-      {/* 5. Work From Home (Remote) Jobs Section */}
-      <section className="space-y-6 bg-slate-100/60 -mx-4 sm:-mx-6 lg:-mx-8 px-4 sm:px-6 lg:px-8 py-12 rounded-3xl border border-slate-200/80">
+      {/* 5. Work From Home (Remote) Jobs Section with Home Office Imagery */}
+      <section className="space-y-6 bg-slate-100/70 -mx-4 sm:-mx-6 lg:-mx-8 px-4 sm:px-6 lg:px-8 py-12 rounded-3xl border border-slate-200/80">
         <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-3">
           <div>
-            <div className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-blue-600 font-display">
-              <Laptop className="w-4 h-4 text-blue-600" />
+            <div className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-teal-600 font-display">
+              <Laptop className="w-4 h-4 text-teal-600" />
               <span>Pan India Flexibility</span>
             </div>
             <h2 className="text-2xl sm:text-3xl font-extrabold font-display text-slate-900 tracking-tight mt-0.5">
-              Work From Home Jobs
+              Work From Home (Remote) Jobs
             </h2>
             <p className="text-xs text-slate-600 mt-1">
               Positions with remote-friendly setups for engineers, analysts, and freshers.
@@ -266,11 +305,36 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
 
           <button
             onClick={() => onNavigate('/jobs?location=Remote')}
-            className="inline-flex items-center gap-1 text-xs font-bold text-blue-600 hover:text-blue-700 transition-colors cursor-pointer"
+            className="inline-flex items-center gap-1 text-xs font-bold text-teal-700 hover:text-teal-800 transition-colors cursor-pointer"
           >
             <span>View All Remote Jobs</span>
             <ChevronRight className="w-4 h-4" />
           </button>
+        </div>
+
+        {/* Remote Workspace Storytelling Banner */}
+        <div className="bg-white rounded-2xl sm:rounded-3xl p-5 sm:p-6 border border-slate-200/90 shadow-2xs flex flex-col md:flex-row items-center gap-6">
+          <div className="w-full md:w-64 aspect-[4/3] rounded-2xl overflow-hidden shrink-0 border border-slate-200 shadow-xs bg-slate-100">
+            <img
+              src="/assets/images/remote-wfh.jpg"
+              alt="Remote engineer home office setup with laptop"
+              className="w-full h-full object-cover object-center hover:scale-105 transition-transform duration-300"
+              loading="lazy"
+              referrerPolicy="no-referrer"
+            />
+          </div>
+          <div className="space-y-2 flex-1 text-left">
+            <span className="text-[11px] font-bold uppercase text-teal-700 bg-teal-50 px-2.5 py-0.5 rounded-full border border-teal-200/60 inline-flex items-center gap-1">
+              <Laptop className="w-3 h-3 text-teal-600" />
+              Work From Anywhere in India
+            </span>
+            <h4 className="text-base sm:text-lg font-bold font-display text-slate-900">
+              Verified Remote Engineering &amp; Analyst Opportunities
+            </h4>
+            <p className="text-xs text-slate-600 leading-relaxed">
+              Skip the metro commute. Work with leading Indian tech startups and multinational teams offering full remote work setups, home office stipends, and flexible hours.
+            </p>
+          </div>
         </div>
 
         {loading ? (
@@ -305,29 +369,54 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
         )}
       </section>
 
-      {/* 6. Internship Jobs Section */}
+      {/* 6. Internship Jobs Section with Students Collaborating Imagery */}
       <section className="space-y-6">
         <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-3">
           <div>
-            <div className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-blue-600 font-display">
-              <GraduationCap className="w-4 h-4 text-blue-600" />
-              <span>Early Career &amp; Freshers</span>
+            <div className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-purple-600 font-display">
+              <GraduationCap className="w-4 h-4 text-purple-600" />
+              <span>Campus &amp; Off-Campus Hiring</span>
             </div>
             <h2 className="text-2xl sm:text-3xl font-extrabold font-display text-slate-900 tracking-tight mt-0.5">
-              Internship Opportunities
+              Internship Opportunities for College Students
             </h2>
             <p className="text-xs text-slate-600 mt-1">
-              Paid corporate internships designed for pre-final, final year students, and recent grads.
+              Paid corporate internships designed for pre-final, final year students, and recent 2024-2026 graduates.
             </p>
           </div>
 
           <button
             onClick={() => onNavigate('/jobs?type=Internship')}
-            className="inline-flex items-center gap-1 text-xs font-bold text-blue-600 hover:text-blue-700 transition-colors cursor-pointer"
+            className="inline-flex items-center gap-1 text-xs font-bold text-purple-700 hover:text-purple-800 transition-colors cursor-pointer"
           >
             <span>View All Internships</span>
             <ChevronRight className="w-4 h-4" />
           </button>
+        </div>
+
+        {/* Student Collaboration Banner */}
+        <div className="bg-white rounded-2xl sm:rounded-3xl p-5 sm:p-6 border border-slate-200/90 shadow-2xs flex flex-col md:flex-row items-center gap-6">
+          <div className="w-full md:w-64 aspect-[4/3] rounded-2xl overflow-hidden shrink-0 border border-slate-200 shadow-xs bg-slate-100">
+            <img
+              src="/assets/images/interns-students.jpg"
+              alt="Indian university students collaborating on laptops in modern tech workspace"
+              className="w-full h-full object-cover object-center hover:scale-105 transition-transform duration-300"
+              loading="lazy"
+              referrerPolicy="no-referrer"
+            />
+          </div>
+          <div className="space-y-2 flex-1 text-left">
+            <span className="text-[11px] font-bold uppercase text-purple-700 bg-purple-50 px-2.5 py-0.5 rounded-full border border-purple-200/60 inline-flex items-center gap-1">
+              <GraduationCap className="w-3 h-3 text-purple-600" />
+              2024 · 2025 · 2026 Batches
+            </span>
+            <h4 className="text-base sm:text-lg font-bold font-display text-slate-900">
+              Launch Your Career with Paid Industry Internships
+            </h4>
+            <p className="text-xs text-slate-600 leading-relaxed">
+              Gain hands-on corporate engineering and analytics experience before graduation. Explore verified stipend internships with pre-placement offers (PPO).
+            </p>
+          </div>
         </div>
 
         {loading ? (
@@ -362,19 +451,22 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
         )}
       </section>
 
-      {/* 7. Featured Companies Section (Only real companies from DB) */}
+      {/* 7. Why Choose Mana Naukari (3-Column Modern Feature Section) */}
+      <WhyChooseUsSection onNavigate={onNavigate} />
+
+      {/* 8. Featured Companies Section (Only real companies from DB) */}
       <FeaturedCompanies
         companies={distinctCompaniesList}
         onCompanyClick={(company) => onNavigate(`/jobs?q=${encodeURIComponent(company)}`)}
       />
 
-      {/* 8. Recruiter Hiring Call to Action */}
+      {/* 9. Recruiter Hiring Call to Action with Corporate Imagery */}
       <RecruiterHiringSection onNavigate={onNavigate} />
 
-      {/* 9. Comprehensive CTA Sections (Resume Review, Portfolio Website, WhatsApp Community) */}
+      {/* 10. Comprehensive CTA Sections (Resume Review with Photo, Developer Portfolio, WhatsApp Community) */}
       <CTASections onNavigate={onNavigate} />
 
-      {/* 10. Subscribe to Job Alerts Form */}
+      {/* 11. Subscribe to Job Alerts Form */}
       <SubscribeJobAlerts />
 
       {/* Copy link toast feedback */}

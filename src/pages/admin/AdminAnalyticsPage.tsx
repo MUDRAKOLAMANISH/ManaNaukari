@@ -46,26 +46,43 @@ export const AdminAnalyticsPage: React.FC<AdminAnalyticsPageProps> = ({ onNaviga
     fetchAnalytics();
   }, []);
 
-  const sqlSetupScript = `-- Run this in Supabase SQL Editor to enable visitor_analytics, job_views, and whatsapp_popup_events:
+  const sqlSetupScript = `-- Run this in Supabase SQL Editor for visitor_analytics & job_views tables:
 
 CREATE TABLE IF NOT EXISTS public.visitor_analytics (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    session_id VARCHAR(64) NOT NULL,
-    page_type VARCHAR(50) NOT NULL,
-    path VARCHAR(255) NOT NULL,
-    referrer TEXT,
+    id BIGSERIAL PRIMARY KEY,
+    page_url TEXT NOT NULL,
+    page_name VARCHAR(255),
+    session_id VARCHAR(64),
+    visitor_id VARCHAR(100) NOT NULL,
+    ip_address VARCHAR(45),
     user_agent TEXT,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
+    timestamp TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()),
+    visited_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now())
 );
 
+-- Schema upgrades if table already exists:
+ALTER TABLE public.visitor_analytics ADD COLUMN IF NOT EXISTS page_name VARCHAR(255);
+ALTER TABLE public.visitor_analytics ADD COLUMN IF NOT EXISTS session_id VARCHAR(64);
+ALTER TABLE public.visitor_analytics ADD COLUMN IF NOT EXISTS timestamp TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now());
+ALTER TABLE public.visitor_analytics ADD COLUMN IF NOT EXISTS visited_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now());
+
 CREATE TABLE IF NOT EXISTS public.job_views (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    job_id UUID NOT NULL,
-    session_id VARCHAR(64) NOT NULL,
+    id BIGSERIAL PRIMARY KEY,
+    job_id BIGINT NOT NULL,
+    visitor_id VARCHAR(100) NOT NULL,
+    session_id VARCHAR(64),
     job_title VARCHAR(255),
     company VARCHAR(150),
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
+    viewed_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now())
 );
+
+-- Schema upgrades if table already exists:
+ALTER TABLE public.job_views ADD COLUMN IF NOT EXISTS session_id VARCHAR(64);
+ALTER TABLE public.job_views ADD COLUMN IF NOT EXISTS job_title VARCHAR(255);
+ALTER TABLE public.job_views ADD COLUMN IF NOT EXISTS company VARCHAR(150);
+ALTER TABLE public.job_views ADD COLUMN IF NOT EXISTS viewed_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now());
 
 CREATE TABLE IF NOT EXISTS public.whatsapp_popup_events (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),

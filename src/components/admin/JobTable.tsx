@@ -2,7 +2,7 @@ import React from 'react';
 import { Job } from '../../types/database.types';
 import { 
   Building2, MapPin, Calendar, Clock, 
-  ExternalLink, Edit, Trash2, PowerOff, CheckCircle2 
+  ExternalLink, Edit, Trash2, PowerOff, CheckCircle2, Share2 
 } from 'lucide-react';
 
 interface JobTableProps {
@@ -11,6 +11,7 @@ interface JobTableProps {
   onEdit: (job: Job) => void;
   onToggleExpire: (job: Job) => void;
   onDelete: (job: Job) => void;
+  onShare?: (job: Job) => void;
 }
 
 export const JobTable: React.FC<JobTableProps> = ({
@@ -19,12 +20,13 @@ export const JobTable: React.FC<JobTableProps> = ({
   onEdit,
   onToggleExpire,
   onDelete,
+  onShare,
 }) => {
   if (loading) {
     return (
-      <div className="p-12 text-center bg-white border border-slate-200 rounded-2xl">
-        <div className="w-8 h-8 border-2 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-3" />
-        <p className="text-xs font-semibold text-slate-700">Loading jobs from Supabase...</p>
+      <div className="p-14 text-center bg-white border border-slate-200 rounded-3xl shadow-xs">
+        <div className="w-9 h-9 border-2 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-3" />
+        <p className="text-xs font-bold text-slate-800">Loading jobs from Supabase...</p>
         <p className="text-[11px] text-slate-400 mt-0.5">Fetching latest database records</p>
       </div>
     );
@@ -32,8 +34,10 @@ export const JobTable: React.FC<JobTableProps> = ({
 
   if (jobs.length === 0) {
     return (
-      <div className="p-12 text-center bg-white border border-slate-200 rounded-2xl space-y-2">
-        <Building2 className="w-10 h-10 text-slate-300 mx-auto" />
+      <div className="p-14 text-center bg-white border border-slate-200 rounded-3xl space-y-2 shadow-xs">
+        <div className="w-12 h-12 rounded-2xl bg-slate-50 border border-slate-100 flex items-center justify-center mx-auto text-slate-300">
+          <Building2 className="w-6 h-6" />
+        </div>
         <h3 className="text-sm font-bold text-slate-800">No Jobs Found</h3>
         <p className="text-xs text-slate-500 max-w-sm mx-auto">
           No records match your active query or no jobs have been added yet in the Supabase database.
@@ -43,20 +47,20 @@ export const JobTable: React.FC<JobTableProps> = ({
   }
 
   return (
-    <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-xs">
-      <div className="overflow-x-auto">
-        <table className="w-full text-left text-xs">
-          {/* Table Header */}
-          <thead className="bg-slate-50/80 border-b border-slate-200 text-slate-600 font-bold uppercase tracking-wider text-[11px]">
+    <div className="bg-white border border-slate-200 rounded-3xl overflow-hidden shadow-xs">
+      <div className="overflow-x-auto max-h-[70vh]">
+        <table className="w-full text-left text-xs border-collapse">
+          {/* Table Sticky Header */}
+          <thead className="sticky top-0 z-10 bg-slate-50/95 backdrop-blur-md border-b border-slate-200 text-slate-600 font-bold uppercase tracking-wider text-[10px]">
             <tr>
-              <th className="py-3 px-4">Job Title & Company</th>
-              <th className="py-3 px-4">Location</th>
-              <th className="py-3 px-4">Category</th>
-              <th className="py-3 px-4">Experience</th>
-              <th className="py-3 px-4">Job Type</th>
-              <th className="py-3 px-4">Dates</th>
-              <th className="py-3 px-4">Status</th>
-              <th className="py-3 px-4 text-right">Actions</th>
+              <th className="py-3.5 px-4">Job Title &amp; Company</th>
+              <th className="py-3.5 px-4">Location</th>
+              <th className="py-3.5 px-4">Category</th>
+              <th className="py-3.5 px-4">Experience</th>
+              <th className="py-3.5 px-4">Job Type</th>
+              <th className="py-3.5 px-4">Dates</th>
+              <th className="py-3.5 px-4">Status</th>
+              <th className="py-3.5 px-4 text-right">Actions</th>
             </tr>
           </thead>
 
@@ -65,7 +69,7 @@ export const JobTable: React.FC<JobTableProps> = ({
             {jobs.map((job) => {
               const isActive = job.status === 'active';
               return (
-                <tr key={job.id} className="hover:bg-slate-50/60 transition-colors">
+                <tr key={job.id} className="hover:bg-blue-50/30 transition-colors duration-150">
                   
                   {/* Job Title & Company */}
                   <td className="py-3.5 px-4 min-w-[220px]">
@@ -140,13 +144,19 @@ export const JobTable: React.FC<JobTableProps> = ({
                   {/* Status */}
                   <td className="py-3.5 px-4 whitespace-nowrap">
                     <span
-                      className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold ${
+                      className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold border ${
                         isActive
-                          ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-                          : 'bg-slate-100 text-slate-600 border border-slate-200'
+                          ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                          : job.status === 'expired'
+                          ? 'bg-amber-50 text-amber-700 border-amber-200'
+                          : 'bg-slate-100 text-slate-600 border-slate-200'
                       }`}
                     >
-                      <span className={`w-1.5 h-1.5 rounded-full ${isActive ? 'bg-emerald-500' : 'bg-slate-400'}`} />
+                      <span
+                        className={`w-1.5 h-1.5 rounded-full ${
+                          isActive ? 'bg-emerald-500' : 'bg-slate-400'
+                        }`}
+                      />
                       <span className="capitalize">{job.status}</span>
                     </span>
                   </td>
@@ -155,6 +165,17 @@ export const JobTable: React.FC<JobTableProps> = ({
                   <td className="py-3.5 px-4 text-right whitespace-nowrap">
                     <div className="inline-flex items-center gap-1">
                       
+                      {/* Share Job Social Button */}
+                      {onShare && (
+                        <button
+                          onClick={() => onShare(job)}
+                          className="p-1.5 text-blue-600 hover:text-blue-700 hover:bg-blue-50 rounded-lg transition-colors cursor-pointer"
+                          title="Share to WhatsApp, Telegram, LinkedIn, X, Facebook"
+                        >
+                          <Share2 className="w-3.5 h-3.5" />
+                        </button>
+                      )}
+
                       {/* View External Link */}
                       <a
                         href={job.apply_link}

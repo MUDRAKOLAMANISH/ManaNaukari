@@ -23,76 +23,119 @@ export const adminAnalyticsService = {
     let tableErrorMessage: string | null = null;
 
     // 1. Fetch Job counts (Active vs Expired)
-    const [activeJobsRes, expiredJobsRes] = await Promise.all([
-      supabase.from('jobs').select('id', { count: 'exact', head: true }).eq('status', 'active'),
-      supabase.from('jobs').select('id', { count: 'exact', head: true }).eq('status', 'expired'),
-    ]);
-
-    const activeJobs = activeJobsRes.count || 0;
-    const expiredJobs = expiredJobsRes.count || 0;
+    let activeJobs = 0;
+    let expiredJobs = 0;
+    try {
+      const [activeJobsRes, expiredJobsRes] = await Promise.all([
+        supabase.from('jobs').select('id', { count: 'exact', head: true }).eq('status', 'active'),
+        supabase.from('jobs').select('id', { count: 'exact', head: true }).eq('status', 'expired'),
+      ]);
+      activeJobs = activeJobsRes.count || 0;
+      expiredJobs = expiredJobsRes.count || 0;
+    } catch (err: any) {
+      console.warn('[AdminAnalyticsService] Jobs count notice:', err);
+    }
 
     // 2. Fetch Applicants counts (Total & Today & Last 14 days)
-    const [totalAppsRes, todayAppsRes, recentAppsRes] = await Promise.all([
-      supabase.from('applicants').select('id', { count: 'exact', head: true }),
-      supabase.from('applicants').select('id', { count: 'exact', head: true }).gte('created_at', startOfToday),
-      supabase.from('applicants').select('id, created_at, job_id').gte('created_at', fourteenDaysAgoIso()),
-    ]);
+    let totalApplications = 0;
+    let todayApplications = 0;
+    let recentApplicantsList: { id: string | number; created_at: string; job_id: string | number }[] = [];
 
-    const totalApplications = totalAppsRes.count || 0;
-    const todayApplications = todayAppsRes.count || 0;
-    const recentApplicantsList = recentAppsRes.data || [];
+    try {
+      const [totalAppsRes, todayAppsRes, recentAppsRes] = await Promise.all([
+        supabase.from('applicants').select('id', { count: 'exact', head: true }),
+        supabase.from('applicants').select('id', { count: 'exact', head: true }).gte('created_at', startOfToday),
+        supabase.from('applicants').select('id, created_at, job_id').gte('created_at', fourteenDaysAgoIso()),
+      ]);
+      totalApplications = totalAppsRes.count || 0;
+      todayApplications = todayAppsRes.count || 0;
+      recentApplicantsList = (recentAppsRes.data as any) || [];
+    } catch (err: any) {
+      console.warn('[AdminAnalyticsService] Applicants count notice:', err);
+    }
 
     // 3. Fetch Visitor Analytics counts
     let totalVisitors = 0;
     let todayVisitors = 0;
     let weeklyVisitors = 0;
     let monthlyVisitors = 0;
-    let recentVisitorsList: { created_at: string; session_id: string }[] = [];
+    let recentVisitorsList: { visited_at?: string; created_at?: string; timestamp?: string; visitor_id?: string }[] = [];
 
     try {
+      // First attempt using 'visited_at' column
       const [allVisRes, todayVisRes, weekVisRes, monthVisRes, recentVisRes] = await Promise.all([
         supabase.from('visitor_analytics').select('id', { count: 'exact', head: true }),
-        supabase.from('visitor_analytics').select('id', { count: 'exact', head: true }).gte('created_at', startOfToday),
-        supabase.from('visitor_analytics').select('id', { count: 'exact', head: true }).gte('created_at', sevenDaysAgoIso),
-        supabase.from('visitor_analytics').select('id', { count: 'exact', head: true }).gte('created_at', thirtyDaysAgoIso),
-        supabase.from('visitor_analytics').select('created_at, session_id').gte('created_at', fourteenDaysAgoIso()),
+        supabase.from('visitor_analytics').select('id', { count: 'exact', head: true }).gte('visited_at', startOfToday),
+        supabase.from('visitor_analytics').select('id', { count: 'exact', head: true }).gte('visited_at', sevenDaysAgoIso),
+        supabase.from('visitor_analytics').select('id', { count: 'exact', head: true }).gte('visited_at', thirtyDaysAgoIso),
+        supabase.from('visitor_analytics').select('visited_at, visitor_id').gte('visited_at', fourteenDaysAgoIso()),
       ]);
 
       if (allVisRes.error) {
-        tablesReady = false;
-        tableErrorMessage = allVisRes.error.message;
+        // Fallback: table might use created_at or timestamp
+        console.debug('[AdminAnalyticsService] Retrying visitor_analytics with created_at fallback...', allVisRes.error.message);
+        const [fallbackAll, fallbackToday, fallbackWeek, fallbackMonth, fallbackRecent] = await Promise.all([
+          supabase.from('visitor_analytics').select('id', { count: 'exact', head: true }),
+          supabase.from('visitor_analytics').select('id', { count: 'exact', head: true }).gte('created_at', startOfToday),
+          supabase.from('visitor_analytics').select('id', { count: 'exact', head: true }).gte('created_at', sevenDaysAgoIso),
+          supabase.from('visitor_analytics').select('id', { count: 'exact', head: true }).gte('created_at', thirtyDaysAgoIso),
+          supabase.from('visitor_analytics').select('created_at, session_id').gte('created_at', fourteenDaysAgoIso()),
+        ]);
+
+        if (fallbackAll.error) {
+          tablesReady = false;
+          tableErrorMessage = fallbackAll.error.message;
+        } else {
+          totalVisitors = fallbackAll.count || 0;
+          todayVisitors = fallbackToday.count || 0;
+          weeklyVisitors = fallbackWeek.count || 0;
+          monthlyVisitors = fallbackMonth.count || 0;
+          recentVisitorsList = (fallbackRecent.data as any) || [];
+        }
       } else {
         totalVisitors = allVisRes.count || 0;
         todayVisitors = todayVisRes.count || 0;
         weeklyVisitors = weekVisRes.count || 0;
         monthlyVisitors = monthVisRes.count || 0;
-        recentVisitorsList = recentVisRes.data || [];
+        recentVisitorsList = (recentVisRes.data as any) || [];
       }
     } catch (err: any) {
+      console.warn('[AdminAnalyticsService] Visitor analytics exception:', err);
       tablesReady = false;
-      tableErrorMessage = err.message || 'visitor_analytics table not found';
+      tableErrorMessage = err.message || 'visitor_analytics table query error';
     }
 
     // 4. Fetch Job Views counts & top viewed
     let totalJobViews = 0;
-    let jobViewsList: { job_id: string; job_title: string | null; company: string | null }[] = [];
+    let jobViewsRawList: { id: string | number; job_id: string | number; visitor_id?: string; viewed_at?: string; created_at?: string }[] = [];
 
     try {
       const [allJvRes, recentJvRes] = await Promise.all([
         supabase.from('job_views').select('id', { count: 'exact', head: true }),
-        supabase.from('job_views').select('job_id, job_title, company').limit(2000),
+        supabase.from('job_views').select('id, job_id, visitor_id, viewed_at').limit(2000),
       ]);
 
       if (allJvRes.error) {
-        tablesReady = false;
-        if (!tableErrorMessage) tableErrorMessage = allJvRes.error.message;
+        console.debug('[AdminAnalyticsService] Retrying job_views fallback...', allJvRes.error.message);
+        const [fbAll, fbRecent] = await Promise.all([
+          supabase.from('job_views').select('id', { count: 'exact', head: true }),
+          supabase.from('job_views').select('id, job_id').limit(2000),
+        ]);
+        if (!fbAll.error) {
+          totalJobViews = fbAll.count || 0;
+          jobViewsRawList = (fbRecent.data as any) || [];
+        } else {
+          tablesReady = false;
+          if (!tableErrorMessage) tableErrorMessage = fbAll.error.message;
+        }
       } else {
         totalJobViews = allJvRes.count || 0;
-        jobViewsList = recentJvRes.data || [];
+        jobViewsRawList = (recentJvRes.data as any) || [];
       }
     } catch (err: any) {
+      console.warn('[AdminAnalyticsService] Job views exception:', err);
       tablesReady = false;
-      if (!tableErrorMessage) tableErrorMessage = err.message || 'job_views table not found';
+      if (!tableErrorMessage) tableErrorMessage = err.message || 'job_views query error';
     }
 
     // 5. Calculate Conversion Rate: (Applications / Total Job Views) * 100
@@ -107,7 +150,9 @@ export const adminAnalyticsService = {
     // 6. Aggregate Visitors by Day (Last 7 Days)
     const visitorsByDay = generateDailySeries(7, (dateKey) => {
       return recentVisitorsList.filter((v) => {
-        const itemDate = new Date(v.created_at).toISOString().split('T')[0];
+        const rawDate = v.visited_at || v.created_at || v.timestamp;
+        if (!rawDate) return false;
+        const itemDate = new Date(rawDate).toISOString().split('T')[0];
         return itemDate === dateKey;
       }).length;
     });
@@ -115,42 +160,62 @@ export const adminAnalyticsService = {
     // 7. Aggregate Applications by Day (Last 7 Days)
     const applicationsByDay = generateDailySeries(7, (dateKey) => {
       return recentApplicantsList.filter((a) => {
+        if (!a.created_at) return false;
         const itemDate = new Date(a.created_at).toISOString().split('T')[0];
         return itemDate === dateKey;
       }).length;
     });
 
-    // 8. Aggregate Top Viewed Jobs
-    const jobViewCounts: Record<string, { title: string; company: string; views: number }> = {};
-    jobViewsList.forEach((jv) => {
+    // 8. Aggregate Top Viewed Jobs (Enriching with real titles and companies from jobs table)
+    const jobViewCounts: Record<string, number> = {};
+    jobViewsRawList.forEach((jv) => {
       if (!jv.job_id) return;
-      if (!jobViewCounts[jv.job_id]) {
-        jobViewCounts[jv.job_id] = {
-          title: jv.job_title || 'Software Opportunity',
-          company: jv.company || 'Hiring Partner',
-          views: 0,
-        };
-      }
-      jobViewCounts[jv.job_id].views += 1;
+      const key = String(jv.job_id);
+      jobViewCounts[key] = (jobViewCounts[key] || 0) + 1;
     });
+
+    const distinctJobIds = Object.keys(jobViewCounts);
+    let jobDetailsMap: Record<string, { title: string; company: string }> = {};
+
+    if (distinctJobIds.length > 0) {
+      try {
+        const { data: jobsInfo } = await supabase
+          .from('jobs')
+          .select('id, title, company')
+          .in('id', distinctJobIds);
+
+        if (jobsInfo) {
+          jobsInfo.forEach((j) => {
+            jobDetailsMap[String(j.id)] = {
+              title: j.title || 'Software Engineering Role',
+              company: j.company || 'Hiring Partner',
+            };
+          });
+        }
+      } catch (err) {
+        console.debug('[AdminAnalyticsService] Could not enrich job titles:', err);
+      }
+    }
 
     // Count applications per job
     const jobAppCounts: Record<string, number> = {};
     recentApplicantsList.forEach((app) => {
       if (app.job_id) {
-        jobAppCounts[app.job_id] = (jobAppCounts[app.job_id] || 0) + 1;
+        const key = String(app.job_id);
+        jobAppCounts[key] = (jobAppCounts[key] || 0) + 1;
       }
     });
 
     const topViewedJobs: TopViewedJobMetric[] = Object.entries(jobViewCounts)
-      .map(([job_id, data]) => {
+      .map(([job_id, views]) => {
+        const info = jobDetailsMap[job_id] || { title: `Job Requisition #${job_id}`, company: 'Hiring Company' };
         const apps = jobAppCounts[job_id] || 0;
-        const rate = data.views > 0 ? Number(((apps / data.views) * 100).toFixed(1)) : 0;
+        const rate = views > 0 ? Number(((apps / views) * 100).toFixed(1)) : 0;
         return {
           job_id,
-          title: data.title,
-          company: data.company,
-          views: data.views,
+          title: info.title,
+          company: info.company,
+          views,
           applications: apps,
           conversionRate: rate,
         };
@@ -178,7 +243,6 @@ export const adminAnalyticsService = {
         whatsAppPopupStats.joins = waJoinsRes.count || 0;
         whatsAppPopupStats.dismisses = waDismissRes.count || 0;
       } else {
-        // Fallback to local storage stats if table not yet created
         const localRaw = typeof window !== 'undefined' ? localStorage.getItem('cv_wa_popup_stats') : null;
         if (localRaw) {
           const parsed = JSON.parse(localRaw);
@@ -217,7 +281,7 @@ export const adminAnalyticsService = {
       // In case server route is unavailable or initial mount
     }
 
-    return {
+    const overviewData: AnalyticsOverview = {
       totalVisitors,
       todayVisitors,
       weeklyVisitors,
@@ -236,6 +300,19 @@ export const adminAnalyticsService = {
       tablesReady,
       tableErrorMessage,
     };
+
+    console.log('[AdminAnalyticsService] 📊 Overview data fetched successfully:', {
+      totalVisitors,
+      todayVisitors,
+      weeklyVisitors,
+      monthlyVisitors,
+      totalJobViews,
+      totalApplications,
+      activeJobs,
+      conversionRate: `${conversionRate}%`,
+    });
+
+    return overviewData;
   },
 };
 

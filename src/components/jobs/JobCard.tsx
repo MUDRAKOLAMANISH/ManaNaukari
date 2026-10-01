@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
+import { motion } from 'framer-motion';
 import { Job } from '../../types/database.types';
 import { normalizeSkills } from '../../utils/skillUtils';
 import { 
   Building2, MapPin, Briefcase, IndianRupee, Calendar, 
-  ArrowUpRight, CheckCircle2, Bookmark, Copy, Check, ShieldCheck
+  ArrowUpRight, CheckCircle2, Bookmark, Copy, Check, Sparkles
 } from 'lucide-react';
 
 interface JobCardProps {
@@ -30,10 +31,10 @@ export const JobCard: React.FC<JobCardProps> = ({ job, onViewDetails, onCopyLink
       
       if (diffDays <= 1) return 'Posted today';
       if (diffDays === 2) return 'Posted yesterday';
-      if (diffDays <= 7) return `Posted ${diffDays} days ago`;
-      return `Posted on ${date.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}`;
+      if (diffDays <= 7) return `${diffDays}d ago`;
+      return date.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
     } catch {
-      return `Posted ${dateStr}`;
+      return dateStr;
     }
   };
 
@@ -54,20 +55,22 @@ export const JobCard: React.FC<JobCardProps> = ({ job, onViewDetails, onCopyLink
   };
 
   return (
-    <div 
-      className={`group relative bg-white rounded-2xl border transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md ${
+    <motion.div 
+      whileHover={{ y: -4, scale: 1.015 }}
+      transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
+      className={`group relative rounded-2xl bg-white/95 backdrop-blur-md p-5 sm:p-6 flex flex-col justify-between transition-all duration-300 shadow-xs hover:shadow-xl ${
         job.featured 
-          ? 'border-blue-300 shadow-xs ring-1 ring-blue-100' 
-          : 'border-slate-200/90 shadow-2xs hover:border-blue-200'
-      } p-5 sm:p-6 flex flex-col justify-between`}
+          ? 'border border-blue-400/80 ring-1 ring-blue-200/60 bg-gradient-to-br from-blue-50/30 via-white to-indigo-50/20' 
+          : 'border border-slate-200/90 hover:border-indigo-300/80 hover:ring-1 hover:ring-indigo-100'
+      }`}
     >
       <div>
         {/* Top Header Row: Company Avatar, Title, Bookmark */}
-        <div className="flex items-start justify-between gap-3 sm:gap-4">
+        <div className="flex items-start justify-between gap-3.5 sm:gap-4">
           <div className="flex items-start gap-3.5 sm:gap-4 flex-1 min-w-0">
             
-            {/* Company Logo or Fallback Monogram */}
-            <div className="w-12 h-12 rounded-xl bg-slate-50 border border-slate-200/80 flex items-center justify-center shrink-0 overflow-hidden text-slate-700 font-bold text-sm tracking-wider shadow-2xs">
+            {/* Company Logo or Fallback Monogram with Subtle Glow */}
+            <div className="w-12 h-12 rounded-2xl bg-white border border-slate-200/80 flex items-center justify-center shrink-0 overflow-hidden text-slate-800 font-bold text-sm tracking-wider shadow-2xs group-hover:border-indigo-200 group-hover:shadow-xs transition-all">
               {job.company_logo && !imgError ? (
                 <img
                   src={job.company_logo}
@@ -77,7 +80,7 @@ export const JobCard: React.FC<JobCardProps> = ({ job, onViewDetails, onCopyLink
                   className="w-full h-full object-contain p-1.5"
                 />
               ) : (
-                <span className="text-blue-700 font-display font-bold">{initials}</span>
+                <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-indigo-600 font-display font-extrabold">{initials}</span>
               )}
             </div>
 
@@ -86,13 +89,14 @@ export const JobCard: React.FC<JobCardProps> = ({ job, onViewDetails, onCopyLink
               <div className="flex items-center gap-2 flex-wrap">
                 <button
                   onClick={() => onViewDetails(job.id)}
-                  className="text-left font-display font-bold text-base sm:text-lg text-slate-900 group-hover:text-blue-600 transition-colors line-clamp-1 cursor-pointer focus:outline-none focus:underline"
+                  className="text-left font-display font-bold text-base sm:text-lg text-slate-900 group-hover:text-blue-600 transition-colors line-clamp-1 cursor-pointer focus:outline-none"
                 >
                   {job.title}
                 </button>
                 {job.featured && (
-                  <span className="text-[10px] font-bold text-blue-700 bg-blue-50 px-2 py-0.5 rounded-md border border-blue-200/80 uppercase tracking-wider">
-                    Featured
+                  <span className="text-[10px] font-bold text-blue-700 bg-blue-50 px-2 py-0.5 rounded-full border border-blue-200 uppercase tracking-wider flex items-center gap-1 shadow-2xs">
+                    <Sparkles className="w-2.5 h-2.5 text-blue-600" />
+                    <span>Featured</span>
                   </span>
                 )}
               </div>
@@ -100,8 +104,8 @@ export const JobCard: React.FC<JobCardProps> = ({ job, onViewDetails, onCopyLink
               {/* Company & Verification Trust Elements */}
               <div className="flex items-center gap-2 text-xs sm:text-sm text-slate-700 font-medium mt-1 flex-wrap">
                 <span className="font-semibold text-slate-900">{job.company}</span>
-                <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-700 bg-emerald-50 px-1.5 py-0.2 rounded border border-emerald-200/80" title="Verified Genuine Requisition">
-                  <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                <span className="inline-flex items-center gap-1 text-[11px] font-medium text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200/70" title="Verified Genuine Requisition">
+                  <CheckCircle2 className="w-3 h-3 text-emerald-600 shrink-0" />
                   <span>Verified Requisition</span>
                 </span>
                 {job.source && (
@@ -112,56 +116,54 @@ export const JobCard: React.FC<JobCardProps> = ({ job, onViewDetails, onCopyLink
                 )}
               </div>
 
-              {/* Core Metadata Row: Location, Experience, Salary */}
-              <div className="flex flex-wrap items-center gap-y-1.5 gap-x-3 text-xs text-slate-600 mt-2.5">
-                <div className="flex items-center gap-1 font-medium">
-                  <MapPin className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+              {/* Core Badges Row: Location, Experience, Salary */}
+              <div className="flex flex-wrap items-center gap-y-1.5 gap-x-2 text-xs text-slate-600 mt-3">
+                {/* Location Badge */}
+                <span className="inline-flex items-center gap-1 text-[11px] font-medium text-slate-700 bg-slate-100/90 px-2.5 py-0.5 rounded-lg border border-slate-200/60">
+                  <MapPin className="w-3 h-3 text-slate-400 shrink-0" />
                   <span>{job.location}</span>
-                </div>
+                </span>
 
-                <span className="text-slate-300 hidden sm:inline" aria-hidden="true">·</span>
-
-                <div className="flex items-center gap-1 font-medium">
-                  <Briefcase className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                {/* Experience Badge */}
+                <span className="inline-flex items-center gap-1 text-[11px] font-medium text-slate-700 bg-slate-100/90 px-2.5 py-0.5 rounded-lg border border-slate-200/60">
+                  <Briefcase className="w-3 h-3 text-slate-400 shrink-0" />
                   <span>{job.experience || 'Fresher'}</span>
-                </div>
+                </span>
 
+                {/* Salary Badge */}
                 {job.salary && (
-                  <>
-                    <span className="text-slate-300 hidden sm:inline" aria-hidden="true">·</span>
-                    <div className="flex items-center gap-0.5 text-emerald-700 font-bold bg-emerald-50/60 px-2 py-0.5 rounded-md border border-emerald-100">
-                      <IndianRupee className="w-3.5 h-3.5 shrink-0" />
-                      <span>{job.salary.replace('₹', '')}</span>
-                    </div>
-                  </>
+                  <span className="inline-flex items-center gap-0.5 text-[11px] text-emerald-700 font-bold bg-emerald-50 px-2.5 py-0.5 rounded-lg border border-emerald-200/80 shadow-2xs">
+                    <IndianRupee className="w-3 h-3 shrink-0" />
+                    <span>{job.salary.replace('₹', '')}</span>
+                  </span>
                 )}
               </div>
             </div>
 
           </div>
 
-          {/* Bookmark Button */}
+          {/* Bookmark / Save Job Button */}
           <button
             onClick={() => setIsSaved(!isSaved)}
-            className={`p-2 rounded-xl border transition-colors cursor-pointer shrink-0 ${
+            className={`p-2.5 rounded-xl border transition-all duration-200 cursor-pointer shrink-0 ${
               isSaved
-                ? 'bg-blue-50 border-blue-200 text-blue-600'
-                : 'bg-white border-slate-200/80 text-slate-400 hover:text-slate-600 hover:bg-slate-50'
+                ? 'bg-blue-50 border-blue-200 text-blue-600 shadow-2xs'
+                : 'bg-white border-slate-200 text-slate-400 hover:text-blue-600 hover:bg-slate-50'
             }`}
             title={isSaved ? 'Job Saved' : 'Save Job'}
             aria-label="Save Job"
           >
-            <Bookmark className={`w-4 h-4 ${isSaved ? 'fill-blue-600' : ''}`} />
+            <Bookmark className={`w-4 h-4 transition-transform ${isSaved ? 'fill-blue-600 scale-110' : ''}`} />
           </button>
         </div>
 
-        {/* Skills Preview */}
+        {/* Skills Preview Tags */}
         {skills.length > 0 && (
-          <div className="mt-3.5 flex flex-wrap items-center gap-1.5">
+          <div className="mt-4 flex flex-wrap items-center gap-1.5">
             {skills.slice(0, 5).map((skill, index) => (
               <span
                 key={index}
-                className="text-[11px] font-medium text-slate-600 bg-slate-100 hover:bg-slate-200/80 px-2.5 py-0.5 rounded-lg transition-colors"
+                className="text-[11px] font-medium text-slate-600 bg-slate-100/80 hover:bg-slate-200/70 px-2.5 py-0.5 rounded-lg transition-colors"
               >
                 {skill}
               </span>
@@ -176,13 +178,15 @@ export const JobCard: React.FC<JobCardProps> = ({ job, onViewDetails, onCopyLink
       </div>
 
       {/* Card Footer: Category, Type, Date, Action Buttons */}
-      <div className="mt-5 pt-3.5 border-t border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+      <div className="mt-5 pt-3.5 border-t border-slate-100/90 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         
         {/* Category & Job Type Inline Info */}
         <div className="flex items-center gap-2 text-xs text-slate-500 flex-wrap">
           <span className="font-semibold text-slate-800">{job.category}</span>
           <span className="text-slate-300" aria-hidden="true">·</span>
-          <span className="font-semibold text-blue-700">{job.job_type}</span>
+          <span className="font-semibold text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded-md border border-indigo-100 text-[11px]">
+            {job.job_type}
+          </span>
           <span className="text-slate-300" aria-hidden="true">·</span>
           <span className="text-slate-400 flex items-center gap-1">
             <Calendar className="w-3 h-3 text-slate-400" />
@@ -190,11 +194,11 @@ export const JobCard: React.FC<JobCardProps> = ({ job, onViewDetails, onCopyLink
           </span>
         </div>
 
-        {/* Actions: Copy Link & Primary View Details Button */}
+        {/* Actions: Copy Link & Primary View Details / Apply Button */}
         <div className="flex items-center gap-2">
           <button
             onClick={handleCopy}
-            className="inline-flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-semibold text-slate-700 bg-slate-50 hover:bg-slate-100 hover:text-blue-600 border border-slate-200/80 rounded-xl transition-colors cursor-pointer"
+            className="inline-flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-semibold text-slate-700 bg-slate-50 hover:bg-slate-100 hover:text-blue-600 border border-slate-200 rounded-xl transition-all cursor-pointer btn-interactive"
             title="Copy unique job link to clipboard"
             aria-label="Copy job link"
           >
@@ -213,7 +217,7 @@ export const JobCard: React.FC<JobCardProps> = ({ job, onViewDetails, onCopyLink
 
           <button
             onClick={() => onViewDetails(job.id)}
-            className="w-full sm:w-auto inline-flex items-center justify-center gap-1.5 px-4 py-2 text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 active:bg-blue-800 rounded-xl shadow-xs transition-all duration-150 cursor-pointer"
+            className="w-full sm:w-auto inline-flex items-center justify-center gap-1.5 px-4 py-2 text-xs font-bold text-white bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 rounded-xl shadow-xs hover:shadow-md transition-all cursor-pointer btn-glow"
           >
             <span>View Details</span>
             <ArrowUpRight className="w-3.5 h-3.5" />
@@ -221,6 +225,6 @@ export const JobCard: React.FC<JobCardProps> = ({ job, onViewDetails, onCopyLink
         </div>
 
       </div>
-    </div>
+    </motion.div>
   );
 };

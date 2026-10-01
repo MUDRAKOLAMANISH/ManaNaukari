@@ -5,8 +5,16 @@ import { normalizeSkills } from '../../utils/skillUtils';
 import { 
   Building2, MapPin, Briefcase, DollarSign, Layers, 
   Tag, Link2, Calendar, FileText, CheckCircle2, AlertCircle, 
-  ArrowLeft, Loader2 
+  ArrowLeft, Loader2, Share2 
 } from 'lucide-react';
+import { 
+  ShareableJob, 
+  getAutoSharePreference, 
+  setAutoSharePreference, 
+  getTelegramConfig, 
+  postToTelegramBotApi 
+} from '../../utils/socialShare';
+import { SocialShareModal } from './SocialShareModal';
 
 interface JobFormProps {
   initialData?: Partial<Job> | null;
@@ -44,6 +52,12 @@ export const JobForm: React.FC<JobFormProps> = ({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+
+  // Social Sharing State
+  const [autoShareEnabled, setAutoShareEnabled] = useState(getAutoSharePreference());
+  const [shareModalJob, setShareModalJob] = useState<ShareableJob | null>(null);
+  const [isShareModalOpen, setIsShareModalOpen] = useState(false);
+  const [toastNotification, setToastNotification] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
 
   // Load categories and hydrate if initialData exists
   useEffect(() => {
@@ -137,7 +151,27 @@ export const JobForm: React.FC<JobFormProps> = ({
             ? 'Job successfully published & category alert notifications dispatched to subscribers!'
             : 'Job successfully published to Supabase database!'
         );
-        onSaved(data);
+
+        // Telegram Auto-Post check if configured
+        const tgConfig = getTelegramConfig();
+        if (autoShareEnabled && tgConfig.autoPostOnPublish && tgConfig.botToken && tgConfig.channelId) {
+          postToTelegramBotApi(data, undefined, tgConfig).then((res) => {
+            if (res.success) {
+              setToastNotification({
+                message: 'Job automatically broadcasted to Telegram channel!',
+                type: 'success',
+              });
+            }
+          });
+        }
+
+        if (autoShareEnabled) {
+          // Open the social share modal with the generated message
+          setShareModalJob(data);
+          setIsShareModalOpen(true);
+        } else {
+          onSaved(data);
+        }
       } else if (mode === 'edit' && initialData && initialData.id) {
         const { data, error } = await adminJobsService.updateJob(initialData.id, jobPayload);
         if (error || !data) {
@@ -470,7 +504,52 @@ export const JobForm: React.FC<JobFormProps> = ({
           <span>Back to Jobs List</span>
         </button>
 
-        <div className="w-full sm:w-auto flex items-center gap-3">
+        <div className="w-full sm:w-auto flex flex-wrap items-center gap-3">
+          {/* Auto Share Toggle */}
+          <label className="inline-flex items-center gap-2 cursor-pointer select-none bg-slate-50 hover:bg-slate-100 border border-slate-200 px-3.5 py-2 rounded-xl transition-colors text-xs font-semibold text-slate-700">
+            <input
+              type="checkbox"
+              checked={autoShareEnabled}
+              onChange={(e) => {
+                const checked = e.target.checked;
+                setAutoShareEnabled(checked);
+                setAutoSharePreference(checked);
+              }}
+              className="w-4 h-4 text-blue-600 rounded border-slate-300 focus:ring-blue-500 cursor-pointer"
+            />
+            <span className="flex items-center gap-1.5">
+              <Share2 className="w-3.5 h-3.5 text-blue-600" />
+              Auto Share After Publishing
+            </span>
+          </label>
+
+          {/* Quick Share Listing button for existing jobs */}
+          {initialData && (
+            <button
+              type="button"
+              onClick={() => {
+                setShareModalJob({
+                  id: initialData.id,
+                  title: title || initialData.title || '',
+                  company: company || initialData.company || '',
+                  location: location || initialData.location || 'Pan India',
+                  experience: experience || initialData.experience || 'Fresher',
+                  salary: salary || initialData.salary || '',
+                  category: category || initialData.category || 'Software Engineering',
+                  job_type: jobType || initialData.job_type || 'Full Time',
+                  apply_link: applyLink || initialData.apply_link || '',
+                  skills_required: skillsRequired || initialData.skills_required || '',
+                });
+                setIsShareModalOpen(true);
+              }}
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold text-blue-700 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded-xl transition-colors cursor-pointer"
+              title="Share job opening to WhatsApp, Telegram, LinkedIn, X, Facebook"
+            >
+              <Share2 className="w-3.5 h-3.5" />
+              <span>Share Listing</span>
+            </button>
+          )}
+
           <button
             type="submit"
             disabled={isSubmitting}
@@ -487,6 +566,36 @@ export const JobForm: React.FC<JobFormProps> = ({
           </button>
         </div>
       </div>
+
+      {/* Toast Notification */}
+      {toastNotification && (
+        <div className="fixed bottom-6 right-6 z-50 animate-fadeIn">
+          <div className={`p-4 rounded-2xl shadow-xl border text-xs font-bold flex items-center gap-2.5 ${
+            toastNotification.type === 'success'
+              ? 'bg-emerald-600 text-white border-emerald-700'
+              : 'bg-rose-600 text-white border-rose-700'
+          }`}>
+            <CheckCircle2 className="w-4 h-4 shrink-0" />
+            <span>{toastNotification.message}</span>
+          </div>
+        </div>
+      )}
+
+      {/* Social Share Modal */}
+      <SocialShareModal
+        isOpen={isShareModalOpen}
+        onClose={() => {
+          setIsShareModalOpen(false);
+          if (shareModalJob) {
+            onSaved(shareModalJob as Job);
+          }
+        }}
+        job={shareModalJob}
+        onToast={(msg, type) => {
+          setToastNotification({ message: msg, type: type || 'success' });
+          setTimeout(() => setToastNotification(null), 4000);
+        }}
+      />
 
     </form>
   );

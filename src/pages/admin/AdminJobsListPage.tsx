@@ -5,7 +5,8 @@ import { AdminHeader } from '../../components/admin/AdminHeader';
 import { JobTable } from '../../components/admin/JobTable';
 import { JobTablePagination } from '../../components/admin/JobTablePagination';
 import { DeleteConfirmModal } from '../../components/admin/DeleteConfirmModal';
-import { Search, Filter, RefreshCw, AlertCircle, Plus } from 'lucide-react';
+import { SocialShareModal } from '../../components/admin/SocialShareModal';
+import { Search, Filter, RefreshCw, AlertCircle, Plus, CheckCircle2 } from 'lucide-react';
 
 interface AdminJobsListPageProps {
   onNavigate: (path: string) => void;
@@ -28,6 +29,10 @@ export const AdminJobsListPage: React.FC<AdminJobsListPageProps> = ({ onNavigate
   // Deletion modal state
   const [deleteTarget, setDeleteTarget] = useState<Job | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+
+  // Social share modal state
+  const [shareTarget, setShareTarget] = useState<Job | null>(null);
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   // Fetch categories once on mount
   useEffect(() => {
@@ -192,6 +197,7 @@ export const AdminJobsListPage: React.FC<AdminJobsListPageProps> = ({ onNavigate
         onEdit={handleEdit}
         onToggleExpire={handleToggleExpire}
         onDelete={(job) => setDeleteTarget(job)}
+        onShare={(job) => setShareTarget(job)}
       />
 
       {/* Pagination Bar */}
@@ -212,6 +218,27 @@ export const AdminJobsListPage: React.FC<AdminJobsListPageProps> = ({ onNavigate
         onConfirm={handleConfirmDelete}
         onCancel={() => setDeleteTarget(null)}
       />
+
+      {/* Social Share Modal */}
+      <SocialShareModal
+        isOpen={Boolean(shareTarget)}
+        job={shareTarget}
+        onClose={() => setShareTarget(null)}
+        onToast={(msg) => {
+          setToastMessage(msg);
+          setTimeout(() => setToastMessage(null), 4000);
+        }}
+      />
+
+      {/* Toast Notification */}
+      {toastMessage && (
+        <div className="fixed bottom-6 right-6 z-50 animate-fadeIn">
+          <div className="p-4 rounded-2xl shadow-xl border bg-emerald-600 text-white border-emerald-700 text-xs font-bold flex items-center gap-2.5">
+            <CheckCircle2 className="w-4 h-4 shrink-0" />
+            <span>{toastMessage}</span>
+          </div>
+        </div>
+      )}
 
     </div>
   );
