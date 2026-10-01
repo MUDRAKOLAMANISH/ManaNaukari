@@ -238,6 +238,7 @@ export interface VisitorAnalytic {
   page_name?: string | null;
   session_id?: string | null;
   visitor_id: string;
+  visit_date?: string | null;
   timestamp?: string | null;
   visited_at?: string;
   ip_address?: string | null;
@@ -254,6 +255,7 @@ export type VisitorAnalyticInsert = {
   page_name?: string | null;
   session_id?: string | null;
   visitor_id: string;
+  visit_date?: string | null;
   timestamp?: string | null;
   visited_at?: string;
   ip_address?: string | null;

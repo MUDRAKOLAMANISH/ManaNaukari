@@ -54,50 +54,82 @@ export const adminAnalyticsService = {
       console.warn('[AdminAnalyticsService] Applicants count notice:', err);
     }
 
-    // 3. Fetch Visitor Analytics counts
+    // 3. Fetch Visitor Analytics counts (True Unique Visitors per device)
     let totalVisitors = 0;
     let todayVisitors = 0;
     let weeklyVisitors = 0;
     let monthlyVisitors = 0;
-    let recentVisitorsList: { visited_at?: string; created_at?: string; timestamp?: string; visitor_id?: string }[] = [];
+    let recentVisitorsList: { visited_at?: string; visit_date?: string; visitor_id?: string }[] = [];
 
     try {
-      // First attempt using 'visited_at' column
-      const [allVisRes, todayVisRes, weekVisRes, monthVisRes, recentVisRes] = await Promise.all([
-        supabase.from('visitor_analytics').select('id', { count: 'exact', head: true }),
-        supabase.from('visitor_analytics').select('id', { count: 'exact', head: true }).gte('visited_at', startOfToday),
-        supabase.from('visitor_analytics').select('id', { count: 'exact', head: true }).gte('visited_at', sevenDaysAgoIso),
-        supabase.from('visitor_analytics').select('id', { count: 'exact', head: true }).gte('visited_at', thirtyDaysAgoIso),
-        supabase.from('visitor_analytics').select('visited_at, visitor_id').gte('visited_at', fourteenDaysAgoIso()),
-      ]);
+      let rows: { visitor_id: string; visited_at?: string; visit_date?: string }[] | null = null;
+      let error: any = null;
 
-      if (allVisRes.error) {
-        // Fallback: table might use created_at or timestamp
-        console.debug('[AdminAnalyticsService] Retrying visitor_analytics with created_at fallback...', allVisRes.error.message);
-        const [fallbackAll, fallbackToday, fallbackWeek, fallbackMonth, fallbackRecent] = await Promise.all([
-          supabase.from('visitor_analytics').select('id', { count: 'exact', head: true }),
-          supabase.from('visitor_analytics').select('id', { count: 'exact', head: true }).gte('created_at', startOfToday),
-          supabase.from('visitor_analytics').select('id', { count: 'exact', head: true }).gte('created_at', sevenDaysAgoIso),
-          supabase.from('visitor_analytics').select('id', { count: 'exact', head: true }).gte('created_at', thirtyDaysAgoIso),
-          supabase.from('visitor_analytics').select('created_at, session_id').gte('created_at', fourteenDaysAgoIso()),
-        ]);
+      const firstAttempt = await supabase
+        .from('visitor_analytics')
+        .select('visitor_id, visited_at, visit_date')
+        .limit(50000);
 
-        if (fallbackAll.error) {
-          tablesReady = false;
-          tableErrorMessage = fallbackAll.error.message;
-        } else {
-          totalVisitors = fallbackAll.count || 0;
-          todayVisitors = fallbackToday.count || 0;
-          weeklyVisitors = fallbackWeek.count || 0;
-          monthlyVisitors = fallbackMonth.count || 0;
-          recentVisitorsList = (fallbackRecent.data as any) || [];
-        }
+      if (firstAttempt.error) {
+        const fallbackAttempt = await supabase
+          .from('visitor_analytics')
+          .select('visitor_id, visited_at')
+          .limit(50000);
+        rows = (fallbackAttempt.data as any) || null;
+        error = fallbackAttempt.error;
       } else {
-        totalVisitors = allVisRes.count || 0;
-        todayVisitors = todayVisRes.count || 0;
-        weeklyVisitors = weekVisRes.count || 0;
-        monthlyVisitors = monthVisRes.count || 0;
-        recentVisitorsList = (recentVisRes.data as any) || [];
+        rows = (firstAttempt.data as any) || null;
+      }
+
+      if (error) {
+        tablesReady = false;
+        tableErrorMessage = error.message;
+      } else if (rows) {
+        recentVisitorsList = rows;
+
+        const totalUniqueSet = new Set<string>();
+        const todayUniqueSet = new Set<string>();
+        const weekUniqueSet = new Set<string>();
+        const monthUniqueSet = new Set<string>();
+
+        const todayDateStr = new Date().toISOString().split('T')[0];
+
+        rows.forEach((row) => {
+          const vid = row.visitor_id;
+          if (!vid) return;
+
+          totalUniqueSet.add(vid);
+
+          const rawDate = row.visited_at;
+          const visitDate = row.visit_date || (rawDate ? new Date(rawDate).toISOString().split('T')[0] : null);
+
+          if (rawDate) {
+            if (rawDate >= startOfToday || visitDate === todayDateStr) {
+              todayUniqueSet.add(vid);
+            }
+            if (rawDate >= sevenDaysAgoIso) {
+              weekUniqueSet.add(vid);
+            }
+            if (rawDate >= thirtyDaysAgoIso) {
+              monthUniqueSet.add(vid);
+            }
+          } else if (visitDate) {
+            if (visitDate === todayDateStr) {
+              todayUniqueSet.add(vid);
+            }
+            if (visitDate >= sevenDaysAgoIso.split('T')[0]) {
+              weekUniqueSet.add(vid);
+            }
+            if (visitDate >= thirtyDaysAgoIso.split('T')[0]) {
+              monthUniqueSet.add(vid);
+            }
+          }
+        });
+
+        totalVisitors = totalUniqueSet.size;
+        todayVisitors = todayUniqueSet.size;
+        weeklyVisitors = weekUniqueSet.size;
+        monthlyVisitors = monthUniqueSet.size;
       }
     } catch (err: any) {
       console.warn('[AdminAnalyticsService] Visitor analytics exception:', err);
@@ -147,14 +179,17 @@ export const adminAnalyticsService = {
       conversionRate = Number(((totalApplications / totalVisitors) * 100).toFixed(1));
     }
 
-    // 6. Aggregate Visitors by Day (Last 7 Days)
+    // 6. Aggregate Unique Visitors by Day (Last 7 Days)
     const visitorsByDay = generateDailySeries(7, (dateKey) => {
-      return recentVisitorsList.filter((v) => {
-        const rawDate = v.visited_at || v.created_at || v.timestamp;
-        if (!rawDate) return false;
-        const itemDate = new Date(rawDate).toISOString().split('T')[0];
-        return itemDate === dateKey;
-      }).length;
+      const dayUniqueVisitors = new Set<string>();
+      recentVisitorsList.forEach((v) => {
+        const rawDate = v.visited_at;
+        const vDate = v.visit_date || (rawDate ? new Date(rawDate).toISOString().split('T')[0] : null);
+        if (vDate === dateKey && v.visitor_id) {
+          dayUniqueVisitors.add(v.visitor_id);
+        }
+      });
+      return dayUniqueVisitors.size;
     });
 
     // 7. Aggregate Applications by Day (Last 7 Days)

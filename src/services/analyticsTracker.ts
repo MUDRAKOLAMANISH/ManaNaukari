@@ -7,20 +7,55 @@ import {
   JobAlertSubscriptionInsert 
 } from '../types/database.types';
 
+export const VISITOR_ID_KEY = 'visitor_id';
+export const LAST_VISIT_DATE_KEY = 'last_visit_date';
+
+/**
+ * Returns today's calendar date in YYYY-MM-DD format (local/UTC synchronized)
+ */
+export function getTodayDateString(): string {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, '0');
+  const day = String(now.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+/**
+ * Checks if a route path is an administrative or internal console page
+ * Admin pages are strictly excluded from visitor telemetry.
+ */
+export function isAdminPath(path?: string): boolean {
+  if (!path && typeof window !== 'undefined') {
+    path = window.location.pathname;
+  }
+  if (!path) return false;
+  const cleanPath = path.split('?')[0].split('#')[0].toLowerCase();
+  return cleanPath.startsWith('/admin') || cleanPath.startsWith('/recruiter/dashboard');
+}
+
 /**
  * Anonymous Visitor Identifier Manager
- * Creates or retrieves a persistent visitor token stored in localStorage across browser sessions.
+ * Creates or retrieves a persistent visitor token stored in localStorage (key: 'visitor_id')
  */
 export function getOrCreateVisitorId(): string {
   if (typeof window === 'undefined') return 'server_visitor';
-  const STORAGE_KEY = 'cv_visitor_id';
-  let visitorId = localStorage.getItem(STORAGE_KEY);
-  if (!visitorId) {
-    visitorId = 'vis_' + Math.random().toString(36).substring(2, 11) + '_' + Date.now().toString(36);
-    try {
-      localStorage.setItem(STORAGE_KEY, visitorId);
-    } catch {
-      // Storage unavailable (e.g. private/incognito restricted)
+  let visitorId: string | null = null;
+  try {
+    visitorId = localStorage.getItem(VISITOR_ID_KEY);
+    if (!visitorId) {
+      // Check legacy key if exists
+      visitorId = localStorage.getItem('cv_visitor_id');
+    }
+    if (!visitorId) {
+      visitorId = 'vis_' + Math.random().toString(36).substring(2, 11) + '_' + Date.now().toString(36);
+    }
+    localStorage.setItem(VISITOR_ID_KEY, visitorId);
+    localStorage.setItem('cv_visitor_id', visitorId); // Keep legacy in sync
+  } catch {
+    // LocalStorage restricted or in private mode
+    if (!visitorId) {
+      visitorId = 'vis_temp_' + Math.random().toString(36).substring(2, 11);
     }
   }
   return visitorId;
@@ -28,7 +63,6 @@ export function getOrCreateVisitorId(): string {
 
 /**
  * Anonymous Session Identifier Manager
- * Creates or retrieves a persistent visitor session token stored in localStorage.
  */
 export function getOrCreateSessionId(): string {
   if (typeof window === 'undefined') return 'server_session';
@@ -45,10 +79,10 @@ export function getOrCreateSessionId(): string {
   return sessionId;
 }
 
-// In-memory debounce cache to avoid duplicate hits on quick React re-renders / mount cycles
-const recentPageHits = new Map<string, number>();
+// In-memory locks to prevent concurrent race-condition inserts during the same page render cycle
+let inMemoryDailyVisitLock: string | null = null;
 const recentJobHits = new Map<string, number>();
-const DEBOUNCE_WINDOW_MS = 3000; // 3 seconds
+const DEBOUNCE_WINDOW_MS = 3000;
 
 // Helper to resolve human-readable page name from path
 export function resolvePageNameFromPath(path: string): string {
@@ -94,9 +128,6 @@ export function resolvePageNameFromPath(path: string): string {
   if (cleanPath === '/recruiter/dashboard' || cleanPath === '/recruiter') {
     return 'Recruiter Dashboard';
   }
-  if (cleanPath === '/admin/analytics') {
-    return 'Admin Analytics';
-  }
   if (cleanPath.startsWith('/admin')) {
     return 'Admin Portal';
   }
@@ -135,28 +166,31 @@ export interface TrackPageViewOptions {
 export const analyticsTracker = {
   getVisitorId: getOrCreateVisitorId,
   getSessionId: getOrCreateSessionId,
+  getTodayDateString,
+  isAdminPath,
 
   /**
-   * Tracks a pageview event in `visitor_analytics`.
-   * Automatically captures:
-   * - page_url
-   * - page_name
-   * - session_id
-   * - visitor_id
-   * - timestamp / visited_at
+   * Tracks a visitor event in `visitor_analytics`.
    * 
-   * Non-blocking, fails gracefully, debounced, with full console debug logging.
+   * Strict Visitor Rules:
+   * 1. Count one device as one visitor per day.
+   * 2. Do not increase visitor count on page refresh.
+   * 3. Store a unique visitor_id in localStorage.
+   * 4. Store last_visit_date in localStorage.
+   * 5. Only create a new visitor record if last_visit_date is different from today's date.
+   * 6. Enforces database unique constraint on (visitor_id, visit_date).
+   * 7. Exclude admin pages from visitor tracking.
+   * 8. Works in AI Studio preview and Netlify production environments.
    */
   trackPageView(optionsOrType?: string | TrackPageViewOptions, maybePath?: string) {
     if (typeof window === 'undefined') return;
 
+    let path = window.location.pathname;
     let pageName = 'Homepage';
     let pageUrl = window.location.href;
-    let path = window.location.pathname;
     let pageType: 'home' | 'jobs_listing' | 'job_details' | 'category_details' | 'other' = 'other';
 
     if (typeof optionsOrType === 'string') {
-      // Legacy signature: trackPageView('home', '/...')
       path = maybePath || window.location.pathname;
       pageUrl = window.location.origin + path;
       pageName = resolvePageNameFromPath(path);
@@ -165,12 +199,12 @@ export const analyticsTracker = {
       else if (optionsOrType === 'job_details') pageType = 'job_details';
       else if (optionsOrType === 'category_details') pageType = 'category_details';
     } else if (typeof optionsOrType === 'object' && optionsOrType !== null) {
-      if (optionsOrType.page_name) pageName = optionsOrType.page_name;
-      if (optionsOrType.page_url) pageUrl = optionsOrType.page_url;
       if (optionsOrType.customPath) {
         path = optionsOrType.customPath;
         pageUrl = window.location.origin + path;
       }
+      if (optionsOrType.page_name) pageName = optionsOrType.page_name;
+      if (optionsOrType.page_url) pageUrl = optionsOrType.page_url;
       if (optionsOrType.page_type) pageType = optionsOrType.page_type;
       if (!optionsOrType.page_name) {
         pageName = resolvePageNameFromPath(path);
@@ -179,26 +213,51 @@ export const analyticsTracker = {
       pageName = resolvePageNameFromPath(path);
     }
 
-    const now = Date.now();
-    const cacheKey = `${path}::${pageName}`;
-    const lastHit = recentPageHits.get(cacheKey);
-
-    if (lastHit && now - lastHit < DEBOUNCE_WINDOW_MS) {
-      // Debounce rapid re-renders
+    // 1. Exclude admin pages from visitor tracking
+    if (isAdminPath(path)) {
+      console.log('[AnalyticsTracker] 🛡️ Excluding admin page from visitor tracking:', path);
       return;
     }
-    recentPageHits.set(cacheKey, now);
+
+    // 2. Count one device as one visitor per day.
+    // Check if this device has already been counted today.
+    const today = getTodayDateString();
+    let lastVisitDate: string | null = null;
+    try {
+      lastVisitDate = localStorage.getItem(LAST_VISIT_DATE_KEY);
+    } catch {
+      // Storage unavailable
+    }
+
+    // If last_visit_date is the same as today, DO NOT create a new visitor record (prevents page refresh increase)
+    if (lastVisitDate === today) {
+      console.log('[AnalyticsTracker] ℹ️ Device already recorded for today (' + today + '). Skipping duplicate visitor count on page refresh/navigation.');
+      return;
+    }
+
+    // In-memory lock for the current JavaScript process
+    if (inMemoryDailyVisitLock === today) {
+      return;
+    }
+    inMemoryDailyVisitLock = today;
+
+    // Immediately record last_visit_date in localStorage
+    try {
+      localStorage.setItem(LAST_VISIT_DATE_KEY, today);
+    } catch {
+      // Storage restricted
+    }
 
     const sessionId = getOrCreateSessionId();
     const visitorId = getOrCreateVisitorId();
     const timestampIso = new Date().toISOString();
 
-    console.log('[AnalyticsTracker] 🚀 Page view triggered:', {
+    console.log('[AnalyticsTracker] 🚀 Recording new daily unique visitor:', {
+      visitor_id: visitorId,
+      visit_date: today,
       page_name: pageName,
       page_url: pageUrl,
       path,
-      session_id: sessionId,
-      visitor_id: visitorId,
       timestamp: timestampIso,
     });
 
@@ -210,6 +269,7 @@ export const analyticsTracker = {
           page_name: pageName,
           session_id: sessionId,
           visitor_id: visitorId,
+          visit_date: today,
           timestamp: timestampIso,
           visited_at: timestampIso,
           user_agent: navigator.userAgent ? navigator.userAgent.slice(0, 255) : null,
@@ -218,13 +278,22 @@ export const analyticsTracker = {
           referrer: document.referrer ? document.referrer.slice(0, 255) : 'direct',
         };
 
-        // Step 1: Attempt insert with full payload
+        // Step 1: Attempt insert with full payload including visit_date
         let { error, data } = await supabase.from('visitor_analytics').insert(fullPayload).select();
 
-        // Step 2: Resilient Schema Fallback
-        // If Supabase returns PGRST204 (column does not exist in schema cache), retry with guaranteed baseline columns
-        if (error && (error.code === 'PGRST204' || error.message?.includes('schema cache') || error.message?.includes('column'))) {
-          console.debug('[AnalyticsTracker] Adapting to database schema (omitting unmigrated columns):', error.message);
+        // Step 2: Handle unique constraint violation (database unique constraint on visitor_id, visit_date)
+        if (error && (error.code === '23505' || error.message?.includes('unique') || error.message?.includes('duplicate key'))) {
+          console.log('[AnalyticsTracker] 🔒 Database unique constraint prevented duplicate visitor count for today:', { visitorId, today });
+          try {
+            localStorage.setItem(LAST_VISIT_DATE_KEY, today);
+          } catch {}
+          return;
+        }
+
+        // Step 3: Resilient Schema Fallback
+        // If Supabase returns PGRST204 or 42703 (column visit_date or optional columns do not exist yet)
+        if (error && (error.code === 'PGRST204' || error.code === '42703' || error.message?.includes('schema cache') || error.message?.includes('column'))) {
+          console.debug('[AnalyticsTracker] Adapting to baseline database schema:', error.message);
           
           const baselinePayload = {
             page_url: pageUrl,
@@ -239,40 +308,53 @@ export const analyticsTracker = {
         }
 
         if (error) {
+          // If unique constraint triggered on fallback
+          if (error.code === '23505' || error.message?.includes('unique') || error.message?.includes('duplicate key')) {
+            console.log('[AnalyticsTracker] 🔒 Unique constraint verified in fallback.');
+            return;
+          }
           console.warn('[AnalyticsTracker] ⚠️ visitor_analytics insert notice:', error.message);
         } else {
-          console.log('[AnalyticsTracker] ✅ Page view successfully recorded in Supabase visitor_analytics:', {
-            page_name: pageName,
+          console.log('[AnalyticsTracker] ✅ Daily unique visitor successfully recorded in Supabase visitor_analytics:', {
             visitor_id: visitorId,
-            session_id: sessionId,
+            visit_date: today,
+            page_name: pageName,
             id: data && data[0] ? data[0].id : 'recorded'
           });
         }
       } catch (err: any) {
-        console.debug('[AnalyticsTracker] Page view tracking exception:', err);
+        console.debug('[AnalyticsTracker] Visitor tracking exception:', err);
       }
     }, 40);
   },
 
   /**
-   * Tracks a job view event in `job_views` and records `job_details` in `visitor_analytics`.
-   * Automatically captures:
-   * - job_id (parsed to numeric or uuid)
-   * - visitor_id
-   * - session_id
-   * - timestamp / viewed_at
-   * - job_title
-   * - company
+   * Tracks a job view event in `job_views`.
+   * Supports both trackJobView({ id, title, company }) and trackJobView(jobId, jobTitle, company)
    */
-  trackJobView(job: { id: string | number; title?: string; company?: string }) {
-    if (typeof window === 'undefined' || !job?.id) return;
+  trackJobView(
+    jobIdOrObj: string | number | { id?: string | number; title?: string; company?: string },
+    maybeJobTitle?: string,
+    maybeCompany?: string
+  ) {
+    if (typeof window === 'undefined') return;
 
-    const rawJobId = job.id;
-    // Parse numeric ID if applicable
-    const numericJobId = typeof rawJobId === 'number' ? rawJobId : (!isNaN(Number(rawJobId)) ? Number(rawJobId) : rawJobId);
+    let jobId: string | number = '';
+    let jobTitle = '';
+    let company: string | undefined = undefined;
 
+    if (typeof jobIdOrObj === 'object' && jobIdOrObj !== null) {
+      jobId = jobIdOrObj.id || '';
+      jobTitle = jobIdOrObj.title || '';
+      company = jobIdOrObj.company;
+    } else {
+      jobId = jobIdOrObj;
+      jobTitle = maybeJobTitle || '';
+      company = maybeCompany;
+    }
+
+    const cacheKey = `job_${jobId}`;
     const now = Date.now();
-    const cacheKey = String(numericJobId);
     const lastHit = recentJobHits.get(cacheKey);
 
     if (lastHit && now - lastHit < DEBOUNCE_WINDOW_MS) {
@@ -283,56 +365,41 @@ export const analyticsTracker = {
     const sessionId = getOrCreateSessionId();
     const visitorId = getOrCreateVisitorId();
     const timestampIso = new Date().toISOString();
-    const jobTitle = (job.title || 'Job Opening').slice(0, 255);
-    const company = (job.company || 'Hiring Partner').slice(0, 150);
 
-    console.log('[AnalyticsTracker] 👁️ Job view triggered:', {
-      job_id: numericJobId,
-      job_title: jobTitle,
-      company,
-      visitor_id: visitorId,
-      session_id: sessionId,
-      timestamp: timestampIso,
-    });
+    const numericJobId = typeof jobId === 'number' ? jobId : parseInt(String(jobId), 10);
+    const resolvedJobId = !isNaN(numericJobId) ? numericJobId : jobId;
 
     setTimeout(async () => {
       try {
-        // Step 1: Attempt insert with full columns
-        const fullPayload: JobViewInsert = {
-          job_id: numericJobId,
+        const payload: JobViewInsert = {
+          job_id: resolvedJobId,
           visitor_id: visitorId,
           session_id: sessionId,
-          job_title: jobTitle,
-          company: company,
+          job_title: jobTitle ? jobTitle.slice(0, 255) : null,
+          company: company ? company.slice(0, 255) : null,
           viewed_at: timestampIso,
         };
 
-        let { error, data } = await supabase.from('job_views').insert(fullPayload).select();
+        const { error, data } = await supabase.from('job_views').insert(payload).select();
 
-        // Step 2: Fallback to baseline columns if schema cache rejects optional columns
-        if (error && (error.code === 'PGRST204' || error.message?.includes('schema cache') || error.message?.includes('column'))) {
-          console.debug('[AnalyticsTracker] Adapting to job_views baseline schema:', error.message);
-          const baselinePayload = {
-            job_id: numericJobId,
+        if (error) {
+          console.debug('[AnalyticsTracker] Retrying job_views with baseline columns...', error.message);
+          const baselineJobView = {
+            job_id: resolvedJobId,
             visitor_id: visitorId,
             viewed_at: timestampIso,
           };
-          const fallbackResult = await supabase.from('job_views').insert(baselinePayload).select();
-          error = fallbackResult.error;
-          data = fallbackResult.data;
-        }
-
-        if (error) {
-          console.warn('[AnalyticsTracker] ⚠️ job_views insert notice:', error.message);
+          await supabase.from('job_views').insert(baselineJobView);
         } else {
-          console.log('[AnalyticsTracker] ✅ Job view successfully recorded in Supabase job_views:', {
-            job_id: numericJobId,
+          console.log('[AnalyticsTracker] ✅ Job view recorded:', {
+            job_id: resolvedJobId,
+            job_title: jobTitle,
             visitor_id: visitorId,
             id: data && data[0] ? data[0].id : 'recorded'
           });
         }
 
-        // Also track the page view for this job details page
+        // Also evaluate daily page view for this job details page
         analyticsTracker.trackPageView({
           page_name: `Job Details: ${jobTitle}`,
           page_url: window.location.href,
@@ -347,13 +414,17 @@ export const analyticsTracker = {
 
   /**
    * Automatically tracks current browser route with accurate page name
+   * Excludes admin pages automatically.
    */
   autoTrackCurrentRoute(currentPath: string) {
+    if (isAdminPath(currentPath)) {
+      return;
+    }
     const pageName = resolvePageNameFromPath(currentPath);
     analyticsTracker.trackPageView({
       page_name: pageName,
       customPath: currentPath,
-      page_url: window.location.origin + currentPath,
+      page_url: (typeof window !== 'undefined' ? window.location.origin : '') + currentPath,
     });
   },
 
@@ -365,7 +436,6 @@ export const analyticsTracker = {
   trackWhatsAppPopup(eventType: WhatsAppPopupEventType, customPath?: string) {
     if (typeof window === 'undefined') return;
 
-    // Update local synchronized cache
     updateLocalWhatsAppStats(eventType);
 
     setTimeout(async () => {
@@ -409,7 +479,6 @@ export const analyticsTracker = {
         .single();
 
       if (error) {
-        // Fallback: save to localStorage if table is not yet set up
         console.debug('[Subscriptions] Notice from Supabase:', error.message);
         const saved = JSON.parse(localStorage.getItem('cv_local_subscriptions') || '[]');
         saved.push({ ...payload, created_at: new Date().toISOString() });

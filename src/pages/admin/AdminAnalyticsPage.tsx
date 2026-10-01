@@ -54,6 +54,7 @@ CREATE TABLE IF NOT EXISTS public.visitor_analytics (
     page_name VARCHAR(255),
     session_id VARCHAR(64),
     visitor_id VARCHAR(100) NOT NULL,
+    visit_date DATE DEFAULT CURRENT_DATE,
     ip_address VARCHAR(45),
     user_agent TEXT,
     timestamp TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()),
@@ -61,11 +62,28 @@ CREATE TABLE IF NOT EXISTS public.visitor_analytics (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now())
 );
 
--- Schema upgrades if table already exists:
+-- Schema upgrades if table already exists (enforcing 1 unique visit per device per day):
+ALTER TABLE public.visitor_analytics ADD COLUMN IF NOT EXISTS visit_date DATE DEFAULT CURRENT_DATE;
 ALTER TABLE public.visitor_analytics ADD COLUMN IF NOT EXISTS page_name VARCHAR(255);
 ALTER TABLE public.visitor_analytics ADD COLUMN IF NOT EXISTS session_id VARCHAR(64);
 ALTER TABLE public.visitor_analytics ADD COLUMN IF NOT EXISTS timestamp TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now());
 ALTER TABLE public.visitor_analytics ADD COLUMN IF NOT EXISTS visited_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now());
+
+-- Backfill visit_date
+UPDATE public.visitor_analytics SET visit_date = (visited_at::date) WHERE visit_date IS NULL;
+
+-- Remove duplicates before applying unique constraint
+DELETE FROM public.visitor_analytics a
+USING public.visitor_analytics b
+WHERE a.id > b.id
+  AND a.visitor_id = b.visitor_id
+  AND (a.visit_date = b.visit_date OR a.visited_at::date = b.visited_at::date);
+
+-- Database unique constraint on (visitor_id, visit_date) to prevent duplicate counts
+ALTER TABLE public.visitor_analytics DROP CONSTRAINT IF EXISTS unique_visitor_per_day;
+ALTER TABLE public.visitor_analytics ADD CONSTRAINT unique_visitor_per_day UNIQUE (visitor_id, visit_date);
+CREATE INDEX IF NOT EXISTS idx_visitor_analytics_visit_date ON public.visitor_analytics(visit_date);
+CREATE INDEX IF NOT EXISTS idx_visitor_analytics_visitor_id ON public.visitor_analytics(visitor_id);
 
 CREATE TABLE IF NOT EXISTS public.job_views (
     id BIGSERIAL PRIMARY KEY,
@@ -280,41 +298,41 @@ CREATE POLICY "Allow admin full access to recruiter_jobs" ON public.recruiter_jo
         {/* 10 Dashboard Metric Cards Grid */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
           
-          {/* Card 1: Total Visitors */}
+          {/* Card 1: Total Unique Visitors */}
           <AnalyticsMetricCard
-            title="Total Visitors"
+            title="Total Unique Visitors"
             value={loading ? '...' : (overview?.totalVisitors ?? 0).toLocaleString()}
-            subtitle="All recorded page visits"
+            subtitle="Distinct devices all-time"
             icon={Users}
             colorScheme="blue"
             badge="All Time"
           />
 
-          {/* Card 2: Today's Visitors */}
+          {/* Card 2: Today's Unique Visitors */}
           <AnalyticsMetricCard
-            title="Today's Visitors"
+            title="Today's Unique Visitors"
             value={loading ? '...' : (overview?.todayVisitors ?? 0).toLocaleString()}
-            subtitle="Visits since UTC 00:00"
+            subtitle="Distinct devices today"
             icon={UserCheck}
             colorScheme="indigo"
             badge="Today"
           />
 
-          {/* Card 3: Weekly Visitors */}
+          {/* Card 3: Weekly Unique Visitors */}
           <AnalyticsMetricCard
-            title="Weekly Visitors"
+            title="Weekly Unique Visitors"
             value={loading ? '...' : (overview?.weeklyVisitors ?? 0).toLocaleString()}
-            subtitle="Trailing 7-day traffic"
+            subtitle="Distinct devices (trailing 7d)"
             icon={Calendar}
             colorScheme="teal"
             badge="Last 7d"
           />
 
-          {/* Card 4: Monthly Visitors */}
+          {/* Card 4: Monthly Unique Visitors */}
           <AnalyticsMetricCard
-            title="Monthly Visitors"
+            title="Monthly Unique Visitors"
             value={loading ? '...' : (overview?.monthlyVisitors ?? 0).toLocaleString()}
-            subtitle="Trailing 30-day traffic"
+            subtitle="Distinct devices (trailing 30d)"
             icon={Clock}
             colorScheme="purple"
             badge="Last 30d"
