@@ -1199,13 +1199,31 @@ export const recruiterService = {
   },
 
   /**
-   * Recruiter Dashboard: Delete a recruiter job
+   * Recruiter Dashboard: Soft-delete a recruiter job (status = 'deleted')
+   * Preserves historical applications, analytics, and recruiter records permanently.
    */
   async deleteRecruiterJob(jobId: string | number): Promise<{ success: boolean; error?: Error | null }> {
     try {
       const { error } = await supabase
         .from('recruiter_jobs')
-        .delete()
+        .update({ status: 'deleted', updated_at: new Date().toISOString() })
+        .eq('id', jobId);
+
+      if (error) throw error;
+      return { success: true };
+    } catch (err: any) {
+      return { success: false, error: err };
+    }
+  },
+
+  /**
+   * Recruiter Dashboard: Restore a soft-deleted recruiter job
+   */
+  async restoreRecruiterJob(jobId: string | number): Promise<{ success: boolean; error?: Error | null }> {
+    try {
+      const { error } = await supabase
+        .from('recruiter_jobs')
+        .update({ status: 'pending_review', updated_at: new Date().toISOString() })
         .eq('id', jobId);
 
       if (error) throw error;

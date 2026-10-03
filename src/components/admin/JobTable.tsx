@@ -2,7 +2,7 @@ import React from 'react';
 import { Job } from '../../types/database.types';
 import { 
   Building2, MapPin, Calendar, Clock, 
-  ExternalLink, Edit, Trash2, PowerOff, CheckCircle2, Share2 
+  ExternalLink, Edit, Trash2, PowerOff, CheckCircle2, Share2, RotateCcw, Pause, Play 
 } from 'lucide-react';
 
 interface JobTableProps {
@@ -10,7 +10,9 @@ interface JobTableProps {
   loading: boolean;
   onEdit: (job: Job) => void;
   onToggleExpire: (job: Job) => void;
+  onTogglePause?: (job: Job) => void;
   onDelete: (job: Job) => void;
+  onRestore?: (job: Job) => void;
   onShare?: (job: Job) => void;
 }
 
@@ -19,7 +21,9 @@ export const JobTable: React.FC<JobTableProps> = ({
   loading,
   onEdit,
   onToggleExpire,
+  onTogglePause,
   onDelete,
+  onRestore,
   onShare,
 }) => {
   if (loading) {
@@ -89,10 +93,10 @@ export const JobTable: React.FC<JobTableProps> = ({
                               <span className="text-emerald-700 font-medium">{job.salary}</span>
                             </>
                           )}
-                          {job.featured && (
+                          {(job.is_featured || job.featured) && (
                             <>
                               <span className="text-slate-300">·</span>
-                              <span className="text-amber-700 bg-amber-50 px-1.5 py-0.2 rounded text-[10px] font-semibold">Featured</span>
+                              <span className="text-amber-800 bg-amber-100/90 border border-amber-300/80 px-1.5 py-0.5 rounded text-[10px] font-bold">⭐ Featured</span>
                             </>
                           )}
                         </div>
@@ -144,19 +148,29 @@ export const JobTable: React.FC<JobTableProps> = ({
                   {/* Status */}
                   <td className="py-3.5 px-4 whitespace-nowrap">
                     <span
-                      className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold border ${
+                      className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold border ${
                         isActive
-                          ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                          ? 'bg-emerald-50 text-emerald-800 border-emerald-300'
+                          : job.status === 'paused'
+                          ? 'bg-amber-50 text-amber-900 border-amber-300'
                           : job.status === 'expired'
-                          ? 'bg-amber-50 text-amber-700 border-amber-200'
-                          : 'bg-slate-100 text-slate-600 border-slate-200'
+                          ? 'bg-rose-50 text-rose-900 border-rose-300'
+                          : job.status === 'deleted'
+                          ? 'bg-slate-100 text-slate-700 border-slate-300'
+                          : 'bg-slate-100 text-slate-700 border-slate-300'
                       }`}
                     >
-                      <span
-                        className={`w-1.5 h-1.5 rounded-full ${
-                          isActive ? 'bg-emerald-500' : 'bg-slate-400'
-                        }`}
-                      />
+                      <span>
+                        {isActive
+                          ? '🟢'
+                          : job.status === 'paused'
+                          ? '🟡'
+                          : job.status === 'expired'
+                          ? '🔴'
+                          : job.status === 'deleted'
+                          ? '🗑️'
+                          : '⚪'}
+                      </span>
                       <span className="capitalize">{job.status}</span>
                     </span>
                   </td>
@@ -165,58 +179,100 @@ export const JobTable: React.FC<JobTableProps> = ({
                   <td className="py-3.5 px-4 text-right whitespace-nowrap">
                     <div className="inline-flex items-center gap-1">
                       
-                      {/* Share Job Social Button */}
-                      {onShare && (
-                        <button
-                          onClick={() => onShare(job)}
-                          className="p-1.5 text-blue-600 hover:text-blue-700 hover:bg-blue-50 rounded-lg transition-colors cursor-pointer"
-                          title="Share to WhatsApp, Telegram, LinkedIn, X, Facebook"
-                        >
-                          <Share2 className="w-3.5 h-3.5" />
-                        </button>
+                      {/* Restore Job Action if status is deleted */}
+                      {job.status === 'deleted' ? (
+                        <div className="inline-flex items-center gap-1.5">
+                          <button
+                            onClick={() => onRestore?.(job)}
+                            className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-bold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-300 rounded-lg transition-colors cursor-pointer"
+                            title="Restore Job back to Active status (Preserves all applications & analytics)"
+                          >
+                            <RotateCcw className="w-3.5 h-3.5 text-emerald-600" />
+                            <span>Restore</span>
+                          </button>
+                          <button
+                            onClick={() => onEdit(job)}
+                            className="p-1.5 text-slate-500 hover:text-blue-600 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer"
+                            title="Edit Job Requisition"
+                          >
+                            <Edit className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      ) : (
+                        <>
+                          {/* Pause / Resume Button */}
+                          {onTogglePause && (
+                            <button
+                              onClick={() => onTogglePause(job)}
+                              className={`p-1.5 rounded-lg transition-colors cursor-pointer ${
+                                job.status === 'paused'
+                                  ? 'text-emerald-600 hover:bg-emerald-50'
+                                  : 'text-amber-600 hover:bg-amber-50'
+                              }`}
+                              title={job.status === 'paused' ? 'Resume / Activate Job' : 'Pause Job (Temporarily Disable Applications)'}
+                            >
+                              {job.status === 'paused' ? (
+                                <Play className="w-3.5 h-3.5" />
+                              ) : (
+                                <Pause className="w-3.5 h-3.5" />
+                              )}
+                            </button>
+                          )}
+
+                          {/* Share Job Social Button */}
+                          {onShare && (
+                            <button
+                              onClick={() => onShare(job)}
+                              className="p-1.5 text-blue-600 hover:text-blue-700 hover:bg-blue-50 rounded-lg transition-colors cursor-pointer"
+                              title="Share to WhatsApp, Telegram, LinkedIn, X, Facebook"
+                            >
+                              <Share2 className="w-3.5 h-3.5" />
+                            </button>
+                          )}
+
+                          {/* View External Link */}
+                          <a
+                            href={job.apply_link}
+                            target="_blank"
+                            rel="noreferrer noopener"
+                            className="p-1.5 text-slate-500 hover:text-blue-600 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer"
+                            title="Open Official Apply Link"
+                          >
+                            <ExternalLink className="w-3.5 h-3.5" />
+                          </a>
+
+                          {/* Edit Button */}
+                          <button
+                            onClick={() => onEdit(job)}
+                            className="p-1.5 text-slate-600 hover:text-blue-600 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer"
+                            title="Edit Job"
+                          >
+                            <Edit className="w-3.5 h-3.5" />
+                          </button>
+
+                          {/* Soft Toggle / Expire Button */}
+                          <button
+                            onClick={() => onToggleExpire(job)}
+                            className={`p-1.5 rounded-lg transition-colors cursor-pointer ${
+                              isActive
+                                ? 'text-amber-600 hover:bg-amber-50'
+                                : 'text-emerald-600 hover:bg-emerald-50'
+                            }`}
+                            title={isActive ? 'Mark as Expired' : 'Activate Job'}
+                          >
+                            <PowerOff className="w-3.5 h-3.5" />
+                          </button>
+
+                          {/* Delete Button (Soft-Delete) */}
+                          <button
+                            onClick={() => onDelete(job)}
+                            className="p-1.5 text-slate-500 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
+                            title="Soft Delete Job (Preserves Applications Permanently)"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </>
                       )}
-
-                      {/* View External Link */}
-                      <a
-                        href={job.apply_link}
-                        target="_blank"
-                        rel="noreferrer noopener"
-                        className="p-1.5 text-slate-500 hover:text-blue-600 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer"
-                        title="Open Official Apply Link"
-                      >
-                        <ExternalLink className="w-3.5 h-3.5" />
-                      </a>
-
-                      {/* Edit Button */}
-                      <button
-                        onClick={() => onEdit(job)}
-                        className="p-1.5 text-slate-600 hover:text-blue-600 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer"
-                        title="Edit Job"
-                      >
-                        <Edit className="w-3.5 h-3.5" />
-                      </button>
-
-                      {/* Soft Toggle / Expire Button */}
-                      <button
-                        onClick={() => onToggleExpire(job)}
-                        className={`p-1.5 rounded-lg transition-colors cursor-pointer ${
-                          isActive
-                            ? 'text-amber-600 hover:bg-amber-50'
-                            : 'text-emerald-600 hover:bg-emerald-50'
-                        }`}
-                        title={isActive ? 'Mark as Expired' : 'Activate Job'}
-                      >
-                        <PowerOff className="w-3.5 h-3.5" />
-                      </button>
-
-                      {/* Delete Button */}
-                      <button
-                        onClick={() => onDelete(job)}
-                        className="p-1.5 text-slate-500 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
-                        title="Delete Job Permanently"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
 
                     </div>
                   </td>

@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import { Job } from '../../types/database.types';
 import { normalizeSkills } from '../../utils/skillUtils';
+import { candidateProfileService } from '../../services/candidateProfileService';
 import { 
   Building2, MapPin, Briefcase, IndianRupee, Calendar, 
   ArrowUpRight, CheckCircle2, Bookmark, Copy, Check, Sparkles
@@ -37,6 +38,10 @@ export const JobCard: React.FC<JobCardProps> = ({ job, onViewDetails, onCopyLink
       return dateStr;
     }
   };
+
+  // Candidate recognition & applied status
+  const localProfile = candidateProfileService.getLocalProfile();
+  const hasApplied = Boolean(localProfile?.applied_jobs && localProfile.applied_jobs[job.id]);
 
   const skills = normalizeSkills(job.skills_required);
 
@@ -93,6 +98,30 @@ export const JobCard: React.FC<JobCardProps> = ({ job, onViewDetails, onCopyLink
                 >
                   {job.title}
                 </button>
+                {/* Status Badges: Active, Paused, Expired */}
+                {hasApplied && (
+                  <span className="text-[11px] font-bold text-emerald-900 bg-emerald-100/90 px-2.5 py-0.5 rounded-full border border-emerald-300 inline-flex items-center gap-1 shadow-2xs">
+                    <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                    <span>Applied ✓</span>
+                  </span>
+                )}
+                {(!job.status || job.status === 'active') ? (
+                  <span className="text-[11px] font-bold text-emerald-800 bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-300 inline-flex items-center gap-1.5 shadow-2xs">
+                    <span>🟢</span>
+                    <span>Active</span>
+                  </span>
+                ) : job.status === 'paused' ? (
+                  <span className="text-[11px] font-bold text-amber-900 bg-amber-50 px-2.5 py-0.5 rounded-full border border-amber-300 inline-flex items-center gap-1.5 shadow-2xs">
+                    <span>🟡</span>
+                    <span>Paused</span>
+                  </span>
+                ) : job.status === 'expired' ? (
+                  <span className="text-[11px] font-bold text-rose-900 bg-rose-50 px-2.5 py-0.5 rounded-full border border-rose-300 inline-flex items-center gap-1.5 shadow-2xs">
+                    <span>🔴</span>
+                    <span>Expired</span>
+                  </span>
+                ) : null}
+
                 {job.featured && (
                   <span className="text-[10px] font-bold text-blue-700 bg-blue-50 px-2 py-0.5 rounded-full border border-blue-200 uppercase tracking-wider flex items-center gap-1 shadow-2xs">
                     <Sparkles className="w-2.5 h-2.5 text-blue-600" />
@@ -138,6 +167,20 @@ export const JobCard: React.FC<JobCardProps> = ({ job, onViewDetails, onCopyLink
                   </span>
                 )}
               </div>
+
+              {/* Status Alert Message for Paused or Expired Jobs */}
+              {job.status === 'paused' && (
+                <div className="mt-3 px-3 py-1.5 rounded-xl bg-amber-50 border border-amber-300 text-xs text-amber-900 font-medium flex items-center gap-2">
+                  <span className="text-xs">🟡</span>
+                  <span>This job is temporarily unavailable.</span>
+                </div>
+              )}
+              {job.status === 'expired' && (
+                <div className="mt-3 px-3 py-1.5 rounded-xl bg-rose-50 border border-rose-300 text-xs text-rose-900 font-medium flex items-center gap-2">
+                  <span className="text-xs">🔴</span>
+                  <span>This job has expired. Applications are no longer being accepted.</span>
+                </div>
+              )}
             </div>
 
           </div>
@@ -215,13 +258,62 @@ export const JobCard: React.FC<JobCardProps> = ({ job, onViewDetails, onCopyLink
             )}
           </button>
 
-          <button
-            onClick={() => onViewDetails(job.id)}
-            className="w-full sm:w-auto inline-flex items-center justify-center gap-1.5 px-4 py-2 text-xs font-bold text-white bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 rounded-xl shadow-xs hover:shadow-md transition-all cursor-pointer btn-glow"
-          >
-            <span>View Details</span>
-            <ArrowUpRight className="w-3.5 h-3.5" />
-          </button>
+          {(!job.status || job.status === 'active') ? (
+            hasApplied ? (
+              <button
+                onClick={() => onViewDetails(job.id)}
+                className="w-full sm:w-auto inline-flex items-center justify-center gap-1.5 px-3.5 py-2 text-xs font-bold text-emerald-900 bg-emerald-100 hover:bg-emerald-200 border border-emerald-300 rounded-xl transition-all cursor-pointer"
+                title="You have already applied for this job. Click to view requisition details."
+              >
+                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-700" />
+                <span>Applied ✓</span>
+              </button>
+            ) : (
+              <button
+                onClick={() => onViewDetails(job.id)}
+                className="w-full sm:w-auto inline-flex items-center justify-center gap-1.5 px-4 py-2 text-xs font-bold text-white bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 rounded-xl shadow-xs hover:shadow-md transition-all cursor-pointer btn-glow"
+              >
+                <span>Apply Now</span>
+                <ArrowUpRight className="w-3.5 h-3.5" />
+              </button>
+            )
+          ) : job.status === 'paused' ? (
+            <div className="flex items-center gap-1.5">
+              <button
+                onClick={() => onViewDetails(job.id)}
+                className="inline-flex items-center justify-center gap-1 px-3 py-2 text-xs font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-xl transition-all cursor-pointer"
+                title="View job description and details"
+              >
+                <span>View</span>
+                <ArrowUpRight className="w-3 h-3 text-slate-500" />
+              </button>
+              <button
+                disabled
+                className="inline-flex items-center justify-center gap-1 px-3 py-2 text-xs font-bold text-amber-900 bg-amber-100/90 border border-amber-300 rounded-xl cursor-not-allowed opacity-90 shadow-none"
+                title="This job is temporarily unavailable."
+              >
+                <span>Apply Disabled</span>
+              </button>
+            </div>
+          ) : (
+            <div className="flex items-center gap-1.5">
+              <button
+                onClick={() => onViewDetails(job.id)}
+                className="inline-flex items-center justify-center gap-1 px-3 py-2 text-xs font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-xl transition-all cursor-pointer"
+                title="View job description and details"
+              >
+                <span>View</span>
+                <ArrowUpRight className="w-3 h-3 text-slate-500" />
+              </button>
+              <button
+                disabled
+                className="inline-flex items-center justify-center gap-1 px-3 py-2 text-xs font-bold text-rose-900 bg-rose-100/90 border border-rose-300 rounded-xl cursor-not-allowed opacity-90 shadow-none"
+                title="This job has expired. Applications are no longer being accepted."
+              >
+                <span>Closed</span>
+              </button>
+            </div>
+          )}
         </div>
 
       </div>

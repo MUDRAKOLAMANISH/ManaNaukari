@@ -1,6 +1,7 @@
 import { supabase } from '../lib/supabase';
 import {
   Job,
+  JobStatus,
   JobInsert,
   JobUpdate,
   Category,
@@ -35,10 +36,11 @@ export const jobsService = {
     try {
       let query = supabase.from('jobs').select('*').order('created_at', { ascending: false });
 
-      if (filters.status) {
+      // Always hide deleted jobs from public portal listings
+      query = query.neq('status', 'deleted');
+
+      if (filters.status && filters.status !== 'all') {
         query = query.eq('status', filters.status);
-      } else {
-        query = query.eq('status', 'active');
       }
 
       if (filters.category) {
@@ -99,23 +101,150 @@ export const jobsService = {
     }
   },
 
+  /**
+   * Top Job Announcement Ticker:
+   * Priority A: Job with is_featured = true (or featured = true), status = 'active'
+   * Priority B: Most recently uploaded active job (status = 'active', created_at DESC)
+   */
+  async getTopAnnouncementJob(): Promise<{
+    job: Job | null;
+    isFeatured: boolean;
+    error: Error | null;
+  }> {
+    try {
+      let featuredJob: Job | null = null;
+
+      // Priority A1: Query active job with is_featured = true
+      try {
+        const { data: featData, error: featErr } = await (supabase as any)
+          .from('jobs')
+          .select('*')
+          .eq('status', 'active')
+          .eq('is_featured', true)
+          .order('updated_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+
+        if (!featErr && featData) {
+          featuredJob = featData as Job;
+        }
+      } catch {
+        // column is_featured may not exist in schema cache
+      }
+
+      // Priority A2: If is_featured returned nothing, check legacy featured column
+      if (!featuredJob) {
+        try {
+          const { data: legFeatData, error: legFeatErr } = await supabase
+            .from('jobs')
+            .select('*')
+            .eq('status', 'active')
+            .eq('featured', true)
+            .order('updated_at', { ascending: false })
+            .limit(1)
+            .maybeSingle();
+
+          if (!legFeatErr && legFeatData) {
+            featuredJob = legFeatData as Job;
+          }
+        } catch {
+          // ignore
+        }
+      }
+
+      if (featuredJob) {
+        return { job: featuredJob, isFeatured: true, error: null };
+      }
+
+      // Priority B: If no featured job exists, fetch the newest active job
+      const { data: latestData, error: latestErr } = await supabase
+        .from('jobs')
+        .select('*')
+        .eq('status', 'active')
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (latestErr) throw latestErr;
+
+      return {
+        job: (latestData as Job) || null,
+        isFeatured: false,
+        error: null,
+      };
+    } catch (err: any) {
+      console.error('[jobsService.getTopAnnouncementJob] Error:', err);
+      return { job: null, isFeatured: false, error: err };
+    }
+  },
+
   async create(job: JobInsert): Promise<{ data: Job | null; error: Error | null }> {
     try {
-      const { data, error } = await supabase.from('jobs').insert(job).select().single();
+      // 1. Primary insert attempt
+      let { data, error } = await supabase.from('jobs').insert(job).select().single();
+
+      // 2. Safe Fallback: Handle missing is_featured or stale schema cache (PGRST204 / 42703)
+      if (error && (error.code === 'PGRST204' || error.code === '42703' || error.message?.includes('is_featured'))) {
+        console.warn('[jobsService.create] Column is_featured missing or stale in schema cache, retrying without is_featured');
+        const fallbackJob = { ...(job as any) };
+        delete fallbackJob.is_featured;
+
+        const fallbackRes = await supabase.from('jobs').insert(fallbackJob).select().single();
+        data = fallbackRes.data;
+        error = fallbackRes.error;
+
+        // 3. Fallback for any other optional column issues
+        if (error && (error.code === 'PGRST204' || error.code === '42703')) {
+          console.warn('[jobsService.create] Secondary schema cache warning, inserting core required fields:', error.message);
+          const coreJob: any = {
+            title: job.title,
+            company: job.company,
+            location: job.location || 'Pan India',
+            experience: job.experience || 'Fresher',
+            job_type: job.job_type || 'Fresher',
+            category: job.category || 'Software Engineering',
+            description: job.description,
+            apply_link: job.apply_link,
+            status: job.status || 'active',
+            posted_date: job.posted_date || new Date().toISOString().split('T')[0],
+            featured: Boolean(job.featured),
+          };
+          if (job.skills_required) coreJob.skills_required = job.skills_required;
+          if (job.salary) coreJob.salary = job.salary;
+          if (job.source) coreJob.source = job.source;
+
+          const coreRes = await supabase.from('jobs').insert(coreJob).select().single();
+          data = coreRes.data;
+          error = coreRes.error;
+        }
+      }
+
       return { data: data as Job | null, error };
     } catch (err: any) {
+      console.error('[jobsService.create] Unexpected insertion error:', err);
       return { data: null, error: err };
     }
   },
 
   async update(id: string, updates: JobUpdate): Promise<{ data: Job | null; error: Error | null }> {
     try {
-      const { data, error } = await supabase
+      const payload = { ...updates, updated_at: new Date().toISOString() };
+      let { data, error } = await supabase
         .from('jobs')
-        .update({ ...updates, updated_at: new Date().toISOString() })
+        .update(payload)
         .eq('id', id)
         .select()
         .single();
+
+      if (error && (error.code === 'PGRST204' || error.code === '42703' || error.message?.includes('is_featured'))) {
+        console.warn('[jobsService.update] Retrying update without is_featured');
+        const fallback = { ...(payload as any) };
+        delete fallback.is_featured;
+        const res = await supabase.from('jobs').update(fallback).eq('id', id).select().single();
+        data = res.data;
+        error = res.error;
+      }
+
       return { data: data as Job | null, error };
     } catch (err: any) {
       return { data: null, error: err };
@@ -124,14 +253,29 @@ export const jobsService = {
 
   async delete(id: string): Promise<{ error: Error | null }> {
     try {
-      const { error } = await supabase.from('jobs').delete().eq('id', id);
+      const { error } = await supabase
+        .from('jobs')
+        .update({ status: 'deleted', updated_at: new Date().toISOString() })
+        .eq('id', id);
       return { error };
     } catch (err: any) {
       return { error: err };
     }
   },
 
-  async setStatus(id: string, status: 'active' | 'expired' | 'draft'): Promise<{ error: Error | null }> {
+  async restore(id: string): Promise<{ error: Error | null }> {
+    try {
+      const { error } = await supabase
+        .from('jobs')
+        .update({ status: 'active', updated_at: new Date().toISOString() })
+        .eq('id', id);
+      return { error };
+    } catch (err: any) {
+      return { error: err };
+    }
+  },
+
+  async setStatus(id: string, status: JobStatus): Promise<{ error: Error | null }> {
     try {
       const { error } = await supabase
         .from('jobs')

@@ -5,6 +5,8 @@ import { createServer as createViteServer } from 'vite';
 import { GoogleGenAI, Type } from '@google/genai';
 import multer from 'multer';
 import {
+  extractTextFromPdf,
+  extractTextFromDocx,
   ingestDocument,
   addTextKnowledgeEntry,
   editTextKnowledgeEntry,
@@ -19,6 +21,7 @@ import {
   queryRag,
   KNOWLEDGE_CATEGORIES,
 } from './src/server/knowledgeEngine';
+import { calculateFallbackAtsMatch } from './src/utils/atsKeywordMatcher';
 
 const app = express();
 const port = 3000;
@@ -238,6 +241,165 @@ ${cleanedText || 'No page content could be directly scraped due to firewall. Inf
     isFallback: true,
     message: 'AI models currently experiencing high demand. Opening manual entry mode.',
   });
+});
+
+// Endpoint: ATS Resume Matcher & Score Engine (LinkedIn Premium / Workday style)
+app.post('/api/ats/analyze', upload.single('resume'), async (req, res) => {
+  try {
+    const file = req.file;
+    const {
+      job_id,
+      job_title = 'Job Requisition',
+      company = 'Company',
+      job_description = '',
+      skills_required = '',
+      experience = 'Fresher',
+      category = 'General',
+      candidate_name = '',
+      candidate_email = '',
+      candidate_phone = '',
+    } = req.body;
+
+    if (!file) {
+      return res.status(400).json({ success: false, error: 'Resume file is required (PDF, DOCX, or TXT).' });
+    }
+
+    console.log(`[ATS Server] Analyzing resume for job "${job_title}" at "${company}", File: ${file.originalname} (${file.size} bytes)`);
+
+    // 1. Extract text from uploaded resume buffer
+    let resumeText = '';
+    const ext = path.extname(file.originalname).toLowerCase();
+
+    try {
+      if (ext === '.pdf') {
+        const pdfResult = await extractTextFromPdf(file.buffer);
+        resumeText = pdfResult.text;
+      } else if (ext === '.docx' || ext === '.doc') {
+        const docxResult = await extractTextFromDocx(file.buffer);
+        resumeText = docxResult.text;
+      } else {
+        resumeText = file.buffer.toString('utf-8');
+      }
+    } catch (extractErr) {
+      console.warn('[ATS Server] Primary text extraction warning, extracting ASCII fallback:', extractErr);
+      const bytes = new Uint8Array(file.buffer);
+      let ascii = '';
+      for (let i = 0; i < bytes.length; i++) {
+        const b = bytes[i];
+        if (b >= 32 && b <= 126) ascii += String.fromCharCode(b);
+        else if (b === 10 || b === 13) ascii += ' ';
+      }
+      resumeText = ascii.slice(0, 50000);
+    }
+
+    if (!resumeText || resumeText.trim().length < 10) {
+      resumeText = file.originalname.replace(/[-_.]/g, ' ');
+    }
+
+    console.log(`[ATS Server] Extracted ${resumeText.length} characters from resume.`);
+
+    // 2. Try Gemini 3.8 Flash AI Analysis if API key is configured
+    const apiKey = process.env.GEMINI_API_KEY;
+    if (apiKey) {
+      try {
+        const ai = new GoogleGenAI({ apiKey });
+        const prompt = `You are a world-class Applicant Tracking System (ATS) scoring engine (like LinkedIn Premium / Workday ATS).
+Analyze the candidate's resume text against this job posting.
+
+Target Job Details:
+- Title: ${job_title}
+- Company: ${company}
+- Experience Requirement: ${experience}
+- Category: ${category}
+- Required Skills: ${skills_required}
+- Job Description:
+"""
+${job_description.slice(0, 8000)}
+"""
+
+Candidate Resume Text:
+"""
+${resumeText.slice(0, 25000)}
+"""
+
+Provide an objective, enterprise-grade ATS evaluation:
+1. match_percentage: Integer 0-100 reflecting overall ATS qualification.
+2. skills_score: Integer 0-100 for core skill overlap.
+3. experience_score: Integer 0-100 for work/project history alignment.
+4. education_score: Integer 0-100 for academic/certification alignment.
+5. keyword_score: Integer 0-100 for ATS keyword density.
+6. matched_skills: Array of strings of skills identified in BOTH resume and job description.
+7. missing_skills: Array of strings of required/preferred job skills that are absent from the resume.
+8. recommendations: Array of 3-4 concise, high-value recommendations to optimize the resume.
+9. strengths: Array of 2-3 specific advantages of this candidate.
+10. summary: 2-sentence executive summary.
+
+Return pure JSON.`;
+
+        const response = await ai.models.generateContent({
+          model: 'gemini-3.8-flash',
+          contents: [{ text: prompt }],
+          config: {
+            responseMimeType: 'application/json',
+          },
+        });
+
+        const rawText = response.text ? response.text.trim() : '';
+        if (rawText) {
+          const aiJson = JSON.parse(rawText);
+          const resultData = {
+            job_id: String(job_id || ''),
+            job_title,
+            company,
+            candidate_name: candidate_name || undefined,
+            candidate_email: candidate_email || undefined,
+            candidate_phone: candidate_phone || undefined,
+            resume_file_name: file.originalname,
+            match_percentage: Math.min(100, Math.max(20, Math.round(Number(aiJson.match_percentage) || 75))),
+            skills_score: Math.min(100, Math.max(20, Math.round(Number(aiJson.skills_score) || 75))),
+            experience_score: Math.min(100, Math.max(20, Math.round(Number(aiJson.experience_score) || 75))),
+            education_score: Math.min(100, Math.max(20, Math.round(Number(aiJson.education_score) || 80))),
+            keyword_score: Math.min(100, Math.max(20, Math.round(Number(aiJson.keyword_score) || 70))),
+            matched_skills: Array.isArray(aiJson.matched_skills) ? aiJson.matched_skills : [],
+            missing_skills: Array.isArray(aiJson.missing_skills) ? aiJson.missing_skills : [],
+            recommendations: Array.isArray(aiJson.recommendations) ? aiJson.recommendations : [],
+            strengths: Array.isArray(aiJson.strengths) ? aiJson.strengths : [],
+            summary: aiJson.summary || `Resume shows high alignment with ${company}'s requirements for ${job_title}.`,
+            analysis_source: 'ai',
+            created_at: new Date().toISOString(),
+          };
+
+          console.log(`[ATS Server] AI analysis complete. Score: ${resultData.match_percentage}%`);
+          return res.json({ success: true, data: resultData });
+        }
+      } catch (geminiErr: any) {
+        console.warn('[ATS Server] Gemini AI scoring failed, engaging deterministic fallback:', geminiErr?.message);
+      }
+    } else {
+      console.warn('[ATS Server] GEMINI_API_KEY not configured, engaging deterministic fallback.');
+    }
+
+    // 3. Fallback: Deterministic Keyword & Heuristics Matcher
+    const fallback = calculateFallbackAtsMatch({
+      resumeText,
+      resumeFileName: file.originalname,
+      jobId: String(job_id || ''),
+      jobTitle: job_title,
+      company,
+      jobDescription: job_description,
+      skillsRequired: skills_required,
+      experienceRequired: experience,
+      candidateName: candidate_name,
+      candidateEmail: candidate_email,
+      candidatePhone: candidate_phone,
+    });
+
+    console.log(`[ATS Server] Deterministic fallback complete. Score: ${fallback.match_percentage}%`);
+    return res.json({ success: true, data: fallback });
+  } catch (err: any) {
+    console.error('[ATS Server] Uncaught error in /api/ats/analyze:', err);
+    return res.status(500).json({ success: false, error: err.message || 'ATS analysis failed' });
+  }
 });
 
 // Endpoint to send Welcome Job Alerts Email via Resend

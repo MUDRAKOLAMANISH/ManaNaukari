@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Job, JobInsert, Category } from '../../types/database.types';
+import { Job, JobInsert, JobStatus, Category } from '../../types/database.types';
 import { adminJobsService } from '../../services/adminJobsService';
 import { normalizeSkills } from '../../utils/skillUtils';
 import { 
@@ -45,7 +45,7 @@ export const JobForm: React.FC<JobFormProps> = ({
   const [featured, setFeatured] = useState(false);
   const [postedDate, setPostedDate] = useState(new Date().toISOString().split('T')[0]);
   const [expiryDate, setExpiryDate] = useState('');
-  const [status, setStatus] = useState<'active' | 'expired' | 'draft'>('active');
+  const [status, setStatus] = useState<JobStatus>('active');
 
   // State
   const [categories, setCategories] = useState<Category[]>([]);
@@ -62,10 +62,39 @@ export const JobForm: React.FC<JobFormProps> = ({
   // Load categories and hydrate if initialData exists
   useEffect(() => {
     const fetchCats = async () => {
-      const data = await adminJobsService.getCategories();
-      setCategories(data);
-      if (data.length > 0 && !initialData) {
-        setCategory(data[0].category_name);
+      console.log('[JobForm] Loading categories...');
+      const dbCategories = await adminJobsService.getCategories();
+      const defaultCategories = [
+        'Software Engineering',
+        'Data & Analytics',
+        'QA & Testing',
+        'Cloud & DevOps',
+        'Operations & Support',
+        'Internship',
+        'Full Stack Development',
+        'Product Management',
+        'UI/UX Design',
+        'Marketing & Sales',
+        'General',
+      ];
+      
+      const categoryNames = new Set(dbCategories.map((c) => c.category_name));
+      defaultCategories.forEach((catName) => categoryNames.add(catName));
+      if (initialData?.category) {
+        categoryNames.add(initialData.category);
+      }
+      
+      const mergedList: Category[] = Array.from(categoryNames).map((name, idx) => ({
+        id: `cat-${idx}-${name}`,
+        category_name: name,
+        created_at: new Date().toISOString(),
+      }));
+      
+      setCategories(mergedList);
+      if (initialData?.category) {
+        setCategory(initialData.category);
+      } else if (mergedList.length > 0) {
+        setCategory(mergedList[0].category_name);
       }
     };
     fetchCats();
@@ -73,6 +102,12 @@ export const JobForm: React.FC<JobFormProps> = ({
 
   useEffect(() => {
     if (initialData) {
+      console.log('[JobForm] Hydrated form with initialData for edit:', {
+        id: initialData.id,
+        title: initialData.title,
+        company: initialData.company,
+        status: initialData.status,
+      });
       setTitle(initialData.title || '');
       setCompany(initialData.company || '');
       setCompanyLogo(initialData.company_logo || '');
@@ -85,7 +120,7 @@ export const JobForm: React.FC<JobFormProps> = ({
       setDescription(initialData.description || '');
       setApplyLink(initialData.apply_link || '');
       setSource(initialData.source || 'Official Careers Portal');
-      setFeatured(initialData.featured || false);
+      setFeatured(Boolean((initialData as any).is_featured ?? initialData.featured ?? false));
       setPostedDate(initialData.posted_date || new Date().toISOString().split('T')[0]);
       setExpiryDate(initialData.expiry_date || '');
       setStatus(initialData.status || 'active');
@@ -136,6 +171,7 @@ export const JobForm: React.FC<JobFormProps> = ({
         apply_link: applyLink.trim(),
         source: source.trim() || 'Official Careers Portal',
         featured,
+        is_featured: featured,
         status,
         posted_date: postedDate,
         expiry_date: expiryDate.trim() || null,
@@ -173,11 +209,18 @@ export const JobForm: React.FC<JobFormProps> = ({
           onSaved(data);
         }
       } else if (mode === 'edit' && initialData && initialData.id) {
+        console.log('[JobForm.handleSubmit] Updating job ID:', initialData.id, 'with payload:', jobPayload);
         const { data, error } = await adminJobsService.updateJob(initialData.id, jobPayload);
         if (error || !data) {
+          console.error('[JobForm.handleSubmit] Error updating job in Supabase:', error);
           throw error || new Error('Failed to update job in Supabase');
         }
-        setSuccessMessage('Job changes saved to Supabase successfully!');
+        console.log('[JobForm.handleSubmit] Job updated successfully in Supabase:', data);
+        setSuccessMessage('Job changes saved to Supabase successfully! All applications, views, and analytics are preserved.');
+        setToastNotification({
+          message: `Job "${data.title}" updated successfully!`,
+          type: 'success',
+        });
         onSaved(data);
       }
     } catch (err: any) {
@@ -443,26 +486,33 @@ export const JobForm: React.FC<JobFormProps> = ({
             </label>
             <select
               value={status}
-              onChange={(e) => setStatus(e.target.value as any)}
+              onChange={(e) => setStatus(e.target.value as JobStatus)}
               className="w-full px-3.5 py-2.5 text-xs sm:text-sm border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-600 focus:outline-none bg-white font-bold capitalize"
             >
-              <option value="active">Active</option>
-              <option value="expired">Expired</option>
+              <option value="active">Active (🟢 Live &amp; Accepting Applications)</option>
+              <option value="paused">Paused (🟡 Temporarily Unavailable)</option>
+              <option value="expired">Expired (🔴 Applications Closed)</option>
+              <option value="closed">Closed</option>
               <option value="draft">Draft</option>
+              <option value="deleted">Deleted (Soft-Deleted)</option>
             </select>
           </div>
         </div>
 
         <div className="pt-2">
-          <label className="inline-flex items-center gap-2 cursor-pointer select-none">
+          <label className="inline-flex items-center gap-2.5 cursor-pointer select-none group bg-slate-50 hover:bg-amber-50/60 p-3 rounded-xl border border-slate-200 hover:border-amber-300 transition-all">
             <input
               type="checkbox"
+              id="mark_featured_job_input"
               checked={featured}
               onChange={(e) => setFeatured(e.target.checked)}
-              className="w-4 h-4 text-blue-600 rounded border-slate-300 focus:ring-blue-500"
+              className="w-4 h-4 text-amber-600 rounded border-slate-300 focus:ring-amber-500 cursor-pointer"
             />
-            <span className="text-xs font-semibold text-slate-800">
-              Mark as Featured Job (Pin to Top / Spotlight)
+            <span className="text-xs font-bold text-slate-800 group-hover:text-amber-950 flex flex-wrap items-center gap-1.5">
+              <span>⭐ Mark as Featured Job</span>
+              <span className="text-[11px] font-normal text-slate-500 group-hover:text-amber-800">
+                (Displays in Top Announcement Bar with 🔥 Featured Job badge)
+              </span>
             </span>
           </label>
         </div>
@@ -558,10 +608,10 @@ export const JobForm: React.FC<JobFormProps> = ({
             {isSubmitting ? (
               <>
                 <Loader2 className="w-4 h-4 animate-spin" />
-                <span>Saving to Supabase...</span>
+                <span>{mode === 'create' ? 'Publishing Job...' : 'Updating Job...'}</span>
               </>
             ) : (
-              <span>{mode === 'create' ? 'Publish Job Listing' : 'Save Changes'}</span>
+              <span>{mode === 'create' ? 'Publish Job Listing' : 'Update Job'}</span>
             )}
           </button>
         </div>

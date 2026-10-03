@@ -82,7 +82,7 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
           companiesRes,
           resumeReviewsCountRes,
         ] = await Promise.allSettled([
-          jobsService.getAll({ status: 'active', limit: 50 }),
+          jobsService.getAll({ limit: 50 }),
           categoriesService.getAll(),
           jobsService.getActiveCount(),
           jobsService.getDistinctActiveCompaniesCount(),

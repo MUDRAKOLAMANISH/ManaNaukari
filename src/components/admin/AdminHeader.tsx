@@ -9,6 +9,7 @@ interface AdminHeaderProps {
   onNavigate: (path: string) => void;
   showAddButton?: boolean;
   showImportButton?: boolean;
+  showBulkImportButton?: boolean;
 }
 
 export const AdminHeader: React.FC<AdminHeaderProps> = ({
@@ -17,6 +18,7 @@ export const AdminHeader: React.FC<AdminHeaderProps> = ({
   onNavigate,
   showAddButton = false,
   showImportButton = true,
+  showBulkImportButton = true,
 }) => {
   const { adminProfile, signOut } = useAuth();
   const currentPath = typeof window !== 'undefined' ? window.location.pathname : '';
@@ -157,6 +159,17 @@ export const AdminHeader: React.FC<AdminHeaderProps> = ({
         </div>
 
         <div className="flex items-center gap-2 flex-wrap">
+          {showBulkImportButton && (
+            <button
+              onClick={() => onNavigate('/admin/bulk-import')}
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-bold text-indigo-700 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 rounded-xl transition-colors cursor-pointer"
+              title="Import up to 10 career URLs at once and generate WhatsApp/LinkedIn messages"
+            >
+              <Layers className="w-3.5 h-3.5 text-indigo-600" />
+              <span>Bulk Job Import</span>
+            </button>
+          )}
+
           {showImportButton && (
             <button
               onClick={() => onNavigate('/admin/import-job')}

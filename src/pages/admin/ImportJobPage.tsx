@@ -4,7 +4,7 @@ import { JobForm } from '../../components/admin/JobForm';
 import { Job } from '../../types/database.types';
 import { 
   Sparkles, Globe, ArrowRight, Loader2, AlertCircle, 
-  CheckCircle2, RefreshCw, FileText, Info, Edit3
+  CheckCircle2, RefreshCw, FileText, Info, Edit3, Layers
 } from 'lucide-react';
 
 interface ImportJobPageProps {
@@ -178,6 +178,27 @@ export const ImportJobPage: React.FC<ImportJobPageProps> = ({ onNavigate }) => {
         onNavigate={onNavigate}
         showAddButton={false}
       />
+
+      {/* Mode switcher: Single URL vs Bulk Import */}
+      <div className="flex items-center gap-2 border-b border-slate-200 pb-3">
+        <button
+          type="button"
+          onClick={() => {}}
+          className="inline-flex items-center gap-2 px-4 py-2 text-xs sm:text-sm font-bold text-blue-700 bg-blue-50 border border-blue-200/80 rounded-xl shadow-2xs"
+        >
+          <Sparkles className="w-4 h-4 text-blue-600" />
+          <span>Single URL Assistant</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => onNavigate('/admin/bulk-import')}
+          className="inline-flex items-center gap-2 px-4 py-2 text-xs sm:text-sm font-semibold text-slate-600 hover:text-slate-900 hover:bg-white rounded-xl border border-transparent transition-colors cursor-pointer"
+        >
+          <Layers className="w-4 h-4 text-indigo-600" />
+          <span>Bulk Import (Up to 10 URLs)</span>
+        </button>
+      </div>
 
       {/* Progress / Step Indicators */}
       <div className="grid grid-cols-2 gap-3 bg-slate-100 p-1.5 rounded-2xl border border-slate-200/90 text-xs font-semibold">

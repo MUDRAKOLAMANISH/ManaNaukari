@@ -39,13 +39,18 @@ export const DeleteConfirmModal: React.FC<DeleteConfirmModalProps> = ({
 
         <div>
           <h3 className="text-base font-bold text-slate-900">
-            Delete Job Listing?
+            Soft Delete Job Listing?
           </h3>
           <p className="text-xs sm:text-sm text-slate-600 mt-1 leading-relaxed">
-            Are you sure you want to permanently delete <strong className="text-slate-900">&quot;{jobTitle}&quot;</strong> from Supabase? This action cannot be reversed.
+            Are you sure you want to remove <strong className="text-slate-900">&quot;{jobTitle}&quot;</strong> from public view?
           </p>
-          <div className="mt-3 p-3 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-900">
-            <strong>Recruiter Tip:</strong> If the vacancy has concluded, you can use <strong>&quot;Expire&quot;</strong> instead to keep candidate application analytics intact.
+          <div className="mt-3 p-3.5 bg-emerald-50 border border-emerald-200 rounded-xl text-xs text-emerald-900 space-y-1">
+            <div className="font-bold flex items-center gap-1.5 text-emerald-800">
+              <span>🛡️ Data Integrity Guarantee</span>
+            </div>
+            <p className="leading-relaxed">
+              This job will be moved to <strong className="text-emerald-950">Deleted status</strong> and hidden from candidates. All candidate applications, resume records, views, and analytics are <strong className="text-emerald-950">permanently preserved</strong>. You can restore this job at any time.
+            </p>
           </div>
         </div>
 
@@ -66,7 +71,7 @@ export const DeleteConfirmModal: React.FC<DeleteConfirmModalProps> = ({
             className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-bold text-white bg-rose-600 hover:bg-rose-700 active:bg-rose-800 disabled:opacity-50 rounded-xl transition-colors cursor-pointer"
           >
             <Trash2 className="w-3.5 h-3.5" />
-            <span>{isDeleting ? 'Deleting...' : 'Delete Permanently'}</span>
+            <span>{isDeleting ? 'Deleting...' : 'Soft Delete Job'}</span>
           </button>
         </div>
       </div>

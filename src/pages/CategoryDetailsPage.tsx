@@ -105,7 +105,6 @@ export const CategoryDetailsPage: React.FC<CategoryDetailsPageProps> = ({
         // 3. Query jobs belonging to that category
         const { data: jobsData } = await jobsService.getAll({
           category: matchedCatName,
-          status: 'active',
           limit: 60,
         });
 

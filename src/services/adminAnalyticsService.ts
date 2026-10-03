@@ -22,16 +22,25 @@ export const adminAnalyticsService = {
     let tablesReady = true;
     let tableErrorMessage: string | null = null;
 
-    // 1. Fetch Job counts (Active vs Expired)
+    // 1. Fetch Job counts (Active vs Paused vs Expired vs Closed vs Deleted)
     let activeJobs = 0;
+    let pausedJobs = 0;
     let expiredJobs = 0;
+    let closedJobs = 0;
+    let deletedJobs = 0;
     try {
-      const [activeJobsRes, expiredJobsRes] = await Promise.all([
+      const [activeJobsRes, pausedJobsRes, expiredJobsRes, closedJobsRes, deletedJobsRes] = await Promise.all([
         supabase.from('jobs').select('id', { count: 'exact', head: true }).eq('status', 'active'),
+        supabase.from('jobs').select('id', { count: 'exact', head: true }).eq('status', 'paused'),
         supabase.from('jobs').select('id', { count: 'exact', head: true }).eq('status', 'expired'),
+        supabase.from('jobs').select('id', { count: 'exact', head: true }).eq('status', 'closed'),
+        supabase.from('jobs').select('id', { count: 'exact', head: true }).eq('status', 'deleted'),
       ]);
       activeJobs = activeJobsRes.count || 0;
+      pausedJobs = pausedJobsRes.count || 0;
       expiredJobs = expiredJobsRes.count || 0;
+      closedJobs = closedJobsRes.count || 0;
+      deletedJobs = deletedJobsRes.count || 0;
     } catch (err: any) {
       console.warn('[AdminAnalyticsService] Jobs count notice:', err);
     }
@@ -324,7 +333,10 @@ export const adminAnalyticsService = {
       totalApplications,
       todayApplications,
       activeJobs,
+      pausedJobs,
       expiredJobs,
+      closedJobs,
+      deletedJobs,
       totalJobViews,
       conversionRate,
       visitorsByDay,

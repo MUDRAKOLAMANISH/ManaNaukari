@@ -51,25 +51,47 @@ export const AdminApplicantsPage: React.FC<AdminApplicantsPageProps> = ({ onNavi
     else setLoading(true);
 
     try {
-      // First attempt: Select applicants with joined visitor_profiles and jobs
-      // Note: visitor_profiles contains (id, name, email, phone, created_at).
-      // If applicants table has status/notes/resume_url columns, fetch them. If not yet migrated, fallback smoothly.
+      // First attempt: Select applicants with joined candidate_profiles, visitor_profiles and jobs
       let { data, error } = await supabase
         .from('applicants')
         .select(`
           id,
           visitor_id,
+          candidate_profile_id,
           job_id,
           status,
           notes,
           resume_url,
           created_at,
+          candidate:candidate_profiles(id, name, email, mobile, resume_url, resume_file_name, created_at),
           visitor:visitor_profiles(id, name, email, phone, created_at),
-          job:jobs(id, title, company, location, category, job_type, salary, experience)
+          job:jobs(id, title, company, location, category, job_type, salary, experience, status)
         `)
         .order('created_at', { ascending: false });
 
-      // Fallback: If status/notes/resume_url columns have not yet been added to applicants table in user's Supabase instance
+      // Fallback 1: If candidate_profile_id / candidate_profiles relation not yet present
+      if (error) {
+        console.warn('[AdminApplicantsPage] Primary candidate_profiles query failed, running standard fallback:', error.message);
+        const fallback1 = await supabase
+          .from('applicants')
+          .select(`
+            id,
+            visitor_id,
+            job_id,
+            status,
+            notes,
+            resume_url,
+            created_at,
+            visitor:visitor_profiles(id, name, email, phone, created_at),
+            job:jobs(id, title, company, location, category, job_type, salary, experience, status)
+          `)
+          .order('created_at', { ascending: false });
+
+        data = fallback1.data as any;
+        error = fallback1.error;
+      }
+
+      // Fallback 2: If status/notes columns missing in legacy instance
       if (error && (error.code === '42703' || error.message?.includes('does not exist'))) {
         console.warn('[AdminApplicantsPage] Standard query failed due to missing columns, running legacy schema fallback:', error.message);
         const fallbackRes = await supabase
@@ -80,7 +102,7 @@ export const AdminApplicantsPage: React.FC<AdminApplicantsPageProps> = ({ onNavi
             job_id,
             created_at,
             visitor:visitor_profiles(id, name, email, phone, created_at),
-            job:jobs(id, title, company, location, category, job_type, salary, experience)
+            job:jobs(id, title, company, location, category, job_type, salary, experience, status)
           `)
           .order('created_at', { ascending: false });
 
@@ -91,15 +113,33 @@ export const AdminApplicantsPage: React.FC<AdminApplicantsPageProps> = ({ onNavi
       if (error) {
         console.error('[AdminApplicantsPage] Error loading applicants:', error);
       } else if (data) {
-        // Normalize single vs array foreign key joins from PostgREST
-        const normalized: Applicant[] = (data as any[]).map((row) => ({
-          ...row,
-          status: row.status || 'New',
-          notes: row.notes || null,
-          resume_url: row.resume_url || null,
-          visitor: Array.isArray(row.visitor) ? row.visitor[0] : row.visitor,
-          job: Array.isArray(row.job) ? row.job[0] : row.job,
-        }));
+        // Normalize single vs array foreign key joins from PostgREST and unify candidate profile
+        const normalized: Applicant[] = (data as any[]).map((row) => {
+          const cand = Array.isArray(row.candidate) ? row.candidate[0] : row.candidate;
+          const vis = Array.isArray(row.visitor) ? row.visitor[0] : row.visitor;
+
+          // Consolidated unified profile
+          const unifiedVisitor = {
+            id: cand?.id || vis?.id || row.candidate_profile_id || row.visitor_id,
+            name: cand?.name || vis?.name || 'Anonymous Candidate',
+            email: cand?.email || vis?.email || 'N/A',
+            phone: cand?.mobile || vis?.phone || 'N/A',
+            resume_url: cand?.resume_url || row.resume_url || vis?.resume_url || null,
+            created_at: cand?.created_at || vis?.created_at || row.created_at,
+          };
+
+          return {
+            ...row,
+            candidate_profile_id: row.candidate_profile_id || cand?.id || null,
+            status: row.status || 'New',
+            notes: row.notes || null,
+            resume_url: cand?.resume_url || row.resume_url || vis?.resume_url || null,
+            resume_file_name: cand?.resume_file_name || row.resume_file_name || null,
+            visitor: unifiedVisitor,
+            candidate: cand || null,
+            job: Array.isArray(row.job) ? row.job[0] : row.job,
+          };
+        });
         setApplicants(normalized);
       } else {
         setApplicants([]);
@@ -115,6 +155,20 @@ export const AdminApplicantsPage: React.FC<AdminApplicantsPageProps> = ({ onNavi
   useEffect(() => {
     fetchApplicants();
   }, []);
+
+  // Candidate applications map to display profile history and count
+  const candidateApplicationsMap = useMemo(() => {
+    const map = new Map<string, Applicant[]>();
+    applicants.forEach((app) => {
+      const emailKey = (app.visitor?.email || app.candidate?.email || '').toLowerCase().trim();
+      if (emailKey && emailKey !== 'n/a' && emailKey !== 'no email provided') {
+        const list = map.get(emailKey) || [];
+        list.push(app);
+        map.set(emailKey, list);
+      }
+    });
+    return map;
+  }, [applicants]);
 
   const showToast = (msg: string) => {
     setToastMessage(msg);
@@ -733,11 +787,26 @@ export const AdminApplicantsPage: React.FC<AdminApplicantsPageProps> = ({ onNavi
                         
                         {/* 1. Applicant Name */}
                         <td className="py-4 px-4 sm:px-6">
-                          <div className="font-bold text-slate-900 text-sm">
-                            {app.visitor?.name || 'Anonymous Candidate'}
+                          <div className="font-bold text-slate-900 text-sm flex items-center gap-1.5 flex-wrap">
+                            <span>{app.visitor?.name || 'Anonymous Candidate'}</span>
+                            {(() => {
+                              const emailKey = (app.visitor?.email || '').toLowerCase().trim();
+                              const historyCount = candidateApplicationsMap.get(emailKey)?.length || 1;
+                              return historyCount > 1 ? (
+                                <span 
+                                  className="text-[10px] font-bold bg-blue-50 text-blue-700 px-2 py-0.5 rounded-full border border-blue-200"
+                                  title={`Candidate profile has ${historyCount} total applications across postings`}
+                                >
+                                  📋 {historyCount} Applications
+                                </span>
+                              ) : null;
+                            })()}
                           </div>
-                          <div className="text-[10px] text-slate-400 font-mono mt-0.5">
-                            ID: #{app.id ? String(app.id).substring(0, 8).toUpperCase() : 'APP'}
+                          <div className="text-[10px] text-slate-400 font-mono mt-0.5 flex items-center gap-2">
+                            <span>ID: #{app.id ? String(app.id).substring(0, 8).toUpperCase() : 'APP'}</span>
+                            {app.candidate_profile_id && (
+                              <span className="text-indigo-600 bg-indigo-50 px-1 rounded text-[9px]">Verified Profile</span>
+                            )}
                           </div>
                         </td>
 
@@ -772,8 +841,28 @@ export const AdminApplicantsPage: React.FC<AdminApplicantsPageProps> = ({ onNavi
 
                         {/* 3. Applied Job Title */}
                         <td className="py-4 px-4">
-                          <div className="font-semibold text-slate-800">
-                            {app.job?.title || 'Open Role'}
+                          <div className="font-semibold text-slate-800 flex items-center gap-1.5 flex-wrap">
+                            <span>{app.job?.title || 'Open Role'}</span>
+                            {app.job?.status === 'paused' && (
+                              <span className="text-[10px] bg-amber-50 text-amber-900 px-1.5 py-0.5 rounded font-bold border border-amber-300">
+                                🟡 Paused
+                              </span>
+                            )}
+                            {app.job?.status === 'expired' && (
+                              <span className="text-[10px] bg-rose-50 text-rose-900 px-1.5 py-0.5 rounded font-bold border border-rose-300">
+                                🔴 Expired
+                              </span>
+                            )}
+                            {app.job?.status === 'deleted' && (
+                              <span className="text-[10px] bg-slate-100 text-slate-700 px-1.5 py-0.5 rounded font-bold border border-slate-300">
+                                🗑️ Deleted Job
+                              </span>
+                            )}
+                            {app.job?.status === 'closed' && (
+                              <span className="text-[10px] bg-slate-100 text-slate-700 px-1.5 py-0.5 rounded font-semibold border border-slate-200">
+                                Closed Job
+                              </span>
+                            )}
                           </div>
                           <div className="text-[11px] text-slate-400">
                             {app.job?.category || 'General'}
@@ -1044,6 +1133,62 @@ export const AdminApplicantsPage: React.FC<AdminApplicantsPageProps> = ({ onNavi
                   )}
                 </div>
               </div>
+
+              {/* 7b. Candidate Application History (Profile Reference) */}
+              {(() => {
+                const emailKey = (selectedApplicant.visitor?.email || '').toLowerCase().trim();
+                const historyList = candidateApplicationsMap.get(emailKey) || [selectedApplicant];
+                return (
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <h4 className="text-xs font-bold uppercase text-slate-500 tracking-wider">
+                        Candidate Application History ({historyList.length})
+                      </h4>
+                      <span className="text-[11px] font-semibold text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full border border-blue-200">
+                        Profile: {selectedApplicant.candidate_profile_id ? `ID #${String(selectedApplicant.candidate_profile_id).substring(0, 8)}` : 'Recognized'}
+                      </span>
+                    </div>
+
+                    <div className="space-y-2 bg-slate-50 p-3 rounded-2xl border border-slate-200/80">
+                      {historyList.map((hApp) => (
+                        <div 
+                          key={hApp.id} 
+                          className={`p-3 rounded-xl border transition-colors flex items-center justify-between gap-3 text-xs ${
+                            hApp.id === selectedApplicant.id 
+                              ? 'bg-blue-50/80 border-blue-300' 
+                              : 'bg-white border-slate-200 hover:border-slate-300'
+                          }`}
+                        >
+                          <div className="space-y-0.5 min-w-0">
+                            <div className="font-bold text-slate-900 truncate">
+                              {hApp.job?.title || 'Open Requisition'}
+                            </div>
+                            <div className="text-[11px] text-slate-500 flex items-center gap-1.5 truncate">
+                              <span className="font-medium text-slate-700">{hApp.job?.company || 'Employer'}</span>
+                              <span>&bull;</span>
+                              <span>{hApp.created_at ? new Date(hApp.created_at).toLocaleDateString() : 'Recent'}</span>
+                            </div>
+                          </div>
+
+                          <div className="shrink-0 flex items-center gap-2">
+                            <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                              hApp.status === 'Shortlisted' ? 'bg-emerald-100 text-emerald-800' :
+                              hApp.status === 'Rejected' ? 'bg-rose-100 text-rose-800' :
+                              hApp.status === 'Reviewed' ? 'bg-purple-100 text-purple-800' :
+                              'bg-blue-100 text-blue-800'
+                            }`}>
+                              {hApp.status || 'New'}
+                            </span>
+                            {hApp.id === selectedApplicant.id && (
+                              <span className="text-[10px] font-bold text-blue-600">Current</span>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })()}
 
               {/* 8. Admin Internal Notes */}
               <div className="space-y-3">

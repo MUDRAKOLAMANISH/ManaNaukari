@@ -4,7 +4,7 @@
  */
 
 export type JobType = 'Fresher' | 'Internship' | 'Full Time' | 'Part Time' | 'Contract';
-export type JobStatus = 'active' | 'expired' | 'draft';
+export type JobStatus = 'active' | 'paused' | 'closed' | 'deleted' | 'expired' | 'draft';
 export type ExperienceLevel = 'Fresher' | '0-1 Years' | '1-3 Years' | 'Any';
 export type AdminRole = 'super_admin' | 'editor';
 
@@ -24,6 +24,7 @@ export interface Job {
   apply_link: string;
   source?: string | null;
   featured: boolean;
+  is_featured?: boolean;
   status: JobStatus;
   posted_date: string;
   expiry_date?: string | null;
@@ -81,7 +82,7 @@ export type ContactMessageInsert = Omit<ContactMessage, 'id' | 'created_at'> & {
   created_at?: string;
 };
 
-// 5. Table: visitor_profiles
+// 5. Table: visitor_profiles (Legacy Lead Capture)
 export interface VisitorProfile {
   id: string;
   name: string;
@@ -97,28 +98,68 @@ export type VisitorProfileInsert = Omit<VisitorProfile, 'id' | 'created_at'> & {
   created_at?: string;
 };
 
+// 5b. Table: candidate_profiles (LinkedIn/Indeed style persistent candidate profile)
+export interface CandidateProfile {
+  id: string;
+  name: string;
+  email: string;
+  mobile: string;
+  resume_url?: string | null;
+  resume_file_name?: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export type CandidateProfileInsert = {
+  id?: string;
+  name: string;
+  email: string;
+  mobile: string;
+  resume_url?: string | null;
+  resume_file_name?: string | null;
+  created_at?: string;
+  updated_at?: string;
+};
+
+export type CandidateProfileUpdate = Partial<CandidateProfileInsert>;
+
 // 6. Table: applicants
 export type ApplicantStatus = 'New' | 'Reviewed' | 'Shortlisted' | 'Rejected' | 'new' | 'reviewed' | 'shortlisted' | 'rejected';
 
 export interface Applicant {
   id: string;
   visitor_id: string;
+  candidate_profile_id?: string | null;
   job_id: string;
   status?: ApplicantStatus;
   notes?: string | null;
   resume_url?: string | null;
+  resume_file_name?: string | null;
+  applied_at?: string;
+  last_reapplied_at?: string | null;
+  attempt_count?: number;
+  application_status?: string;
   created_at: string;
   updated_at?: string;
   // Optional joined models
   visitor?: VisitorProfile;
+  candidate?: CandidateProfile;
   job?: Job;
 }
 
-export type ApplicantInsert = Omit<Applicant, 'id' | 'created_at' | 'visitor' | 'job'> & {
+export type ApplicantInsert = {
   id?: string;
+  visitor_id?: string;
+  candidate_profile_id?: string | null;
+  job_id: string;
   status?: ApplicantStatus;
   notes?: string | null;
   resume_url?: string | null;
+  resume_file_name?: string | null;
+  applied_at?: string;
+  last_reapplied_at?: string | null;
+  attempt_count?: number;
+  application_status?: string;
   created_at?: string;
   updated_at?: string;
 };
@@ -419,7 +460,10 @@ export interface AnalyticsOverview {
   totalApplications: number;
   todayApplications: number;
   activeJobs: number;
+  pausedJobs?: number;
   expiredJobs: number;
+  closedJobs?: number;
+  deletedJobs?: number;
   totalJobViews: number;
   conversionRate: number; // percentage
   visitorsByDay: DailyMetricPoint[];
@@ -429,4 +473,27 @@ export interface AnalyticsOverview {
   alertDeliveryStats?: AlertDeliveryStats;
   tablesReady: boolean;
   tableErrorMessage?: string | null;
+}
+
+// 12. Table: resume_match_results
+export interface ResumeMatchResultRecord {
+  id: string;
+  job_id: string;
+  job_title: string;
+  company: string;
+  candidate_name?: string | null;
+  candidate_email?: string | null;
+  candidate_phone?: string | null;
+  resume_file_name?: string | null;
+  match_percentage: number;
+  skills_score: number;
+  experience_score: number;
+  education_score: number;
+  keyword_score: number;
+  matched_skills: string[];
+  missing_skills: string[];
+  recommendations: string[];
+  strengths: string[];
+  summary?: string | null;
+  created_at: string;
 }

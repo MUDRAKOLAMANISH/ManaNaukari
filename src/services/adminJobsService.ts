@@ -72,18 +72,33 @@ export const adminJobsService = {
   /**
    * Fetch single job by ID for edit mode
    */
-  async getJobById(id: string): Promise<{ data: Job | null; error: Error | null }> {
+  async getJobById(id: string | number): Promise<{ data: Job | null; error: Error | null }> {
     try {
+      console.log(`[adminJobsService.getJobById] Fetching job requisition for ID: ${id}`);
+      const cleanId = String(id).trim();
+
       const { data, error } = await supabase
         .from('jobs')
         .select('*')
-        .eq('id', id)
+        .eq('id', cleanId)
         .single();
 
-      if (error) throw error;
+      if (error) {
+        console.error(`[adminJobsService.getJobById] Supabase error for ID ${id}:`, error);
+        throw error;
+      }
+
+      console.log(`[adminJobsService.getJobById] Successfully fetched job for edit:`, {
+        id: data?.id,
+        title: data?.title,
+        company: data?.company,
+        status: data?.status,
+        category: data?.category,
+      });
+
       return { data: data as Job, error: null };
     } catch (err: any) {
-      console.error(`Error fetching job ${id}:`, err);
+      console.error(`[adminJobsService.getJobById] Exception fetching job ${id}:`, err);
       return { data: null, error: err };
     }
   },
@@ -111,13 +126,50 @@ export const adminJobsService = {
    */
   async createJob(payload: JobInsert): Promise<{ data: Job | null; error: Error | null }> {
     try {
-      const { data, error } = await supabase
+      console.log('[adminJobsService.createJob] Creating job in Supabase:', payload.title);
+      const isFeatured = Boolean(payload.is_featured ?? payload.featured);
+
+      // Requirement 6 & 7: If admin marks this job as featured, replace previous featured jobs
+      if (isFeatured) {
+        try {
+          await (supabase as any).from('jobs').update({ is_featured: false, featured: false }).neq('id', 'temp_id');
+        } catch {
+          try {
+            await supabase.from('jobs').update({ featured: false }).neq('id', 'temp_id');
+          } catch {}
+        }
+      }
+
+      // Try inserting with both is_featured and featured
+      let { data, error } = await supabase
         .from('jobs')
-        .insert([payload])
+        .insert([{
+          ...payload,
+          featured: isFeatured,
+          is_featured: isFeatured,
+        }])
         .select()
         .single();
 
+      // Fallback if is_featured column is not yet present in schema cache
+      if (error && (error.code === 'PGRST204' || error.message?.includes('is_featured'))) {
+        console.warn('[adminJobsService.createJob] is_featured column missing in schema cache, retrying with featured only');
+        const { is_featured: _, ...fallbackPayload } = payload as any;
+        const fallbackRes = await supabase
+          .from('jobs')
+          .insert([{
+            ...fallbackPayload,
+            featured: isFeatured,
+          }])
+          .select()
+          .single();
+        data = fallbackRes.data;
+        error = fallbackRes.error;
+      }
+
       if (error) throw error;
+
+      console.log('[adminJobsService.createJob] Job created successfully, ID:', data?.id);
 
       // When a new job is created and marked 'active', trigger automatic job alert broadcast
       if (data && data.status === 'active') {
@@ -133,22 +185,69 @@ export const adminJobsService = {
 
   /**
    * Update an existing job in Supabase
+   * Preserves historical applications, analytics, and recruiter records permanently
    */
-  async updateJob(id: string, payload: JobUpdate): Promise<{ data: Job | null; error: Error | null }> {
+  async updateJob(id: string | number, payload: JobUpdate): Promise<{ data: Job | null; error: Error | null }> {
     try {
-      const updates = {
+      const cleanId = String(id).trim();
+      console.log(`[adminJobsService.updateJob] Initiating update for job ID: ${cleanId}`, payload);
+
+      const isFeatured = (payload.is_featured !== undefined || payload.featured !== undefined)
+        ? Boolean(payload.is_featured ?? payload.featured)
+        : undefined;
+
+      // Requirement 6 & 7: If admin marks this job as featured, unmark any other featured jobs
+      if (isFeatured) {
+        try {
+          await (supabase as any).from('jobs').update({ is_featured: false, featured: false }).neq('id', cleanId);
+        } catch {
+          try {
+            await supabase.from('jobs').update({ featured: false }).neq('id', cleanId);
+          } catch {}
+        }
+      }
+
+      const updates: any = {
         ...payload,
         updated_at: new Date().toISOString(),
       };
+      if (isFeatured !== undefined) {
+        updates.featured = isFeatured;
+        updates.is_featured = isFeatured;
+      }
 
-      const { data, error } = await supabase
+      let { data, error } = await supabase
         .from('jobs')
         .update(updates)
-        .eq('id', id)
+        .eq('id', cleanId)
         .select()
         .single();
 
-      if (error) throw error;
+      // Fallback if is_featured column is not yet present in schema cache
+      if (error && (error.code === 'PGRST204' || error.message?.includes('is_featured'))) {
+        console.warn('[adminJobsService.updateJob] is_featured column missing in schema cache, retrying with featured only');
+        delete updates.is_featured;
+        const fallbackRes = await supabase
+          .from('jobs')
+          .update(updates)
+          .eq('id', cleanId)
+          .select()
+          .single();
+        data = fallbackRes.data;
+        error = fallbackRes.error;
+      }
+
+      if (error) {
+        console.error(`[adminJobsService.updateJob] Supabase update failed for job ID ${cleanId}:`, error);
+        throw error;
+      }
+
+      console.log(`[adminJobsService.updateJob] Successfully updated job ${cleanId} in Supabase:`, {
+        id: data?.id,
+        title: data?.title,
+        status: data?.status,
+        updated_at: data?.updated_at,
+      });
 
       // If job was updated to 'active', trigger alert broadcast
       if (data && data.status === 'active' && payload.status === 'active') {
@@ -157,7 +256,7 @@ export const adminJobsService = {
 
       return { data: data as Job, error: null };
     } catch (err: any) {
-      console.error(`Error updating job ${id}:`, err);
+      console.error(`[adminJobsService.updateJob] Exception updating job ${id}:`, err);
       return { data: null, error: err };
     }
   },
@@ -185,15 +284,80 @@ export const adminJobsService = {
   },
 
   /**
-   * Delete a job from Supabase
+   * Pause/Resume toggle: Change status between 'paused' and 'active'
    */
-  async deleteJob(id: string): Promise<{ success: boolean; error: Error | null }> {
+  async togglePauseJob(id: string, currentStatus: string): Promise<{ success: boolean; newStatus: string; error: Error | null }> {
     try {
-      const { error } = await supabase.from('jobs').delete().eq('id', id);
+      const newStatus = currentStatus === 'paused' ? 'active' : 'paused';
+      const { error } = await supabase
+        .from('jobs')
+        .update({
+          status: newStatus,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', id);
+
+      if (error) throw error;
+      return { success: true, newStatus, error: null };
+    } catch (err: any) {
+      console.error(`Error toggling pause status ${id}:`, err);
+      return { success: false, newStatus: currentStatus, error: err };
+    }
+  },
+
+  /**
+   * Set specific status (active, paused, expired, closed, deleted)
+   */
+  async updateJobStatus(id: string, status: string): Promise<{ success: boolean; error: Error | null }> {
+    try {
+      const { error } = await supabase
+        .from('jobs')
+        .update({
+          status,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', id);
+
       if (error) throw error;
       return { success: true, error: null };
     } catch (err: any) {
-      console.error(`Error deleting job ${id}:`, err);
+      console.error(`Error updating job status ${id}:`, err);
+      return { success: false, error: err };
+    }
+  },
+
+  /**
+   * Soft-delete a job in Supabase (status = 'deleted')
+   * Does NOT remove database rows. Applications, applicants, analytics, views,
+   * recruiter info, and contact history remain 100% permanently preserved.
+   */
+  async deleteJob(id: string): Promise<{ success: boolean; error: Error | null }> {
+    try {
+      const { error } = await supabase
+        .from('jobs')
+        .update({ status: 'deleted', updated_at: new Date().toISOString() })
+        .eq('id', id);
+      if (error) throw error;
+      return { success: true, error: null };
+    } catch (err: any) {
+      console.error(`Error soft-deleting job ${id}:`, err);
+      return { success: false, error: err };
+    }
+  },
+
+  /**
+   * Restore a soft-deleted or closed job back to active status
+   */
+  async restoreJob(id: string): Promise<{ success: boolean; error: Error | null }> {
+    try {
+      const { error } = await supabase
+        .from('jobs')
+        .update({ status: 'active', updated_at: new Date().toISOString() })
+        .eq('id', id);
+      if (error) throw error;
+      return { success: true, error: null };
+    } catch (err: any) {
+      console.error(`Error restoring job ${id}:`, err);
       return { success: false, error: err };
     }
   },

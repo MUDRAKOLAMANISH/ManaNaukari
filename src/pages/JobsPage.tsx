@@ -29,6 +29,7 @@ export const JobsPage: React.FC<JobsPageProps> = ({ onNavigate }) => {
   const [keyword, setKeyword] = useState<string>('');
   const [location, setLocation] = useState<string>('');
   const [selectedCategory, setSelectedCategory] = useState<string>('All');
+  const [selectedStatus, setSelectedStatus] = useState<string>('all');
   
   // Checkbox state arrays for multi-selection
   const [selectedJobTypes, setSelectedJobTypes] = useState<string[]>([]);
@@ -147,7 +148,7 @@ export const JobsPage: React.FC<JobsPageProps> = ({ onNavigate }) => {
 
       try {
         const [jobsRes, catsRes] = await Promise.all([
-          jobsService.getAll({ status: 'active' }),
+          jobsService.getAll(),
           categoriesService.getAll(),
         ]);
 
@@ -274,6 +275,12 @@ export const JobsPage: React.FC<JobsPageProps> = ({ onNavigate }) => {
   // Filter & Search computation
   const filteredJobs = useMemo(() => {
     return jobs.filter((job) => {
+      // 0. Status Filter (All, Active, Paused, Expired)
+      if (selectedStatus !== 'all') {
+        const jobStatus = job.status || 'active';
+        if (jobStatus !== selectedStatus) return false;
+      }
+
       // 1. Keyword match in title, company, or skills
       if (keyword.trim()) {
         const term = keyword.toLowerCase();
@@ -576,10 +583,27 @@ export const JobsPage: React.FC<JobsPageProps> = ({ onNavigate }) => {
               </div>
             </div>
 
-            {/* Right: Sort Dropdown */}
-            <div className="flex items-center gap-2">
-              <span className="text-xs text-slate-500 hidden sm:inline">Sort by:</span>
-              <div className="relative">
+            {/* Right: Status Filter & Sort Dropdown */}
+            <div className="flex items-center gap-2.5 flex-wrap">
+              <div className="flex items-center gap-1.5">
+                <span className="text-xs text-slate-500 hidden md:inline">Status:</span>
+                <select
+                  value={selectedStatus}
+                  onChange={(e) => {
+                    setSelectedStatus(e.target.value);
+                    setCurrentPage(1);
+                  }}
+                  className="text-xs font-semibold text-slate-800 bg-slate-50 border border-slate-200 rounded-xl px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-600 cursor-pointer"
+                >
+                  <option value="all">All Statuses</option>
+                  <option value="active">🟢 Active Only</option>
+                  <option value="paused">🟡 Paused Only</option>
+                  <option value="expired">🔴 Expired Only</option>
+                </select>
+              </div>
+
+              <div className="flex items-center gap-1.5">
+                <span className="text-xs text-slate-500 hidden sm:inline">Sort by:</span>
                 <select
                   value={sortBy}
                   onChange={(e) => setSortBy(e.target.value as any)}

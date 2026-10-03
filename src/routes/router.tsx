@@ -11,6 +11,7 @@ import { AdminJobsListPage } from '../pages/admin/AdminJobsListPage';
 import { AddJobPage } from '../pages/admin/AddJobPage';
 import { EditJobPage } from '../pages/admin/EditJobPage';
 import { ImportJobPage } from '../pages/admin/ImportJobPage';
+import { BulkImportPage } from '../pages/admin/BulkImportPage';
 import { RecruiterJobsAdminPage } from '../pages/admin/RecruiterJobsAdminPage';
 import { AdminAnalyticsPage } from '../pages/admin/AdminAnalyticsPage';
 import { AdminResumeOrdersPage } from '../pages/admin/AdminResumeOrdersPage';
@@ -66,10 +67,37 @@ export function matchRoute(path: string, onNavigate: (targetPath: string) => voi
     };
   }
 
-  // 3. Admin Edit Job Route: /admin/jobs/:id/edit
+  // 2c. Bulk Job Import & Broadcast Center Route (Up to 10 URLs)
+  if (cleanPath === '/admin/bulk-import' || cleanPath === '/admin/bulk-jobs') {
+    return {
+      component: (
+        <ProtectedRoute onNavigate={onNavigate}>
+          <BulkImportPage onNavigate={onNavigate} />
+        </ProtectedRoute>
+      ),
+      title: 'Bulk Job Import & Broadcast | Mana Naukari Admin',
+    };
+  }
+
+  // 3. Admin Edit Job Route: /admin/jobs/edit/:jobId (or legacy /admin/jobs/:id/edit)
+  if (cleanPath.startsWith('/admin/jobs/edit/')) {
+    const rawId = cleanPath.replace('/admin/jobs/edit/', '').split('/')[0];
+    const jobId = decodeURIComponent(rawId || '');
+    console.log('[Router] Matched Admin Edit Job Route (/admin/jobs/edit/:jobId) with jobId:', jobId);
+    return {
+      component: (
+        <ProtectedRoute onNavigate={onNavigate}>
+          <EditJobPage jobId={jobId} onNavigate={onNavigate} />
+        </ProtectedRoute>
+      ),
+      title: 'Edit Job Opening | Mana Naukari Admin',
+    };
+  }
+
   if (cleanPath.startsWith('/admin/jobs/') && cleanPath.endsWith('/edit')) {
     const segments = cleanPath.split('/');
-    const jobId = segments[3];
+    const jobId = decodeURIComponent(segments[3] || '');
+    console.log('[Router] Matched Admin Edit Job Route (/admin/jobs/:id/edit) with jobId:', jobId);
     return {
       component: (
         <ProtectedRoute onNavigate={onNavigate}>

@@ -3,6 +3,7 @@ import { Navbar } from './Navbar';
 import { Footer } from './Footer';
 import { WhatsAppCommunityPopup } from '../common/WhatsAppCommunityPopup';
 import { FloatingChatbot } from '../chat/FloatingChatbot';
+import { TopJobAnnouncementTicker } from '../home/TopJobAnnouncementTicker';
 
 interface MainLayoutProps {
   children: React.ReactNode;
@@ -16,7 +17,12 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ children, currentPath, o
       {/* 1. Global Navigation Bar */}
       <Navbar currentPath={currentPath} onNavigate={onNavigate} />
 
-      {/* 2. Main Page Content Container */}
+      {/* 2. Top Job Announcement Ticker (Top of homepage below navbar) */}
+      {(currentPath === '/' || currentPath === '') && (
+        <TopJobAnnouncementTicker onNavigate={onNavigate} />
+      )}
+
+      {/* 3. Main Page Content Container */}
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {children}
       </main>

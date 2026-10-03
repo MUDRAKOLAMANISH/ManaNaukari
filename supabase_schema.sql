@@ -83,17 +83,26 @@ CREATE TABLE IF NOT EXISTS public.applicants (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,
 
-    -- Foreign Keys with cascading delete for data integrity
+    -- Foreign Keys with RESTRICT to permanently preserve applicant records
     CONSTRAINT fk_applicants_visitor 
         FOREIGN KEY (visitor_id) 
         REFERENCES public.visitor_profiles(id) 
-        ON DELETE CASCADE,
+        ON UPDATE CASCADE
+        ON DELETE RESTRICT,
 
     CONSTRAINT fk_applicants_job 
         FOREIGN KEY (job_id) 
         REFERENCES public.jobs(id) 
-        ON DELETE CASCADE
+        ON UPDATE CASCADE
+        ON DELETE RESTRICT
 );
+
+-- Backward-compatible columns and constraints migration:
+ALTER TABLE public.applicants DROP CONSTRAINT IF EXISTS fk_applicants_job;
+ALTER TABLE public.applicants ADD CONSTRAINT fk_applicants_job FOREIGN KEY (job_id) REFERENCES public.jobs(id) ON UPDATE CASCADE ON DELETE RESTRICT;
+
+ALTER TABLE public.applicants DROP CONSTRAINT IF EXISTS fk_applicants_visitor;
+ALTER TABLE public.applicants ADD CONSTRAINT fk_applicants_visitor FOREIGN KEY (visitor_id) REFERENCES public.visitor_profiles(id) ON UPDATE CASCADE ON DELETE RESTRICT;
 
 -- Backward-compatible columns addition if table already exists in user's Supabase project:
 ALTER TABLE public.applicants ADD COLUMN IF NOT EXISTS status VARCHAR(50) DEFAULT 'New';
@@ -250,8 +259,13 @@ CREATE TABLE IF NOT EXISTS public.job_views (
     CONSTRAINT fk_job_views_job 
         FOREIGN KEY (job_id) 
         REFERENCES public.jobs(id) 
-        ON DELETE CASCADE
+        ON UPDATE CASCADE
+        ON DELETE RESTRICT
 );
+
+-- Backward-compatible constraint update for job_views:
+ALTER TABLE public.job_views DROP CONSTRAINT IF EXISTS fk_job_views_job;
+ALTER TABLE public.job_views ADD CONSTRAINT fk_job_views_job FOREIGN KEY (job_id) REFERENCES public.jobs(id) ON UPDATE CASCADE ON DELETE RESTRICT;
 
 CREATE INDEX IF NOT EXISTS idx_job_views_created_at 
     ON public.job_views (created_at DESC);
