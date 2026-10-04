@@ -500,7 +500,7 @@ https://jobs.lever.co/company/example-role`}
                     <div key={item.id} className="py-4 flex flex-col md:flex-row md:items-center justify-between gap-4 hover:bg-slate-50/60 p-2 rounded-xl transition-colors">
                       <div className="space-y-1.5 flex-1 min-w-0">
                         <div className="flex items-center gap-2">
-                          <span className="w-6 h-6 rounded-full bg-blue-100 text-blue-800 text-xs font-bold flex items-center justify-center shrink-0">
+                          <span className="w-6 h-6 rounded-full bg-emerald-100 text-emerald-800 text-xs font-bold flex items-center justify-center shrink-0">
                             {idx + 1}
                           </span>
                           <h5 className="text-sm sm:text-base font-bold text-slate-900 truncate">
@@ -509,6 +509,14 @@ https://jobs.lever.co/company/example-role`}
                           <span className="text-xs font-semibold px-2 py-0.5 rounded-md bg-slate-100 text-slate-700 shrink-0">
                             {item.company}
                           </span>
+                          <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200 shrink-0 flex items-center gap-1">
+                            <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                            <span>Saved to DB</span>
+                          </span>
+                        </div>
+
+                        <div className="pl-8 text-[11px] text-slate-400 font-mono truncate max-w-xl">
+                          Source: {item.originalUrl}
                         </div>
 
                         <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-slate-600 pl-8">
@@ -596,14 +604,19 @@ https://jobs.lever.co/company/example-role`}
 
                 <div className="space-y-2">
                   {result.failedJobs.map((fail, fIdx) => (
-                    <div key={fIdx} className="p-3 rounded-xl bg-rose-50/70 border border-rose-200 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs">
-                      <div className="min-w-0">
-                        <span className="font-mono text-slate-800 font-semibold truncate block max-w-xl">
-                          {fail.url}
-                        </span>
-                        <span className="text-rose-700 font-medium mt-0.5 block">
-                          Reason: {fail.reason}
-                        </span>
+                    <div key={fIdx} className="p-4 rounded-xl bg-rose-50/80 border border-rose-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+                      <div className="space-y-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <span className="text-[10px] font-bold uppercase tracking-wider text-rose-700 bg-rose-100 px-2 py-0.5 rounded border border-rose-200 shrink-0">
+                            Import Failed
+                          </span>
+                          <span className="font-mono text-slate-800 font-semibold truncate block max-w-xl">
+                            {fail.url}
+                          </span>
+                        </div>
+                        <p className="text-rose-800 font-medium pl-1">
+                          <strong>Error Details:</strong> {fail.reason}
+                        </p>
                       </div>
 
                       <button
@@ -612,7 +625,7 @@ https://jobs.lever.co/company/example-role`}
                           setRawUrlsInput(fail.url);
                           setResult(null);
                         }}
-                        className="px-3 py-1.5 text-xs font-semibold text-rose-700 bg-white hover:bg-rose-100 border border-rose-300 rounded-lg cursor-pointer shrink-0 transition-colors"
+                        className="px-3.5 py-1.5 text-xs font-bold text-rose-700 bg-white hover:bg-rose-100 border border-rose-300 rounded-xl cursor-pointer shrink-0 transition-colors shadow-2xs"
                       >
                         Retry This URL
                       </button>

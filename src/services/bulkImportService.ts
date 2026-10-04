@@ -1,5 +1,6 @@
 import { Job, JobInsert } from '../types/database.types';
 import { jobsService } from './supabaseService';
+import { supabase } from '../lib/supabase';
 import { generateJobUrlPath, getAbsoluteJobUrl } from '../utils/jobUrlUtils';
 
 export interface BulkImportSuccessItem {
@@ -37,7 +38,39 @@ export interface BulkImportProgress {
   status: 'pending' | 'extracting' | 'saving' | 'completed' | 'failed';
 }
 
+// Cached check for optional is_featured column
+let isFeaturedColumnAvailable: boolean | null = null;
+
 export const bulkImportService = {
+  /**
+   * Refreshes schema references before batch operations
+   */
+  async refreshSchemaReferences(): Promise<void> {
+    isFeaturedColumnAvailable = null;
+    await this.checkIsFeaturedAvailable();
+  },
+
+  /**
+   * Proactively checks if is_featured exists in schema cache
+   */
+  async checkIsFeaturedAvailable(): Promise<boolean> {
+    if (isFeaturedColumnAvailable !== null) {
+      return isFeaturedColumnAvailable;
+    }
+    try {
+      const { error } = await supabase.from('jobs').select('is_featured').limit(1);
+      if (error && (error.code === 'PGRST204' || error.code === '42703' || error.message?.includes('is_featured'))) {
+        console.warn('[bulkImportService] is_featured column not in schema cache. Safely falling back to featured.');
+        isFeaturedColumnAvailable = false;
+      } else {
+        isFeaturedColumnAvailable = true;
+      }
+    } catch {
+      isFeaturedColumnAvailable = false;
+    }
+    return isFeaturedColumnAvailable;
+  },
+
   /**
    * Helper to parse and clean up to 10 URLs from pasted text
    */
@@ -56,10 +89,15 @@ export const bulkImportService = {
     const seen = new Set<string>();
 
     for (const token of candidates) {
-      // Basic check for URL
       let candidate = token;
       if (!candidate.startsWith('http://') && !candidate.startsWith('https://')) {
-        if (candidate.startsWith('www.') || candidate.includes('.com') || candidate.includes('.in') || candidate.includes('.org') || candidate.includes('.io')) {
+        if (
+          candidate.startsWith('www.') ||
+          candidate.includes('.com') ||
+          candidate.includes('.in') ||
+          candidate.includes('.org') ||
+          candidate.includes('.io')
+        ) {
           candidate = `https://${candidate}`;
         } else {
           continue;
@@ -206,7 +244,8 @@ export const bulkImportService = {
   },
 
   /**
-   * Process a single URL: Extract -> Insert in Database -> Generate Mana Naukari link
+   * Process a single URL: Extract -> Safely Insert in Database -> Generate Mana Naukari link
+   * Handles missing optional fields (is_featured, etc.) gracefully without failing
    */
   async processSingleUrl(url: string): Promise<{ success: boolean; data?: BulkImportSuccessItem; error?: string }> {
     try {
@@ -217,8 +256,11 @@ export const bulkImportService = {
         throw new Error('Unable to extract job title or company name from the provided URL.');
       }
 
+      // Check if is_featured column is supported in Supabase schema cache
+      const supportsFeatured = await this.checkIsFeaturedAvailable();
+
       // 2. Prepare database payload
-      const jobInsert: JobInsert = {
+      const jobInsert: any = {
         title: extracted.title,
         company: extracted.company,
         company_logo: null,
@@ -232,16 +274,51 @@ export const bulkImportService = {
         apply_link: extracted.apply_link || url,
         source: extracted.source || 'Official Careers Portal',
         featured: false,
-        is_featured: false,
         status: 'active',
         posted_date: new Date().toISOString().split('T')[0],
       };
 
-      // 3. Insert into Supabase jobs table
-      const { data: createdJob, error: insertError } = await jobsService.create(jobInsert);
+      // Only include is_featured if schema supports it
+      if (supportsFeatured) {
+        jobInsert.is_featured = false;
+      }
 
-      if (insertError || !createdJob) {
-        throw new Error(insertError?.message || 'Database insert failed.');
+      // 3. Insert into Supabase jobs table
+      let { data: createdJob, error: insertError } = await jobsService.create(jobInsert as JobInsert);
+
+      // If schema error mentions is_featured or code PGRST204, strip is_featured and retry
+      if (insertError && (insertError.message?.includes('is_featured') || (insertError as any).code === 'PGRST204' || (insertError as any).code === '42703')) {
+        console.warn('[bulkImportService] Retrying job insertion without is_featured column');
+        isFeaturedColumnAvailable = false;
+        delete jobInsert.is_featured;
+        const retryResult = await jobsService.create(jobInsert as JobInsert);
+        createdJob = retryResult.data;
+        insertError = retryResult.error;
+      }
+
+      // If still error, fall back to core required columns only
+      if (insertError && ((insertError as any).code === 'PGRST204' || (insertError as any).code === '42703')) {
+        console.warn('[bulkImportService] Secondary schema error, retrying with core columns only');
+        const corePayload: any = {
+          title: extracted.title,
+          company: extracted.company,
+          location: extracted.location || 'Pan India',
+          experience: extracted.experience || 'Fresher',
+          job_type: extracted.job_type || 'Fresher',
+          category: extracted.category || 'Software Engineering',
+          description: extracted.description || `Official requisition for ${extracted.title} at ${extracted.company}.`,
+          apply_link: extracted.apply_link || url,
+          status: 'active',
+          posted_date: new Date().toISOString().split('T')[0],
+          featured: false,
+        };
+        const coreResult = await jobsService.create(corePayload as JobInsert);
+        createdJob = coreResult.data;
+        insertError = coreResult.error;
+      }
+
+      if (insertError || !createdJob || !createdJob.id) {
+        throw new Error(insertError?.message || 'Database insert failed to return valid Job ID.');
       }
 
       // 4. Generate SEO-friendly slug & absolute Mana Naukari URL
@@ -280,6 +357,9 @@ export const bulkImportService = {
     urls: string[],
     onProgress?: (progress: BulkImportProgress) => void
   ): Promise<BulkImportResult> {
+    // Proactively refresh schema references before batch starts
+    await this.refreshSchemaReferences();
+
     const limitedUrls = urls.slice(0, 10);
     const successfulJobs: BulkImportSuccessItem[] = [];
     const failedJobs: BulkImportFailedItem[] = [];
@@ -297,12 +377,12 @@ export const bulkImportService = {
 
       const result = await this.processSingleUrl(url);
 
-      if (result.success && result.data) {
+      if (result.success && result.data && result.data.id) {
         successfulJobs.push(result.data);
       } else {
         failedJobs.push({
           url,
-          reason: result.error || 'Failed to extract requisition parameters.',
+          reason: result.error || 'Failed to extract requisition parameters or insert record.',
         });
       }
     }
@@ -326,11 +406,11 @@ export const bulkImportService = {
   },
 
   /**
-   * 4, 5, 6, 7. Generate professional WhatsApp shareable message
+   * Generate professional WhatsApp shareable message
    * Uses ONLY Mana Naukari URLs (Never original company career URLs).
    */
   generateWhatsAppMessage(jobs: BulkImportSuccessItem[]): string {
-    if (jobs.length === 0) return '';
+    if (!jobs || jobs.length === 0) return '';
 
     const lines: string[] = [];
     lines.push('🔥 *LATEST HIRING ALERTS | MANA NAUKARI* 🔥');
@@ -363,7 +443,7 @@ export const bulkImportService = {
    * Uses ONLY Mana Naukari URLs (Never original company career URLs).
    */
   generateLinkedInPost(jobs: BulkImportSuccessItem[]): string {
-    if (jobs.length === 0) return '';
+    if (!jobs || jobs.length === 0) return '';
 
     const lines: string[] = [];
     lines.push('🚀 Exciting Career Opportunities Alert! [Mana Naukari Verified Openings]');
@@ -395,7 +475,7 @@ export const bulkImportService = {
    * Uses ONLY Mana Naukari URLs (Never original company career URLs).
    */
   generateTelegramPost(jobs: BulkImportSuccessItem[]): string {
-    if (jobs.length === 0) return '';
+    if (!jobs || jobs.length === 0) return '';
 
     const lines: string[] = [];
     lines.push('📢 **NEW JOB REQUISITIONS | MANA NAUKARI**');
