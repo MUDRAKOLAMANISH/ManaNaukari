@@ -4,6 +4,7 @@ import { jobsService, visitorProfilesService, applicantsService } from '../servi
 import { candidateProfileService } from '../services/candidateProfileService';
 import { normalizeSkills } from '../utils/skillUtils';
 import { generateJobUrlPath, getAbsoluteJobUrl } from '../utils/jobUrlUtils';
+import { validateIndianMobile, validateCandidateEmail } from '../utils/candidateValidation';
 import { ShareModal } from '../components/common/ShareModal';
 import { Toast } from '../components/common/Toast';
 import { ApplyModal } from '../components/jobs/ApplyModal';
@@ -268,11 +269,12 @@ export const JobDetailsPage: React.FC<JobDetailsPageProps> = ({ jobId, onNavigat
     setIsReapplying(true);
     try {
       const localProfile = candidateProfileService.getLocalProfile();
-      const candidateId = localProfile?.id || applicantEmail || 'candidate';
+      const candidateId = localProfile?.visitor_id || localProfile?.id || applicantEmail || 'candidate';
       await candidateProfileService.recordReapply({
         jobId: job.id,
         candidateProfileId: candidateId,
         candidateEmail: localProfile?.email || applicantEmail,
+        candidatePhone: localProfile?.mobile || applicantPhone,
       });
 
       setToastMessage(`✓ Reopening official application for ${job.company}...`);
@@ -289,20 +291,13 @@ export const JobDetailsPage: React.FC<JobDetailsPageProps> = ({ jobId, onNavigat
     }
   };
 
-  // Mobile and email validation helpers
-  const isValidEmail = (email: string) => {
-    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
-  };
-
-  const isValidPhone = (phone: string) => {
-    const cleaned = phone.replace(/[\s\-\+\(\)]/g, '');
-    return cleaned.length >= 10 && /^\d+$/.test(cleaned);
-  };
-
-  // Candidate submission and sequential Supabase insert flow with Deduplication
-  const handleSubmitLead = async (e: React.FormEvent) => {
+  // Candidate submission and sequential Supabase insert flow with Verification & Deduplication
+  const handleSubmitLead = async (
+    e: React.FormEvent,
+    verificationOptions?: { isVerified?: boolean; verifiedAt?: string }
+  ) => {
     e.preventDefault();
-    console.log('[JobDetailsPage.handleSubmitLead] Candidate submission initiated.');
+    console.log('[JobDetailsPage.handleSubmitLead] Candidate submission initiated.', verificationOptions);
 
     if (!job) {
       setLeadError('Job requisition not found.');
@@ -318,19 +313,21 @@ export const JobDetailsPage: React.FC<JobDetailsPageProps> = ({ jobId, onNavigat
     const trimmedEmail = applicantEmail.trim().toLowerCase();
     const trimmedPhone = applicantPhone.trim();
 
-    // Strict Validations
+    // Strict Validations (Requirements 3 & 4)
     if (!trimmedName) {
       setLeadError('Please provide your full name.');
       return;
     }
 
-    if (!isValidEmail(trimmedEmail)) {
-      setLeadError('Please provide a valid email address.');
+    const emailCheck = validateCandidateEmail(trimmedEmail);
+    if (!emailCheck.isValid) {
+      setLeadError(emailCheck.error || 'Please provide a valid email address.');
       return;
     }
 
-    if (!isValidPhone(trimmedPhone)) {
-      setLeadError('Please provide a valid 10-digit mobile number.');
+    const mobileCheck = validateIndianMobile(trimmedPhone);
+    if (!mobileCheck.isValid) {
+      setLeadError(mobileCheck.error || 'Please provide a valid 10-digit mobile number.');
       return;
     }
 
@@ -338,19 +335,28 @@ export const JobDetailsPage: React.FC<JobDetailsPageProps> = ({ jobId, onNavigat
     setIsSubmittingLead(true);
 
     try {
-      // Step 1: Save or Update Candidate Profile (Persistent Recognition across applications)
+      // Step 1: Save or Update Candidate Profile with Verification fields (Persistent Recognition across applications)
+      const localProfile = candidateProfileService.getLocalProfile();
+      const isAlreadyVerified = Boolean(verificationOptions?.isVerified || localProfile?.email_verified);
+      const verifiedTimestamp = verificationOptions?.verifiedAt || localProfile?.verified_at || (isAlreadyVerified ? new Date().toISOString() : null);
+
       console.log('[JobDetailsPage.handleSubmitLead] Step 1: Saving candidate profile in candidate_profiles...', {
         name: trimmedName,
-        email: trimmedEmail,
-        mobile: trimmedPhone,
+        email: emailCheck.cleanEmail,
+        mobile: mobileCheck.cleanNumber,
         resume_file_name: applicantResumeFileName,
+        email_verified: isAlreadyVerified,
+        verified_at: verifiedTimestamp,
       });
 
       const { data: profileData, error: profileErr } = await candidateProfileService.saveOrUpdateProfile({
         name: trimmedName,
-        email: trimmedEmail,
-        mobile: trimmedPhone,
+        email: emailCheck.cleanEmail,
+        mobile: mobileCheck.cleanNumber,
         resume_file_name: applicantResumeFileName || null,
+        email_verified: isAlreadyVerified,
+        verified_at: verifiedTimestamp,
+        last_verified_at: isAlreadyVerified ? new Date().toISOString() : null,
       });
 
       if (profileErr || !profileData?.id) {

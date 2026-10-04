@@ -11,6 +11,7 @@ import { resumeMatchService } from '../../services/resumeMatchService';
 import { calculateFallbackAtsMatch } from '../../utils/atsKeywordMatcher';
 import { AtsMatchResult } from '../../types/ats.types';
 import { ReapplyConfirmModal } from './ReapplyConfirmModal';
+import { validateIndianMobile, validateCandidateEmail } from '../../utils/candidateValidation';
 
 export interface ApplyModalProps {
   isOpen: boolean;
@@ -25,7 +26,7 @@ export interface ApplyModalProps {
   isSubmittingLead: boolean;
   leadError: string | null;
   leadSuccess: boolean;
-  onSubmit: (e: React.FormEvent) => void;
+  onSubmit: (e: React.FormEvent, options?: { isVerified?: boolean; verifiedAt?: string }) => void;
   initialResumeFileName?: string;
   onProfileUpdated?: (profile: CandidateProfile) => void;
   onReapply?: () => void;
@@ -72,6 +73,9 @@ export const ApplyModal: React.FC<ApplyModalProps> = ({
   // Reapply confirmation modal state
   const [isInternalReapplyOpen, setIsInternalReapplyOpen] = useState(false);
   const [isReapplyingInternal, setIsReapplyingInternal] = useState(false);
+
+  // Form validation error state
+  const [formValidationError, setFormValidationError] = useState<string | null>(null);
 
   // Track scroll position to ensure user stays on exact same screen position after closing
   const scrollYRef = useRef<number>(0);
@@ -127,10 +131,25 @@ export const ApplyModal: React.FC<ApplyModalProps> = ({
         if (!applicantPhone) setApplicantPhone(localProfile.mobile);
         if (localProfile.resume_file_name) setResumeFileName(localProfile.resume_file_name);
 
+        // If local profile does not have verified numeric visitor_id, resolve it now
+        if (!localProfile.visitor_id && localProfile.email) {
+          candidateProfileService.findProfileByEmailOrMobile(localProfile.email, localProfile.mobile).then((res) => {
+            if (res.data?.id && !isNaN(Number(res.data.id))) {
+              const numId = Number(res.data.id);
+              const updated = candidateProfileService.saveLocalProfile({
+                ...localProfile,
+                id: String(numId),
+                visitor_id: numId,
+              });
+              setCandidateProfile(updated);
+            }
+          }).catch(() => {});
+        }
+
         // Deduplication Check
         const dedupResult = await candidateProfileService.checkJobApplication(
           job.id,
-          localProfile.id,
+          localProfile.visitor_id || localProfile.id,
           localProfile.email,
           localProfile.mobile
         );
@@ -193,6 +212,9 @@ export const ApplyModal: React.FC<ApplyModalProps> = ({
             mobile: foundProfile.mobile,
             resume_url: foundProfile.resume_url || undefined,
             resume_file_name: foundProfile.resume_file_name || undefined,
+            email_verified: foundProfile.email_verified ?? false,
+            verified_at: foundProfile.verified_at || null,
+            last_verified_at: foundProfile.last_verified_at || null,
           });
 
           setCandidateProfile(localSaved);
@@ -331,18 +353,49 @@ export const ApplyModal: React.FC<ApplyModalProps> = ({
     const fakeEvent = {
       preventDefault: () => {},
     } as React.FormEvent;
+
     onSubmit(fakeEvent);
+  };
+
+  // Form submission handler: validates candidate information and directly submits application
+  const handleFormSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setFormValidationError(null);
+
+    const trimmedName = applicantName.trim();
+    const trimmedEmail = applicantEmail.trim().toLowerCase();
+    const trimmedPhone = applicantPhone.trim();
+
+    if (!trimmedName) {
+      setFormValidationError('Please provide your full name.');
+      return;
+    }
+
+    const emailCheck = validateCandidateEmail(trimmedEmail);
+    if (!emailCheck.isValid) {
+      setFormValidationError(emailCheck.error || 'Please provide a valid email address.');
+      return;
+    }
+
+    const mobileCheck = validateIndianMobile(trimmedPhone);
+    if (!mobileCheck.isValid) {
+      setFormValidationError(mobileCheck.error || 'Please provide a valid 10-digit mobile number.');
+      return;
+    }
+
+    onSubmit(e);
   };
 
   // Internal Reapply handler
   const handleConfirmReapplyInternal = async () => {
     setIsReapplyingInternal(true);
     try {
-      const candidateId = candidateProfile?.id || applicantEmail || 'candidate';
+      const candidateId = candidateProfile?.visitor_id || candidateProfile?.id || applicantEmail || 'candidate';
       await candidateProfileService.recordReapply({
         jobId: job.id,
         candidateProfileId: candidateId,
         candidateEmail: candidateProfile?.email || applicantEmail,
+        candidatePhone: candidateProfile?.mobile || applicantPhone,
       });
 
       setTimeout(() => {
@@ -702,9 +755,15 @@ export const ApplyModal: React.FC<ApplyModalProps> = ({
                         <Sparkles className="w-3 h-3 text-amber-500 fill-amber-500" />
                         <span>Candidate Profile Recognized</span>
                       </div>
-                      <h4 className="text-base sm:text-lg font-black text-slate-900 font-display">
-                        Welcome Back, {applicantName || 'Candidate'}!
-                      </h4>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <h4 className="text-base sm:text-lg font-black text-slate-900 font-display">
+                          Welcome Back, {applicantName || 'Candidate'}!
+                        </h4>
+                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-blue-100 text-blue-800 text-[10px] font-bold border border-blue-200">
+                          <CheckCircle2 className="w-3.5 h-3.5 text-blue-600" />
+                          <span>Candidate Profile</span>
+                        </span>
+                      </div>
                     </div>
                   </div>
 
@@ -720,7 +779,7 @@ export const ApplyModal: React.FC<ApplyModalProps> = ({
                 </div>
 
                 <p className="text-xs text-slate-600 leading-relaxed font-medium">
-                  We pre-filled your verified credentials from your candidate profile. Review details below or update your resume before continuing.
+                  We pre-filled your information from your candidate profile. Review details below or update your resume before continuing.
                 </p>
 
                 {/* Candidate Info Grid */}
@@ -875,14 +934,27 @@ export const ApplyModal: React.FC<ApplyModalProps> = ({
             </div>
           ) : (
             /* 6. FIRST TIME APPLICATION OR EDITING FORM */
-            <form onSubmit={onSubmit} className="space-y-4 animate-fadeIn">
+            <form onSubmit={handleFormSubmit} className="space-y-4 animate-fadeIn">
               
+              {formValidationError && (
+                <div className="p-3.5 rounded-xl bg-rose-50 border border-rose-200 text-xs text-rose-800 space-y-1 animate-fadeIn flex items-start gap-2">
+                  <AlertCircle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
+                  <div>
+                    <span className="font-bold block text-rose-900">Verification Notice</span>
+                    <p className="leading-relaxed">{formValidationError}</p>
+                  </div>
+                </div>
+              )}
+
               {isRecognized && (
                 <div className="flex items-center justify-between pb-1">
                   <span className="text-xs font-bold text-slate-700">Edit Your Candidate Credentials:</span>
                   <button
                     type="button"
-                    onClick={() => setIsEditingDetails(false)}
+                    onClick={() => {
+                      setFormValidationError(null);
+                      setIsEditingDetails(false);
+                    }}
                     className="text-xs font-semibold text-blue-600 hover:underline cursor-pointer"
                   >
                     Back to Profile Summary
@@ -900,7 +972,10 @@ export const ApplyModal: React.FC<ApplyModalProps> = ({
                   required
                   placeholder="e.g. Rahul Sharma"
                   value={applicantName}
-                  onChange={(e) => setApplicantName(e.target.value)}
+                  onChange={(e) => {
+                    setFormValidationError(null);
+                    setApplicantName(e.target.value);
+                  }}
                   onBlur={handleDetectOnBlur}
                   className="w-full px-3.5 py-2.5 text-xs sm:text-sm border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-600 focus:outline-none transition-shadow"
                 />
@@ -908,15 +983,21 @@ export const ApplyModal: React.FC<ApplyModalProps> = ({
 
               {/* Email Address */}
               <div>
-                <label className="block text-xs sm:text-sm font-semibold text-slate-700 mb-1.5">
-                  Email Address <span className="text-red-500">*</span>
-                </label>
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="block text-xs sm:text-sm font-semibold text-slate-700">
+                    Email Address <span className="text-red-500">*</span>
+                  </label>
+                  <span className="text-[11px] text-slate-400 font-medium">Used for job updates</span>
+                </div>
                 <input
                   type="email"
                   required
-                  placeholder="rahul@example.com"
+                  placeholder="e.g. rahul@gmail.com"
                   value={applicantEmail}
-                  onChange={(e) => setApplicantEmail(e.target.value)}
+                  onChange={(e) => {
+                    setFormValidationError(null);
+                    setApplicantEmail(e.target.value);
+                  }}
                   onBlur={handleDetectOnBlur}
                   className="w-full px-3.5 py-2.5 text-xs sm:text-sm border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-600 focus:outline-none transition-shadow"
                 />
@@ -924,15 +1005,22 @@ export const ApplyModal: React.FC<ApplyModalProps> = ({
 
               {/* Mobile Number */}
               <div>
-                <label className="block text-xs sm:text-sm font-semibold text-slate-700 mb-1.5">
-                  Mobile Number <span className="text-red-500">*</span>
-                </label>
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="block text-xs sm:text-sm font-semibold text-slate-700">
+                    Mobile Number <span className="text-red-500">*</span>
+                  </label>
+                  <span className="text-[11px] text-slate-400 font-medium">10 digits (starts with 6,7,8,9)</span>
+                </div>
                 <input
                   type="tel"
                   required
+                  maxLength={10}
                   placeholder="e.g. 9876543210"
                   value={applicantPhone}
-                  onChange={(e) => setApplicantPhone(e.target.value)}
+                  onChange={(e) => {
+                    setFormValidationError(null);
+                    setApplicantPhone(e.target.value);
+                  }}
                   onBlur={handleDetectOnBlur}
                   className="w-full px-3.5 py-2.5 text-xs sm:text-sm border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-600 focus:outline-none transition-shadow"
                 />
@@ -970,11 +1058,11 @@ export const ApplyModal: React.FC<ApplyModalProps> = ({
                   {isSubmittingLead ? (
                     <>
                       <Loader2 className="w-4 h-4 animate-spin" />
-                      <span>Saving Profile &amp; Opening Job...</span>
+                      <span>Saving Profile &amp; Opening Official Job...</span>
                     </>
                   ) : (
                     <>
-                      <span>Continue Application</span>
+                      <span>Continue &amp; Apply</span>
                       <ArrowRight className="w-4 h-4" />
                     </>
                   )}
@@ -988,7 +1076,7 @@ export const ApplyModal: React.FC<ApplyModalProps> = ({
         <div className="px-5 py-3 bg-slate-50 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-400 shrink-0">
           <span className="flex items-center gap-1">
             <ShieldCheck className="w-3.5 h-3.5 text-slate-400" />
-            <span>Mana Naukari Direct Verification System</span>
+            <span>Mana Naukari Direct Application</span>
           </span>
           <button
             type="button"

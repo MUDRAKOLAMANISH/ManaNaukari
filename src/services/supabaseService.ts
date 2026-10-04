@@ -382,62 +382,113 @@ export const visitorProfilesService = {
   async upsert(profile: VisitorProfileInsert): Promise<{ data: VisitorProfile | null; error: any }> {
     console.log('[visitorProfilesService.upsert] Starting profile upsert with payload:', profile);
     try {
-      // Step A: Attempt lookup by email first in case email unique constraint is not present or differs
-      const cleanEmail = profile.email.trim().toLowerCase();
-      console.log(`[visitorProfilesService.upsert] Checking existing profile for email: ${cleanEmail}`);
-      
-      const existingQuery = await supabase
-        .from('visitor_profiles')
-        .select('*')
-        .eq('email', cleanEmail)
-        .maybeSingle();
+      const cleanEmail = (profile.email || '').trim().toLowerCase();
+      const cleanPhone = (profile.phone || '').trim();
+      const cleanName = (profile.name || '').trim() || 'Candidate';
 
-      console.log('[visitorProfilesService.upsert] Existing profile query result:', existingQuery);
-
-      if (existingQuery.error && existingQuery.error.code !== 'PGRST116') {
-        console.warn('[visitorProfilesService.upsert] Query check warning:', existingQuery.error);
-      }
-
-      if (existingQuery.data?.id) {
-        console.log(`[visitorProfilesService.upsert] Found existing profile id ${existingQuery.data.id}. Updating name and phone...`);
-        const updateRes = await supabase
+      // Step A: Find existing visitor profile using email
+      if (cleanEmail) {
+        const { data: existingByEmail } = await supabase
           .from('visitor_profiles')
-          .update({
-            name: profile.name.trim(),
-            phone: profile.phone.trim(),
-          })
-          .eq('id', existingQuery.data.id)
-          .select()
-          .single();
+          .select('id, name, email, phone, created_at')
+          .ilike('email', cleanEmail)
+          .limit(1)
+          .maybeSingle();
 
-        console.log('[visitorProfilesService.upsert] Update result:', updateRes);
-        if (updateRes.error) {
-          console.error('[visitorProfilesService.upsert] Error updating profile:', updateRes.error);
-          return { data: null, error: updateRes.error };
+        if (existingByEmail && existingByEmail.id) {
+          const numId = Number(existingByEmail.id);
+          if (!isNaN(numId) && numId > 0) {
+            console.log('[visitorProfilesService.upsert] Found existing profile by email with numeric id:', numId);
+            // Update name and phone if provided
+            await supabase
+              .from('visitor_profiles')
+              .update({
+                name: cleanName,
+                phone: cleanPhone || existingByEmail.phone,
+              })
+              .eq('id', numId);
+
+            return {
+              data: {
+                ...existingByEmail,
+                id: String(numId),
+                name: cleanName,
+                phone: cleanPhone || existingByEmail.phone,
+              } as VisitorProfile,
+              error: null,
+            };
+          }
         }
-        return { data: updateRes.data as VisitorProfile, error: null };
       }
 
-      // Step B: Insert brand new profile
-      console.log('[visitorProfilesService.upsert] No existing profile found. Inserting new record...');
-      const insertRes = await supabase
+      // Step B: Find existing visitor profile using phone
+      if (cleanPhone) {
+        const { data: existingByPhone } = await supabase
+          .from('visitor_profiles')
+          .select('id, name, email, phone, created_at')
+          .eq('phone', cleanPhone)
+          .limit(1)
+          .maybeSingle();
+
+        if (existingByPhone && existingByPhone.id) {
+          const numId = Number(existingByPhone.id);
+          if (!isNaN(numId) && numId > 0) {
+            console.log('[visitorProfilesService.upsert] Found existing profile by phone with numeric id:', numId);
+            return {
+              data: {
+                ...existingByPhone,
+                id: String(numId),
+              } as VisitorProfile,
+              error: null,
+            };
+          }
+        }
+      }
+
+      // Step C: Create new visitor profile if not found
+      // Only insert core columns: name, email, phone
+      console.log('[visitorProfilesService.upsert] No existing profile found. Inserting new visitor_profiles record...');
+      const { data: insertRes, error: insertErr } = await supabase
         .from('visitor_profiles')
         .insert({
-          name: profile.name.trim(),
+          name: cleanName,
           email: cleanEmail,
-          phone: profile.phone.trim(),
+          phone: cleanPhone,
         })
-        .select()
+        .select('id, name, email, phone, created_at')
         .single();
 
-      console.log('[visitorProfilesService.upsert] Insert result:', insertRes);
-
-      if (insertRes.error) {
-        console.error('[visitorProfilesService.upsert] Insert error:', insertRes.error);
-        return { data: null, error: insertRes.error };
+      if (insertErr) {
+        console.warn('[visitorProfilesService.upsert] Insert error, checking race condition:', insertErr.message);
+        // Retry check on email
+        if (cleanEmail) {
+          const { data: retryData } = await supabase
+            .from('visitor_profiles')
+            .select('id, name, email, phone, created_at')
+            .ilike('email', cleanEmail)
+            .limit(1)
+            .maybeSingle();
+          if (retryData && retryData.id) {
+            return {
+              data: {
+                ...retryData,
+                id: String(Number(retryData.id)),
+              } as VisitorProfile,
+              error: null,
+            };
+          }
+        }
+        return { data: null, error: insertErr };
       }
 
-      return { data: insertRes.data as VisitorProfile, error: null };
+      const numId = Number(insertRes.id);
+      return {
+        data: {
+          ...insertRes,
+          id: String(numId),
+        } as VisitorProfile,
+        error: null,
+      };
     } catch (err: any) {
       console.error('[visitorProfilesService.upsert] Unexpected caught exception:', err);
       return { data: null, error: err };
@@ -462,15 +513,90 @@ export const visitorProfilesService = {
 // ==========================================
 
 export const applicantsService = {
+  /**
+   * Record Application in applicants table with guaranteed numeric bigint foreign key.
+   * Requirements fulfilled:
+   * 1. Find existing visitor profile using email or phone
+   * 2. Create visitor profile if not found
+   * 3. Get numeric visitor_profiles.id
+   * 4. Save that numeric ID into applicants.visitor_id
+   * 5. Never save cand_* strings into applicants.visitor_id
+   * 6. Keep foreign key relationships intact
+   * 7. Proper error handling and success messages
+   */
   async recordApplication(applicant: ApplicantInsert): Promise<{ data: Applicant | null; error: any }> {
     console.log('[applicantsService.recordApplication] Starting application record with payload:', applicant);
     try {
-      console.log('[applicantsService.recordApplication] Executing supabase.from("applicants").insert(...)');
+      // 1. Resolve and validate numeric job_id (bigint)
+      const numericJobId = Number(applicant.job_id);
+      if (isNaN(numericJobId) || numericJobId <= 0) {
+        return {
+          data: null,
+          error: new Error(`Invalid job ID: "${applicant.job_id}". Expected positive numeric ID.`),
+        };
+      }
+
+      // 2. Resolve and validate numeric visitor_id (bigint)
+      // NEVER save or pass "cand_*" strings into applicants.visitor_id
+      let numericVisitorId: number | null = null;
+      const rawVisitorId = String(applicant.visitor_id || '');
+
+      if (rawVisitorId && !rawVisitorId.startsWith('cand_') && !isNaN(Number(rawVisitorId)) && Number(rawVisitorId) > 0) {
+        numericVisitorId = Number(rawVisitorId);
+      } else {
+        // Resolve or create visitor profile using email or phone
+        const targetEmail = applicant.email || applicant.visitor?.email || '';
+        const targetPhone = applicant.phone || applicant.visitor?.phone || '';
+        const targetName = applicant.name || applicant.visitor?.name || 'Candidate';
+
+        const { data: profileRes, error: profErr } = await visitorProfilesService.upsert({
+          name: targetName,
+          email: targetEmail,
+          phone: targetPhone,
+        });
+
+        if (profErr || !profileRes || !profileRes.id) {
+          return {
+            data: null,
+            error: new Error(profErr?.message || 'Could not resolve visitor profile for application.'),
+          };
+        }
+
+        numericVisitorId = Number(profileRes.id);
+      }
+
+      if (!numericVisitorId || isNaN(numericVisitorId) || numericVisitorId <= 0) {
+        return {
+          data: null,
+          error: new Error('Failed to resolve numeric visitor ID for application.'),
+        };
+      }
+
+      console.log(`[applicantsService.recordApplication] Verified foreign keys: visitor_id=${numericVisitorId} (bigint), job_id=${numericJobId} (bigint)`);
+
+      // 3. Check for duplicate application
+      const { data: existingApp } = await supabase
+        .from('applicants')
+        .select('id, created_at')
+        .eq('job_id', numericJobId)
+        .eq('visitor_id', numericVisitorId)
+        .limit(1)
+        .maybeSingle();
+
+      if (existingApp) {
+        console.log('[applicantsService.recordApplication] Application already exists for (visitor_id, job_id):', existingApp);
+        return {
+          data: existingApp as Applicant,
+          error: null,
+        };
+      }
+
+      // 4. Insert into applicants table with guaranteed numeric bigint foreign keys
       const { data, error } = await supabase
         .from('applicants')
         .insert({
-          visitor_id: applicant.visitor_id,
-          job_id: applicant.job_id,
+          visitor_id: numericVisitorId,
+          job_id: numericJobId,
         })
         .select()
         .single();
@@ -478,6 +604,11 @@ export const applicantsService = {
       console.log('[applicantsService.recordApplication] Insert completed. Result:', { data, error });
 
       if (error) {
+        // Handle unique constraint violation gracefully
+        if (error.code === '23505' || error.message?.includes('duplicate key') || error.message?.includes('unique constraint')) {
+          console.warn('[applicantsService.recordApplication] Duplicate prevented by DB constraint');
+          return { data: { visitor_id: numericVisitorId, job_id: numericJobId } as any, error: null };
+        }
         console.error('[applicantsService.recordApplication] Error recording applicant:', error);
         return { data: null, error };
       }
@@ -512,7 +643,7 @@ export const applicantsService = {
     }
   },
 
-  async updateStatus(id: string, status: string): Promise<{ success: boolean; error: any }> {
+  async updateStatus(id: string | number, status: string): Promise<{ success: boolean; error: any }> {
     try {
       const { error } = await supabase
         .from('applicants')
@@ -530,7 +661,7 @@ export const applicantsService = {
     }
   },
 
-  async updateNotes(id: string, notes: string): Promise<{ success: boolean; error: any }> {
+  async updateNotes(id: string | number, notes: string): Promise<{ success: boolean; error: any }> {
     try {
       const { error } = await supabase
         .from('applicants')
@@ -548,7 +679,7 @@ export const applicantsService = {
     }
   },
 
-  async delete(id: string): Promise<{ success: boolean; error: any }> {
+  async delete(id: string | number): Promise<{ success: boolean; error: any }> {
     try {
       const { error } = await supabase
         .from('applicants')

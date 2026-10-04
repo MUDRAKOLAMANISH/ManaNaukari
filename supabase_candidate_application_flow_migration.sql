@@ -58,3 +58,22 @@ ON public.applicants (candidate_profile_id, job_id, created_at DESC);
 -- 9. Add is_featured column to jobs table for Top Job Announcement Ticker
 ALTER TABLE public.jobs ADD COLUMN IF NOT EXISTS is_featured BOOLEAN DEFAULT FALSE;
 CREATE INDEX IF NOT EXISTS idx_jobs_is_featured ON public.jobs (is_featured, created_at DESC);
+
+-- ============================================================================
+-- 10. Candidate Email Verification System (Prompt 7 Requirements)
+-- Adds verification fields to candidate profiles to reject fake emails & numbers
+-- ============================================================================
+ALTER TABLE public.candidate_profiles 
+ADD COLUMN IF NOT EXISTS email_verified BOOLEAN DEFAULT false,
+ADD COLUMN IF NOT EXISTS verified_at TIMESTAMP WITH TIME ZONE,
+ADD COLUMN IF NOT EXISTS last_verified_at TIMESTAMP WITH TIME ZONE;
+
+-- Fast index for verified candidates
+CREATE INDEX IF NOT EXISTS idx_candidate_profiles_verified 
+ON public.candidate_profiles (email, email_verified);
+
+-- Also add to visitor_profiles for fallback compatibility
+ALTER TABLE public.visitor_profiles 
+ADD COLUMN IF NOT EXISTS email_verified BOOLEAN DEFAULT false,
+ADD COLUMN IF NOT EXISTS verified_at TIMESTAMP WITH TIME ZONE,
+ADD COLUMN IF NOT EXISTS last_verified_at TIMESTAMP WITH TIME ZONE;

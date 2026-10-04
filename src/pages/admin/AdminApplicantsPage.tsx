@@ -63,7 +63,7 @@ export const AdminApplicantsPage: React.FC<AdminApplicantsPageProps> = ({ onNavi
           notes,
           resume_url,
           created_at,
-          candidate:candidate_profiles(id, name, email, mobile, resume_url, resume_file_name, created_at),
+          candidate:candidate_profiles(id, name, email, mobile, resume_url, resume_file_name, email_verified, verified_at, created_at),
           visitor:visitor_profiles(id, name, email, phone, created_at),
           job:jobs(id, title, company, location, category, job_type, salary, experience, status)
         `)
@@ -185,7 +185,7 @@ export const AdminApplicantsPage: React.FC<AdminApplicantsPageProps> = ({ onNavi
   };
 
   // Status Update Handler
-  const handleUpdateStatus = async (id: string, newStatus: 'New' | 'Reviewed' | 'Shortlisted' | 'Rejected') => {
+  const handleUpdateStatus = async (id: string | number, newStatus: 'New' | 'Reviewed' | 'Shortlisted' | 'Rejected') => {
     setIsUpdatingStatus(true);
     try {
       const { success, error } = await applicantsService.updateStatus(id, newStatus);
@@ -804,9 +804,11 @@ export const AdminApplicantsPage: React.FC<AdminApplicantsPageProps> = ({ onNavi
                           </div>
                           <div className="text-[10px] text-slate-400 font-mono mt-0.5 flex items-center gap-2">
                             <span>ID: #{app.id ? String(app.id).substring(0, 8).toUpperCase() : 'APP'}</span>
-                            {app.candidate_profile_id && (
-                              <span className="text-indigo-600 bg-indigo-50 px-1 rounded text-[9px]">Verified Profile</span>
-                            )}
+                            {app.candidate?.email_verified ? (
+                              <span className="text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded text-[9px] font-bold border border-emerald-200">✓ Verified Email</span>
+                            ) : app.candidate_profile_id ? (
+                              <span className="text-indigo-600 bg-indigo-50 px-1 rounded text-[9px]">Recognized Profile</span>
+                            ) : null}
                           </div>
                         </td>
 

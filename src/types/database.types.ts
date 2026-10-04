@@ -106,6 +106,9 @@ export interface CandidateProfile {
   mobile: string;
   resume_url?: string | null;
   resume_file_name?: string | null;
+  email_verified?: boolean;
+  verified_at?: string | null;
+  last_verified_at?: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -117,6 +120,9 @@ export type CandidateProfileInsert = {
   mobile: string;
   resume_url?: string | null;
   resume_file_name?: string | null;
+  email_verified?: boolean;
+  verified_at?: string | null;
+  last_verified_at?: string | null;
   created_at?: string;
   updated_at?: string;
 };
@@ -127,10 +133,10 @@ export type CandidateProfileUpdate = Partial<CandidateProfileInsert>;
 export type ApplicantStatus = 'New' | 'Reviewed' | 'Shortlisted' | 'Rejected' | 'new' | 'reviewed' | 'shortlisted' | 'rejected';
 
 export interface Applicant {
-  id: string;
-  visitor_id: string;
+  id: string | number;
+  visitor_id: string | number;
   candidate_profile_id?: string | null;
-  job_id: string;
+  job_id: string | number;
   status?: ApplicantStatus;
   notes?: string | null;
   resume_url?: string | null;
@@ -148,10 +154,14 @@ export interface Applicant {
 }
 
 export type ApplicantInsert = {
-  id?: string;
-  visitor_id?: string;
+  id?: string | number;
+  visitor_id?: string | number;
   candidate_profile_id?: string | null;
-  job_id: string;
+  job_id: string | number;
+  name?: string;
+  email?: string;
+  phone?: string;
+  visitor?: VisitorProfile;
   status?: ApplicantStatus;
   notes?: string | null;
   resume_url?: string | null;
