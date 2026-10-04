@@ -16,6 +16,9 @@ export interface BulkImportSuccessItem {
   originalUrl: string;
   category: string;
   jobType: string;
+  status: 'draft' | 'active';
+  description?: string;
+  apply_link?: string;
 }
 
 export interface BulkImportFailedItem {
@@ -259,7 +262,7 @@ export const bulkImportService = {
       // Check if is_featured column is supported in Supabase schema cache
       const supportsFeatured = await this.checkIsFeaturedAvailable();
 
-      // 2. Prepare database payload
+      // 2. Prepare database payload - Jobs are saved as 'draft' so admin reviews before publishing
       const jobInsert: any = {
         title: extracted.title,
         company: extracted.company,
@@ -274,7 +277,7 @@ export const bulkImportService = {
         apply_link: extracted.apply_link || url,
         source: extracted.source || 'Official Careers Portal',
         featured: false,
-        status: 'active',
+        status: 'draft',
         posted_date: new Date().toISOString().split('T')[0],
       };
 
@@ -308,7 +311,7 @@ export const bulkImportService = {
           category: extracted.category || 'Software Engineering',
           description: extracted.description || `Official requisition for ${extracted.title} at ${extracted.company}.`,
           apply_link: extracted.apply_link || url,
-          status: 'active',
+          status: 'draft',
           posted_date: new Date().toISOString().split('T')[0],
           featured: false,
         };
@@ -340,6 +343,9 @@ export const bulkImportService = {
           originalUrl: url,
           category: createdJob.category,
           jobType: createdJob.job_type,
+          status: (createdJob.status as 'draft' | 'active') || 'draft',
+          description: createdJob.description,
+          apply_link: createdJob.apply_link,
         },
       };
     } catch (err: any) {
@@ -498,5 +504,45 @@ export const bulkImportService = {
     lines.push('🌐 Browse all jobs: https://mananaukari.com');
 
     return lines.join('\n');
+  },
+
+  /**
+   * Publish a list of job IDs: updates status from 'draft' to 'active'
+   */
+  async publishJobs(jobIds: string[]): Promise<{ success: boolean; count: number; error?: string }> {
+    if (!jobIds || jobIds.length === 0) return { success: true, count: 0 };
+    try {
+      const now = new Date().toISOString();
+      const { error } = await supabase
+        .from('jobs')
+        .update({ status: 'active', updated_at: now })
+        .in('id', jobIds);
+
+      if (error) throw error;
+      return { success: true, count: jobIds.length };
+    } catch (err: any) {
+      console.error('[bulkImportService.publishJobs] Error publishing jobs:', err);
+      return { success: false, count: 0, error: err?.message || 'Failed to publish jobs' };
+    }
+  },
+
+  /**
+   * Delete a list of job IDs (soft delete: status = 'deleted')
+   */
+  async deleteJobs(jobIds: string[]): Promise<{ success: boolean; count: number; error?: string }> {
+    if (!jobIds || jobIds.length === 0) return { success: true, count: 0 };
+    try {
+      const now = new Date().toISOString();
+      const { error } = await supabase
+        .from('jobs')
+        .update({ status: 'deleted', updated_at: now })
+        .in('id', jobIds);
+
+      if (error) throw error;
+      return { success: true, count: jobIds.length };
+    } catch (err: any) {
+      console.error('[bulkImportService.deleteJobs] Error deleting jobs:', err);
+      return { success: false, count: 0, error: err?.message || 'Failed to delete jobs' };
+    }
   },
 };

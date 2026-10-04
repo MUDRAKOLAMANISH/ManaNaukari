@@ -151,6 +151,8 @@ export const JobTable: React.FC<JobTableProps> = ({
                       className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold border ${
                         isActive
                           ? 'bg-emerald-50 text-emerald-800 border-emerald-300'
+                          : job.status === 'draft'
+                          ? 'bg-purple-50 text-purple-900 border-purple-300'
                           : job.status === 'paused'
                           ? 'bg-amber-50 text-amber-900 border-amber-300'
                           : job.status === 'expired'
@@ -163,6 +165,8 @@ export const JobTable: React.FC<JobTableProps> = ({
                       <span>
                         {isActive
                           ? '🟢'
+                          : job.status === 'draft'
+                          ? '📝'
                           : job.status === 'paused'
                           ? '🟡'
                           : job.status === 'expired'

@@ -49,10 +49,10 @@ export const Footer: React.FC<FooterProps> = ({ onNavigate }) => {
               <div className="flex items-center gap-2 text-xs font-medium text-slate-300">
                 <Mail className="w-4 h-4 text-blue-400 shrink-0" />
                 <a
-                  href="mailto:manishmudrakola8@gmail.com"
+                  href="mailto:mananaukari2026@gmail.com"
                   className="text-blue-400 hover:text-blue-300 transition-colors underline-offset-2 hover:underline"
                 >
-                  Email: manishmudrakola8@gmail.com
+                  Email: mananaukari2026@gmail.com
                 </a>
               </div>
             </div>
@@ -255,10 +255,10 @@ export const Footer: React.FC<FooterProps> = ({ onNavigate }) => {
               Contact
             </button>
             <a
-              href="mailto:manishmudrakola8@gmail.com"
+              href="mailto:mananaukari2026@gmail.com"
               className="hover:text-slate-300 transition-colors cursor-pointer"
             >
-              manishmudrakola8@gmail.com
+              mananaukari2026@gmail.com
             </a>
           </div>
         </div>

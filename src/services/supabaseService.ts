@@ -36,11 +36,13 @@ export const jobsService = {
     try {
       let query = supabase.from('jobs').select('*').order('created_at', { ascending: false });
 
-      // Always hide deleted jobs from public portal listings
-      query = query.neq('status', 'deleted');
-
+      // Ensure draft and deleted jobs are not visible to public users
       if (filters.status && filters.status !== 'all') {
         query = query.eq('status', filters.status);
+      } else if (!filters.status) {
+        query = query.eq('status', 'active');
+      } else {
+        query = query.neq('status', 'deleted').neq('status', 'draft');
       }
 
       if (filters.category) {

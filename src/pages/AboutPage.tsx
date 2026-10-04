@@ -105,6 +105,7 @@ export const AboutPage: React.FC<AboutPageProps> = ({ onNavigate }) => {
             <li>100% free candidate job application portal.</li>
             <li>All postings are curated directly from authorized corporate sources.</li>
             <li>Recruiter listings are subjected to manual admin verification.</li>
+            <li>For policy inquiries or disputes, contact our support team at <a href="mailto:mananaukari2026@gmail.com" className="text-blue-600 underline">mananaukari2026@gmail.com</a>.</li>
           </ul>
         </div>
 
@@ -115,7 +116,7 @@ export const AboutPage: React.FC<AboutPageProps> = ({ onNavigate }) => {
             <span>Privacy Policy</span>
           </div>
           <p className="text-xs text-slate-600 leading-relaxed">
-            <strong>Mana Naukari</strong> respects your privacy. We never sell, rent, or trade your personal data. Subscription emails and job alert preferences are securely handled and can be unsubscribed with a single click.
+            <strong>Mana Naukari</strong> respects your privacy. We never sell, rent, or trade your personal data. Subscription emails and job alert preferences are securely handled and can be unsubscribed with a single click. For data access or deletion requests, email us at <a href="mailto:mananaukari2026@gmail.com" className="text-blue-600 underline">mananaukari2026@gmail.com</a>.
           </p>
           <ul className="text-xs text-slate-500 space-y-1.5 list-disc pl-4">
             <li>Zero tracking of intrusive third-party advertising cookies.</li>

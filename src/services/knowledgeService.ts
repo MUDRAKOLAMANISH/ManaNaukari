@@ -1028,7 +1028,7 @@ export async function seedInitialKnowledgeIfEmpty(): Promise<boolean> {
 All job requisitions on Mana Naukari link directly to official corporate career portals (Workday, Greenhouse, Lever, Google Forms, or official HR sites).
 Mana Naukari is 100% free for candidates and job seekers. We never charge any middleman fees, registration fees, or application fees.
 We verify every listing manually to ensure there are no fraudulent schemes, multi-level marketing, or fee demands.
-Candidates can reach support through the Contact page or email support@mananaukari.in.`,
+Candidates can reach support through the Contact page or email mananaukari2026@gmail.com.`,
       },
       {
         title: 'ATS Resume Review & Optimization Service',

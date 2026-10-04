@@ -34,6 +34,7 @@ export const AdminJobsListPage: React.FC<AdminJobsListPageProps> = ({ onNavigate
   const [statusCounts, setStatusCounts] = useState<{
     all: number;
     active: number;
+    draft: number;
     paused: number;
     expired: number;
     deleted: number;
@@ -41,6 +42,7 @@ export const AdminJobsListPage: React.FC<AdminJobsListPageProps> = ({ onNavigate
   }>({
     all: 0,
     active: 0,
+    draft: 0,
     paused: 0,
     expired: 0,
     deleted: 0,
@@ -86,9 +88,10 @@ export const AdminJobsListPage: React.FC<AdminJobsListPageProps> = ({ onNavigate
   // Fetch status summary counts
   const loadStatusCounts = async () => {
     try {
-      const [allRes, activeRes, pausedRes, expiredRes, deletedRes, closedRes] = await Promise.all([
+      const [allRes, activeRes, draftRes, pausedRes, expiredRes, deletedRes, closedRes] = await Promise.all([
         supabase.from('jobs').select('id', { count: 'exact', head: true }),
         supabase.from('jobs').select('id', { count: 'exact', head: true }).eq('status', 'active'),
+        supabase.from('jobs').select('id', { count: 'exact', head: true }).eq('status', 'draft'),
         supabase.from('jobs').select('id', { count: 'exact', head: true }).eq('status', 'paused'),
         supabase.from('jobs').select('id', { count: 'exact', head: true }).eq('status', 'expired'),
         supabase.from('jobs').select('id', { count: 'exact', head: true }).eq('status', 'deleted'),
@@ -98,6 +101,7 @@ export const AdminJobsListPage: React.FC<AdminJobsListPageProps> = ({ onNavigate
       setStatusCounts({
         all: allRes.count || 0,
         active: activeRes.count || 0,
+        draft: draftRes.count || 0,
         paused: pausedRes.count || 0,
         expired: expiredRes.count || 0,
         deleted: deletedRes.count || 0,
@@ -305,11 +309,12 @@ CREATE OR REPLACE VIEW public.applications AS SELECT * FROM public.applicants;`;
         )}
       </div>
 
-      {/* Quick Status Filter Tabs: Active, Paused, Expired, Deleted */}
+      {/* Quick Status Filter Tabs: Active, Draft, Paused, Expired, Deleted */}
       <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none">
         {[
           { key: 'all', label: 'All Jobs', count: statusCounts.all, emoji: '📋' },
           { key: 'active', label: 'Active', count: statusCounts.active, emoji: '🟢' },
+          { key: 'draft', label: 'Drafts', count: statusCounts.draft, emoji: '📝' },
           { key: 'paused', label: 'Paused', count: statusCounts.paused, emoji: '🟡' },
           { key: 'expired', label: 'Expired', count: statusCounts.expired, emoji: '🔴' },
           { key: 'deleted', label: 'Deleted', count: statusCounts.deleted, emoji: '🗑️' },

@@ -129,7 +129,7 @@ const SEED_FAQS: Omit<KnowledgeFAQ, 'id' | 'created_at' | 'updated_at'>[] = [
   {
     category: 'Company Information',
     question: 'How do I contact Mana Naukari support?',
-    answer: 'You can reach out via the Contact page (/contact) or email support directly at support@mananaukari.in. We also provide an official WhatsApp community for real-time job alerts.',
+    answer: 'You can reach out via the Contact page (/contact) or email support directly at mananaukari2026@gmail.com. We also provide an official WhatsApp community for real-time job alerts.',
   },
   {
     category: 'Policies',

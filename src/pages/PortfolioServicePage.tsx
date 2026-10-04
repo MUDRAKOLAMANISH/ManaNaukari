@@ -233,7 +233,7 @@ export const PortfolioServicePage: React.FC<PortfolioServicePageProps> = ({ onNa
                     <input
                       type="email"
                       required
-                      placeholder="e.g. manish@gmail.com"
+                      placeholder="e.g. candidate@gmail.com"
                       value={candidateEmail}
                       onChange={(e) => setCandidateEmail(e.target.value)}
                       className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-600 focus:outline-none"

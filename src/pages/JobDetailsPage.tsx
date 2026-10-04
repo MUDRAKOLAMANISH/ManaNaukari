@@ -90,8 +90,8 @@ export const JobDetailsPage: React.FC<JobDetailsPageProps> = ({ jobId, onNavigat
         const { data, error: fetchErr } = await jobsService.getById(jobId);
         if (!isMounted) return;
 
-        if (fetchErr || !data || data.status === 'deleted') {
-          setError('This job opening is no longer available or has been unlisted.');
+        if (fetchErr || !data || data.status === 'deleted' || data.status === 'draft') {
+          setError('This job opening is no longer available or is pending review.');
           setJob(null);
           setLoading(false);
           return;
