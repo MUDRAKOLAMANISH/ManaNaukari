@@ -247,6 +247,14 @@ export const AdminJobsListPage: React.FC<AdminJobsListPageProps> = ({ onNavigate
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
       });
+
+      // Defensive Handling: Check Content-Type before calling response.json()
+      const contentType = res.headers.get('content-type') || '';
+      if (!contentType.includes('application/json')) {
+        alert("Availability checker service is unavailable.");
+        return;
+      }
+
       const data = await res.json();
       if (data.success) {
         setToastMessage(`Job scan complete! Checked ${data.totalChecked} jobs. Flagged ${data.flaggedCount} potential closures.`);
