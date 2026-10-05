@@ -283,7 +283,7 @@ export const AdminJobsListPage: React.FC<AdminJobsListPageProps> = ({ onNavigate
     // Fallback if review columns are missing in the remote database schema cache
     if (error && (error.message?.includes('review_date') || error.message?.includes('review_reason') || error.message?.includes('schema cache'))) {
       console.warn('[Admin] Review columns are missing in Supabase schema. Retrying status update only.');
-      const fallbackRes = await adminJobsService.updateJob(job.id, { status: newStatus });
+      const fallbackRes = await adminJobsService.updateJob(job.id, { status: newStatus as any });
       error = fallbackRes.error;
     }
 

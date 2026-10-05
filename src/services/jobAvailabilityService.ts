@@ -171,7 +171,7 @@ export const jobAvailabilityService = {
           unverifiedCount++;
         }
 
-        // Update the job details in Supabase
+        // Update the job details in Supabase with resilient fallbacks
         let { error: updateErr } = await supabase
           .from('jobs')
           .update({
@@ -182,17 +182,57 @@ export const jobAvailabilityService = {
           })
           .eq('id', job.id);
 
-        // Fallback if columns are missing in user's database schema cache
+        // Fallback 1: If columns (review_date / review_reason) are missing in the schema
         if (updateErr && (updateErr.message?.includes('review_date') || updateErr.message?.includes('review_reason') || updateErr.message?.includes('schema cache'))) {
-          console.warn(`[Job Checker] Database schema is pending migration. Falling back to updating job status only for ID ${job.id}`);
-          const fallbackRes = await supabase
+          console.warn(`[Job Checker] Database schema columns are missing. Falling back to status-only update for ID ${job.id}`);
+          let fallbackRes = await supabase
             .from('jobs')
             .update({
               status: result.status,
               updated_at: new Date().toISOString(),
             })
             .eq('id', job.id);
+          
+          // Fallback 1b: If status-only update fails due to 'needs_review' not being in check constraint
+          if (fallbackRes.error && (fallbackRes.error.message?.includes('check constraint') || fallbackRes.error.message?.includes('jobs_status_check')) && result.status === 'needs_review') {
+            console.warn(`[Job Checker] 'needs_review' status is restricted by constraint. Falling back to 'expired' status for ID ${job.id}`);
+            fallbackRes = await supabase
+              .from('jobs')
+              .update({
+                status: 'expired',
+                updated_at: new Date().toISOString(),
+              })
+              .eq('id', job.id);
+          }
           updateErr = fallbackRes.error;
+        }
+
+        // Fallback 2: If columns exist, but status 'needs_review' is restricted by constraint
+        if (updateErr && (updateErr.message?.includes('check constraint') || updateErr.message?.includes('jobs_status_check')) && result.status === 'needs_review') {
+          console.warn(`[Job Checker] 'needs_review' is restricted by constraint. Retrying update with status 'expired' and metadata for ID ${job.id}`);
+          const retryRes = await supabase
+            .from('jobs')
+            .update({
+              status: 'expired',
+              review_reason: result.reason,
+              review_date: result.lastChecked,
+              updated_at: new Date().toISOString(),
+            })
+            .eq('id', job.id);
+          
+          if (retryRes.error && (retryRes.error.message?.includes('review_date') || retryRes.error.message?.includes('review_reason') || retryRes.error.message?.includes('schema cache'))) {
+            // Missing columns, so fallback to status-only with 'expired'
+            const finalRes = await supabase
+              .from('jobs')
+              .update({
+                status: 'expired',
+                updated_at: new Date().toISOString(),
+              })
+              .eq('id', job.id);
+            updateErr = finalRes.error;
+          } else {
+            updateErr = retryRes.error;
+          }
         }
 
         if (updateErr) {
