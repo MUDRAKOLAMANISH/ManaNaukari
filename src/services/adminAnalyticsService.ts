@@ -22,21 +22,35 @@ export const adminAnalyticsService = {
     let tablesReady = true;
     let tableErrorMessage: string | null = null;
 
-    // 1. Fetch Job counts (Active vs Paused vs Expired vs Closed vs Deleted)
+    // 1. Fetch Job counts (Active vs Draft vs Needs Review vs Paused vs Expired vs Closed vs Deleted)
     let activeJobs = 0;
+    let draftJobs = 0;
+    let needsReviewJobs = 0;
     let pausedJobs = 0;
     let expiredJobs = 0;
     let closedJobs = 0;
     let deletedJobs = 0;
     try {
-      const [activeJobsRes, pausedJobsRes, expiredJobsRes, closedJobsRes, deletedJobsRes] = await Promise.all([
+      const [
+        activeJobsRes,
+        draftJobsRes,
+        needsReviewRes,
+        pausedJobsRes,
+        expiredJobsRes,
+        closedJobsRes,
+        deletedJobsRes,
+      ] = await Promise.all([
         supabase.from('jobs').select('id', { count: 'exact', head: true }).eq('status', 'active'),
+        supabase.from('jobs').select('id', { count: 'exact', head: true }).eq('status', 'draft'),
+        supabase.from('jobs').select('id', { count: 'exact', head: true }).eq('status', 'needs_review'),
         supabase.from('jobs').select('id', { count: 'exact', head: true }).eq('status', 'paused'),
         supabase.from('jobs').select('id', { count: 'exact', head: true }).eq('status', 'expired'),
         supabase.from('jobs').select('id', { count: 'exact', head: true }).eq('status', 'closed'),
         supabase.from('jobs').select('id', { count: 'exact', head: true }).eq('status', 'deleted'),
       ]);
       activeJobs = activeJobsRes.count || 0;
+      draftJobs = draftJobsRes.count || 0;
+      needsReviewJobs = needsReviewRes.count || 0;
       pausedJobs = pausedJobsRes.count || 0;
       expiredJobs = expiredJobsRes.count || 0;
       closedJobs = closedJobsRes.count || 0;
@@ -333,6 +347,8 @@ export const adminAnalyticsService = {
       totalApplications,
       todayApplications,
       activeJobs,
+      draftJobs,
+      needsReviewJobs,
       pausedJobs,
       expiredJobs,
       closedJobs,

@@ -14,6 +14,7 @@ interface JobTableProps {
   onDelete: (job: Job) => void;
   onRestore?: (job: Job) => void;
   onShare?: (job: Job) => void;
+  onUpdateStatus?: (job: Job, newStatus: string) => void;
 }
 
 export const JobTable: React.FC<JobTableProps> = ({
@@ -25,6 +26,7 @@ export const JobTable: React.FC<JobTableProps> = ({
   onDelete,
   onRestore,
   onShare,
+  onUpdateStatus,
 }) => {
   if (loading) {
     return (
@@ -100,6 +102,14 @@ export const JobTable: React.FC<JobTableProps> = ({
                             </>
                           )}
                         </div>
+                        {job.review_reason && (
+                          <div className="mt-1.5 text-[10px] text-orange-900 bg-orange-50 border border-orange-200/80 rounded-lg p-2 flex flex-col gap-0.5 max-w-sm">
+                            <span className="font-bold flex items-center gap-1 text-orange-950">⚠️ Flagged: {job.review_reason}</span>
+                            {job.review_date && (
+                              <span className="text-slate-500 font-medium text-[9px]">Last Checked: {new Date(job.review_date).toLocaleString()}</span>
+                            )}
+                          </div>
+                        )}
                       </div>
                     </div>
                   </td>
@@ -151,12 +161,16 @@ export const JobTable: React.FC<JobTableProps> = ({
                       className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold border ${
                         isActive
                           ? 'bg-emerald-50 text-emerald-800 border-emerald-300'
+                          : job.status === 'needs_review'
+                          ? 'bg-orange-50 text-orange-900 border-orange-300'
                           : job.status === 'draft'
                           ? 'bg-purple-50 text-purple-900 border-purple-300'
                           : job.status === 'paused'
                           ? 'bg-amber-50 text-amber-900 border-amber-300'
                           : job.status === 'expired'
                           ? 'bg-rose-50 text-rose-900 border-rose-300'
+                          : job.status === 'closed'
+                          ? 'bg-slate-100 text-slate-800 border-slate-300'
                           : job.status === 'deleted'
                           ? 'bg-slate-100 text-slate-700 border-slate-300'
                           : 'bg-slate-100 text-slate-700 border-slate-300'
@@ -165,17 +179,21 @@ export const JobTable: React.FC<JobTableProps> = ({
                       <span>
                         {isActive
                           ? '🟢'
+                          : job.status === 'needs_review'
+                          ? '⚠️'
                           : job.status === 'draft'
                           ? '📝'
                           : job.status === 'paused'
                           ? '🟡'
                           : job.status === 'expired'
                           ? '🔴'
+                          : job.status === 'closed'
+                          ? '🔒'
                           : job.status === 'deleted'
                           ? '🗑️'
                           : '⚪'}
                       </span>
-                      <span className="capitalize">{job.status}</span>
+                      <span className="capitalize">{job.status === 'needs_review' ? 'Needs Review' : job.status}</span>
                     </span>
                   </td>
 
@@ -183,8 +201,39 @@ export const JobTable: React.FC<JobTableProps> = ({
                   <td className="py-3.5 px-4 text-right whitespace-nowrap">
                     <div className="inline-flex items-center gap-1">
                       
-                      {/* Restore Job Action if status is deleted */}
-                      {job.status === 'deleted' ? (
+                      {/* Needs Review Custom Actions Panel */}
+                      {job.status === 'needs_review' ? (
+                        <div className="inline-flex items-center gap-1.5">
+                          <button
+                            onClick={() => onUpdateStatus?.(job, 'active')}
+                            className="inline-flex items-center gap-1 px-2.5 py-1 text-[10px] font-bold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-300 rounded-lg transition-colors cursor-pointer"
+                            title="Keep Active (Clears flags)"
+                          >
+                            <span>Keep Active</span>
+                          </button>
+                          <button
+                            onClick={() => onUpdateStatus?.(job, 'closed')}
+                            className="inline-flex items-center gap-1 px-2.5 py-1 text-[10px] font-bold text-slate-700 bg-slate-50 hover:bg-slate-100 border border-slate-300 rounded-lg transition-colors cursor-pointer"
+                            title="Mark Job as Closed"
+                          >
+                            <span>Mark Closed</span>
+                          </button>
+                          <button
+                            onClick={() => onUpdateStatus?.(job, 'paused')}
+                            className="inline-flex items-center gap-1 px-2.5 py-1 text-[10px] font-bold text-amber-700 bg-amber-50 hover:bg-amber-100 border border-amber-300 rounded-lg transition-colors cursor-pointer"
+                            title="Pause Job Applications"
+                          >
+                            <span>Pause</span>
+                          </button>
+                          <button
+                            onClick={() => onDelete(job)}
+                            className="inline-flex items-center gap-1 px-2.5 py-1 text-[10px] font-bold text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-300 rounded-lg transition-colors cursor-pointer"
+                            title="Delete Job"
+                          >
+                            <span>Delete</span>
+                          </button>
+                        </div>
+                      ) : job.status === 'deleted' ? (
                         <div className="inline-flex items-center gap-1.5">
                           <button
                             onClick={() => onRestore?.(job)}

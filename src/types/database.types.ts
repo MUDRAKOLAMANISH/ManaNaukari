@@ -4,7 +4,7 @@
  */
 
 export type JobType = 'Fresher' | 'Internship' | 'Full Time' | 'Part Time' | 'Contract';
-export type JobStatus = 'active' | 'paused' | 'closed' | 'deleted' | 'expired' | 'draft';
+export type JobStatus = 'active' | 'draft' | 'paused' | 'expired' | 'needs_review' | 'closed' | 'deleted';
 export type ExperienceLevel = 'Fresher' | '0-1 Years' | '1-3 Years' | 'Any';
 export type AdminRole = 'super_admin' | 'editor';
 
@@ -26,6 +26,8 @@ export interface Job {
   featured: boolean;
   is_featured?: boolean;
   status: JobStatus;
+  review_reason?: string | null;
+  review_date?: string | null;
   posted_date: string;
   expiry_date?: string | null;
   created_at: string;
@@ -470,6 +472,8 @@ export interface AnalyticsOverview {
   totalApplications: number;
   todayApplications: number;
   activeJobs: number;
+  draftJobs?: number;
+  needsReviewJobs?: number;
   pausedJobs?: number;
   expiredJobs: number;
   closedJobs?: number;

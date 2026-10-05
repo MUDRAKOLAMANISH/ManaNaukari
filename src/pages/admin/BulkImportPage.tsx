@@ -12,7 +12,7 @@ import {
   Loader2, Copy, Check, ExternalLink, RefreshCw, 
   FileText, ArrowRight, ShieldCheck, MessageSquare, Linkedin,
   SendHorizontal, Trash2, Eye, Edit3, CheckSquare, Square,
-  UploadCloud, AlertTriangle, X
+  UploadCloud, X
 } from 'lucide-react';
 import { adminJobsService } from '../../services/adminJobsService';
 
@@ -31,10 +31,18 @@ export const BulkImportPage: React.FC<BulkImportPageProps> = ({ onNavigate }) =>
   const [copiedFormat, setCopiedFormat] = useState<string | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
-  // Review table states (Step 4, 5, 6)
+  // Review table states (Select, Actions)
   const [selectedJobIds, setSelectedJobIds] = useState<Set<string>>(new Set());
   const [isActionLoading, setIsActionLoading] = useState(false);
   
+  // Combined messaging states
+  const [editedMessages, setEditedMessages] = useState<{
+    whatsapp: string;
+    linkedin: string;
+    telegram: string;
+  }>({ whatsapp: '', linkedin: '', telegram: '' });
+  const [isEditingMessage, setIsEditingMessage] = useState(false);
+
   // Preview modal state
   const [previewJob, setPreviewJob] = useState<BulkImportSuccessItem | null>(null);
 
@@ -47,6 +55,7 @@ export const BulkImportPage: React.FC<BulkImportPageProps> = ({ onNavigate }) =>
     experience: '',
     salary: '',
     skills: '',
+    jobType: '',
   });
 
   // Parse input in real-time
@@ -72,6 +81,8 @@ export const BulkImportPage: React.FC<BulkImportPageProps> = ({ onNavigate }) =>
     setSelectedJobIds(new Set());
     setPreviewJob(null);
     setEditingJob(null);
+    setEditedMessages({ whatsapp: '', linkedin: '', telegram: '' });
+    setIsEditingMessage(false);
   };
 
   // Run Bulk Extraction (Jobs saved as status = 'draft')
@@ -97,6 +108,13 @@ export const BulkImportPage: React.FC<BulkImportPageProps> = ({ onNavigate }) =>
         const allIds = new Set(importResult.successfulJobs.map((j) => j.id));
         setSelectedJobIds(allIds);
         setToastMessage('Jobs extracted successfully. Review and publish when ready.');
+
+        // Requirement 1 & 6: Generate combined message immediately after extraction, before publishing
+        setEditedMessages({
+          whatsapp: bulkImportService.generateWhatsAppMessage(importResult.successfulJobs),
+          linkedin: bulkImportService.generateLinkedInPost(importResult.successfulJobs),
+          telegram: bulkImportService.generateTelegramPost(importResult.successfulJobs),
+        });
       } else {
         setToastMessage(`⚠️ None of the ${importResult.totalProcessed} URLs could be extracted.`);
       }
@@ -129,7 +147,7 @@ export const BulkImportPage: React.FC<BulkImportPageProps> = ({ onNavigate }) =>
     setSelectedJobIds(next);
   };
 
-  // Step 6: Publish Selected
+  // Publish Selected
   const handlePublishSelected = async () => {
     if (!result || selectedJobIds.size === 0) {
       alert('Please select at least one job to publish.');
@@ -162,7 +180,7 @@ export const BulkImportPage: React.FC<BulkImportPageProps> = ({ onNavigate }) =>
     }
   };
 
-  // Step 6: Publish All
+  // Publish All
   const handlePublishAll = async () => {
     if (!result || result.successfulJobs.length === 0) return;
 
@@ -191,7 +209,7 @@ export const BulkImportPage: React.FC<BulkImportPageProps> = ({ onNavigate }) =>
     }
   };
 
-  // Step 6: Delete Selected
+  // Delete Selected
   const handleDeleteSelected = async () => {
     if (!result || selectedJobIds.size === 0) {
       alert('Please select at least one job to delete.');
@@ -207,9 +225,9 @@ export const BulkImportPage: React.FC<BulkImportPageProps> = ({ onNavigate }) =>
     try {
       const res = await bulkImportService.deleteJobs(idsToDelete);
       if (res.success) {
+        const remaining = result.successfulJobs.filter((job) => !selectedJobIds.has(job.id));
         setResult((prev) => {
           if (!prev) return null;
-          const remaining = prev.successfulJobs.filter((job) => !selectedJobIds.has(job.id));
           return {
             ...prev,
             importedCount: remaining.length,
@@ -218,6 +236,13 @@ export const BulkImportPage: React.FC<BulkImportPageProps> = ({ onNavigate }) =>
         });
         setSelectedJobIds(new Set());
         setToastMessage(`✓ Successfully deleted ${res.count} job(s).`);
+
+        // Update messages with remaining
+        setEditedMessages({
+          whatsapp: bulkImportService.generateWhatsAppMessage(remaining),
+          linkedin: bulkImportService.generateLinkedInPost(remaining),
+          telegram: bulkImportService.generateTelegramPost(remaining),
+        });
       } else {
         alert(`Failed to delete jobs: ${res.error}`);
       }
@@ -237,9 +262,9 @@ export const BulkImportPage: React.FC<BulkImportPageProps> = ({ onNavigate }) =>
     try {
       const res = await bulkImportService.deleteJobs([jobId]);
       if (res.success) {
+        const remaining = result ? result.successfulJobs.filter((j) => j.id !== jobId) : [];
         setResult((prev) => {
           if (!prev) return null;
-          const remaining = prev.successfulJobs.filter((j) => j.id !== jobId);
           return {
             ...prev,
             importedCount: remaining.length,
@@ -252,6 +277,13 @@ export const BulkImportPage: React.FC<BulkImportPageProps> = ({ onNavigate }) =>
           return next;
         });
         setToastMessage(`✓ Job "${jobTitle}" deleted.`);
+
+        // Update messages with remaining
+        setEditedMessages({
+          whatsapp: bulkImportService.generateWhatsAppMessage(remaining),
+          linkedin: bulkImportService.generateLinkedInPost(remaining),
+          telegram: bulkImportService.generateTelegramPost(remaining),
+        });
       } else {
         alert(`Failed to delete: ${res.error}`);
       }
@@ -273,12 +305,13 @@ export const BulkImportPage: React.FC<BulkImportPageProps> = ({ onNavigate }) =>
       experience: job.experience,
       salary: job.salary || '',
       skills: job.skills.join(', '),
+      jobType: job.jobType || 'Full Time',
     });
   };
 
   const handleSaveQuickEdit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!editingJob) return;
+    if (!editingJob || !result) return;
 
     setIsActionLoading(true);
     try {
@@ -293,6 +326,7 @@ export const BulkImportPage: React.FC<BulkImportPageProps> = ({ onNavigate }) =>
         location: editFormData.location.trim(),
         experience: editFormData.experience.trim(),
         salary: editFormData.salary.trim() || 'Best in Industry',
+        job_type: editFormData.jobType.trim(),
         skills_required: parsedSkills,
       };
 
@@ -302,24 +336,34 @@ export const BulkImportPage: React.FC<BulkImportPageProps> = ({ onNavigate }) =>
         return;
       }
 
+      const updatedJobs = result.successfulJobs.map((j) =>
+        j.id === editingJob.id
+          ? {
+              ...j,
+              title: data.title,
+              company: data.company,
+              location: data.location,
+              experience: data.experience || j.experience,
+              salary: data.salary,
+              jobType: data.job_type || j.jobType,
+              skills: Array.isArray(data.skills_required) ? data.skills_required : parsedSkills,
+            }
+          : j
+      );
+
       setResult((prev) => {
         if (!prev) return null;
         return {
           ...prev,
-          successfulJobs: prev.successfulJobs.map((j) =>
-            j.id === editingJob.id
-              ? {
-                  ...j,
-                  title: data.title,
-                  company: data.company,
-                  location: data.location,
-                  experience: data.experience || j.experience,
-                  salary: data.salary,
-                  skills: Array.isArray(data.skills_required) ? data.skills_required : parsedSkills,
-                }
-              : j
-          ),
+          successfulJobs: updatedJobs,
         };
+      });
+
+      // Regenerate messages with edited data
+      setEditedMessages({
+        whatsapp: bulkImportService.generateWhatsAppMessage(updatedJobs),
+        linkedin: bulkImportService.generateLinkedInPost(updatedJobs),
+        telegram: bulkImportService.generateTelegramPost(updatedJobs),
       });
 
       setEditingJob(null);
@@ -332,26 +376,9 @@ export const BulkImportPage: React.FC<BulkImportPageProps> = ({ onNavigate }) =>
     }
   };
 
-  // Active jobs for broadcasting
-  const publishedJobs = result?.successfulJobs.filter((j) => j.status === 'active') || [];
-
-  // Message Generators
-  const getGeneratedMessage = (format: MessageFormat): string => {
-    if (publishedJobs.length === 0) return '';
-    switch (format) {
-      case 'whatsapp':
-        return bulkImportService.generateWhatsAppMessage(publishedJobs);
-      case 'linkedin':
-        return bulkImportService.generateLinkedInPost(publishedJobs);
-      case 'telegram':
-        return bulkImportService.generateTelegramPost(publishedJobs);
-      default:
-        return '';
-    }
-  };
-
+  // Message Copy/Edit/Regenerate Actions
   const handleCopyMessage = (format: MessageFormat) => {
-    const text = getGeneratedMessage(format);
+    const text = editedMessages[format];
     if (!text) return;
 
     navigator.clipboard.writeText(text);
@@ -362,24 +389,33 @@ export const BulkImportPage: React.FC<BulkImportPageProps> = ({ onNavigate }) =>
     }, 2500);
   };
 
+  const handleRegenerateMessages = () => {
+    if (!result) return;
+    setEditedMessages({
+      whatsapp: bulkImportService.generateWhatsAppMessage(result.successfulJobs),
+      linkedin: bulkImportService.generateLinkedInPost(result.successfulJobs),
+      telegram: bulkImportService.generateTelegramPost(result.successfulJobs),
+    });
+    setToastMessage('✓ Combined sharing message successfully regenerated!');
+  };
+
   const handleOpenWhatsApp = () => {
-    const text = getGeneratedMessage('whatsapp');
+    const text = editedMessages['whatsapp'];
     if (!text) return;
     const url = `https://api.whatsapp.com/send?text=${encodeURIComponent(text)}`;
     window.open(url, '_blank');
   };
 
   const handleOpenTelegram = () => {
-    const text = getGeneratedMessage('telegram');
+    const text = editedMessages['telegram'];
     if (!text) return;
     const url = `https://t.me/share/url?text=${encodeURIComponent(text)}`;
     window.open(url, '_blank');
   };
 
   const handleOpenLinkedIn = () => {
-    const url = `https://www.linkedin.com/feed/`;
-    window.open(url, '_blank');
-    setToastMessage('LinkedIn opened. Paste your copied post into the create box!');
+    window.open('https://www.linkedin.com/feed/', '_blank');
+    setToastMessage('LinkedIn opened. Paste your copied post text into the post editor!');
   };
 
   return (
@@ -395,7 +431,7 @@ export const BulkImportPage: React.FC<BulkImportPageProps> = ({ onNavigate }) =>
           showImportButton={true}
         />
 
-        {/* Tab switch between Bulk & Single URL */}
+        {/* Tab switcher */}
         <div className="flex items-center gap-2 mb-6 border-b border-slate-200 pb-3">
           <button
             onClick={() => {}}
@@ -414,7 +450,7 @@ export const BulkImportPage: React.FC<BulkImportPageProps> = ({ onNavigate }) =>
           </button>
         </div>
 
-        {/* Step 1: Input URLs Section */}
+        {/* URL Inputs */}
         <div className="bg-white rounded-3xl border border-slate-200/90 p-6 sm:p-8 shadow-xs mb-8">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4">
             <div>
@@ -436,7 +472,6 @@ export const BulkImportPage: React.FC<BulkImportPageProps> = ({ onNavigate }) =>
                 onClick={handleLoadSampleUrls}
                 disabled={isProcessing}
                 className="px-3.5 py-2 text-xs font-semibold text-indigo-700 bg-indigo-50 hover:bg-indigo-100/90 border border-indigo-200 rounded-xl transition-colors cursor-pointer flex items-center gap-1.5"
-                title="Populate 5 sample career requisition links"
               >
                 <FileText className="w-3.5 h-3.5 text-indigo-600" />
                 <span>Load Sample URLs</span>
@@ -456,7 +491,6 @@ export const BulkImportPage: React.FC<BulkImportPageProps> = ({ onNavigate }) =>
             </div>
           </div>
 
-          {/* URLs Textarea */}
           <div className="relative">
             <textarea
               rows={6}
@@ -471,7 +505,6 @@ https://jobs.lever.co/company/example-role`}
               className="w-full font-mono text-xs sm:text-sm p-4 rounded-2xl border border-slate-300 focus:ring-2 focus:ring-blue-600 focus:border-blue-600 focus:outline-none transition-shadow bg-slate-50/50 resize-y leading-relaxed"
             />
 
-            {/* Live Count Badge */}
             <div className="absolute right-3 bottom-3 flex items-center gap-2">
               <span className={`px-2.5 py-1 rounded-lg text-xs font-bold shadow-2xs border ${
                 parsedUrls.length === 0
@@ -492,7 +525,6 @@ https://jobs.lever.co/company/example-role`}
             </p>
           )}
 
-          {/* Action Trigger Button */}
           <div className="mt-5 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4 pt-4 border-t border-slate-100">
             <div className="text-xs text-slate-500 flex items-center gap-1.5">
               <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0" />
@@ -520,7 +552,7 @@ https://jobs.lever.co/company/example-role`}
           </div>
         </div>
 
-        {/* Live Processing Indicator */}
+        {/* Processing State */}
         {isProcessing && progress && (
           <div className="bg-white rounded-3xl border border-blue-200 p-6 sm:p-8 shadow-md mb-8 animate-fadeIn">
             <div className="flex items-center justify-between mb-3">
@@ -542,7 +574,6 @@ https://jobs.lever.co/company/example-role`}
               </span>
             </div>
 
-            {/* Progress Bar */}
             <div className="h-2.5 w-full bg-slate-100 rounded-full overflow-hidden p-0.5 border border-slate-200 mb-3">
               <div
                 className="h-full bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 rounded-full transition-all duration-300"
@@ -556,11 +587,11 @@ https://jobs.lever.co/company/example-role`}
           </div>
         )}
 
-        {/* Steps 4, 5, 6, 7: Review Table & Actions */}
+        {/* Review Area */}
         {result && (
           <div className="space-y-8 animate-fadeIn">
             
-            {/* Step 9 Notification Banner */}
+            {/* Status Info bar */}
             <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-3xl p-5 sm:p-6 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
               <div className="flex items-start gap-3">
                 <div className="w-10 h-10 rounded-2xl bg-blue-600 text-white flex items-center justify-center shrink-0 shadow-xs">
@@ -571,12 +602,11 @@ https://jobs.lever.co/company/example-role`}
                     Jobs extracted successfully. Review and publish when ready.
                   </h3>
                   <p className="text-xs text-blue-700 mt-0.5">
-                    Extracted {result.importedCount} job(s) saved with status <code className="font-mono bg-blue-100/80 px-1.5 py-0.5 rounded text-blue-900 font-bold">draft</code>. Public users cannot see them until you click Publish.
+                    Extracted {result.importedCount} job(s) saved with status <code className="font-mono bg-blue-100/80 px-1.5 py-0.5 rounded text-blue-900 font-bold">draft</code>. Only published jobs are visible on the website.
                   </p>
                 </div>
               </div>
 
-              {/* Status Counters */}
               <div className="flex items-center gap-2 self-end sm:self-center">
                 <div className="px-3.5 py-2 rounded-xl bg-purple-50 border border-purple-200 text-center">
                   <span className="text-xs font-black text-purple-700">
@@ -591,11 +621,198 @@ https://jobs.lever.co/company/example-role`}
               </div>
             </div>
 
-            {/* Step 4 & 5 & 6: Review Table with Selection & Action Buttons */}
+            {/* Combined Broadcasting Message Center - Previews, copies, edits and regenerates before publishing */}
+            {result.successfulJobs.length > 0 && (
+              <div className="bg-white rounded-3xl border border-slate-200/90 p-6 sm:p-8 shadow-xs animate-fadeIn">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b border-slate-100">
+                  <div>
+                    <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-bold mb-2">
+                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                      <span>{result.successfulJobs.length} Extracted Job(s) Integrated in Sharing Announcement</span>
+                    </div>
+                    <h3 className="text-xl font-black font-display text-slate-900">
+                      Combined Sharing Announcement Builder
+                    </h3>
+                    <p className="text-xs sm:text-sm text-slate-500 mt-0.5">
+                      Review, customize, and finalize one master message containing all extracted jobs. Perfect to share on WhatsApp, Telegram, or LinkedIn.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="pt-6">
+                  <div className="flex flex-wrap items-center gap-2 mb-4">
+                    <span className="text-xs font-bold text-slate-700 mr-2">Select Shareable Channel:</span>
+                    
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setActiveMessageFormat('whatsapp');
+                        setIsEditingMessage(false);
+                      }}
+                      className={`inline-flex items-center gap-2 px-4 py-2 text-xs font-bold rounded-xl transition-all cursor-pointer ${
+                        activeMessageFormat === 'whatsapp'
+                          ? 'bg-emerald-600 text-white shadow-xs'
+                          : 'bg-emerald-50 text-emerald-800 hover:bg-emerald-100 border border-emerald-200'
+                      }`}
+                    >
+                      <MessageSquare className="w-3.5 h-3.5" />
+                      <span>WhatsApp Broadcast</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setActiveMessageFormat('linkedin');
+                        setIsEditingMessage(false);
+                      }}
+                      className={`inline-flex items-center gap-2 px-4 py-2 text-xs font-bold rounded-xl transition-all cursor-pointer ${
+                        activeMessageFormat === 'linkedin'
+                          ? 'bg-blue-700 text-white shadow-xs'
+                          : 'bg-blue-50 text-blue-800 hover:bg-blue-100 border border-blue-200'
+                      }`}
+                    >
+                      <Linkedin className="w-3.5 h-3.5" />
+                      <span>LinkedIn Post</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setActiveMessageFormat('telegram');
+                        setIsEditingMessage(false);
+                      }}
+                      className={`inline-flex items-center gap-2 px-4 py-2 text-xs font-bold rounded-xl transition-all cursor-pointer ${
+                        activeMessageFormat === 'telegram'
+                          ? 'bg-sky-600 text-white shadow-xs'
+                          : 'bg-sky-50 text-sky-800 hover:bg-sky-100 border border-sky-200'
+                      }`}
+                    >
+                      <SendHorizontal className="w-3.5 h-3.5" />
+                      <span>Telegram Post</span>
+                    </button>
+                  </div>
+
+                  <div className="p-3 rounded-xl bg-blue-50/70 border border-blue-200 text-xs text-blue-900 flex items-center justify-between mb-4">
+                    <div className="flex items-center gap-2">
+                      <ShieldCheck className="w-4 h-4 text-blue-700 shrink-0" />
+                      <span className="font-semibold">
+                        Strict Security Enforced: Announcements contain ONLY absolute Mana Naukari URLs. All original career links are permanently hidden.
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Message Previewer / Editor Container */}
+                  <div className="relative rounded-2xl border border-slate-300 bg-slate-900 text-slate-100 p-5 shadow-inner">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-3 border-b border-slate-800 mb-3 text-xs gap-3">
+                      <div className="flex items-center gap-2">
+                        <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
+                        <span className="font-bold text-slate-200 capitalize">
+                          {activeMessageFormat} Format Preview ({result.successfulJobs.length} jobs)
+                        </span>
+                      </div>
+
+                      <div className="flex flex-wrap items-center gap-2">
+                        {/* 5. Copy Message */}
+                        <button
+                          type="button"
+                          onClick={() => handleCopyMessage(activeMessageFormat)}
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-white rounded-lg text-xs font-bold transition-colors cursor-pointer border border-slate-700"
+                        >
+                          {copiedFormat === activeMessageFormat ? (
+                            <>
+                              <Check className="w-3.5 h-3.5 text-emerald-400" />
+                              <span className="text-emerald-400">Copied!</span>
+                            </>
+                          ) : (
+                            <>
+                              <Copy className="w-3.5 h-3.5 text-slate-400" />
+                              <span>Copy Message</span>
+                            </>
+                          )}
+                        </button>
+
+                        {/* 5. Edit Message */}
+                        <button
+                          type="button"
+                          onClick={() => setIsEditingMessage(!isEditingMessage)}
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-white rounded-lg text-xs font-bold transition-colors cursor-pointer border border-slate-700"
+                        >
+                          <Edit3 className="w-3.5 h-3.5 text-slate-400" />
+                          <span>{isEditingMessage ? 'Done Editing' : 'Edit Message'}</span>
+                        </button>
+
+                        {/* 5. Regenerate Message */}
+                        <button
+                          type="button"
+                          onClick={handleRegenerateMessages}
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-white rounded-lg text-xs font-bold transition-colors cursor-pointer border border-slate-700"
+                        >
+                          <RefreshCw className="w-3.5 h-3.5 text-slate-400" />
+                          <span>Regenerate Message</span>
+                        </button>
+
+                        {activeMessageFormat === 'whatsapp' && (
+                          <button
+                            type="button"
+                            onClick={handleOpenWhatsApp}
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold transition-colors cursor-pointer"
+                          >
+                            <ExternalLink className="w-3.5 h-3.5" />
+                            <span>WhatsApp Send</span>
+                          </button>
+                        )}
+
+                        {activeMessageFormat === 'linkedin' && (
+                          <button
+                            type="button"
+                            onClick={handleOpenLinkedIn}
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold transition-colors cursor-pointer"
+                          >
+                            <ExternalLink className="w-3.5 h-3.5" />
+                            <span>LinkedIn Share</span>
+                          </button>
+                        )}
+
+                        {activeMessageFormat === 'telegram' && (
+                          <button
+                            type="button"
+                            onClick={handleOpenTelegram}
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-sky-600 hover:bg-sky-700 text-white rounded-lg text-xs font-bold transition-colors cursor-pointer"
+                          >
+                            <ExternalLink className="w-3.5 h-3.5" />
+                            <span>Telegram Post</span>
+                          </button>
+                        )}
+                      </div>
+                    </div>
+
+                    {isEditingMessage ? (
+                      <textarea
+                        rows={12}
+                        value={editedMessages[activeMessageFormat]}
+                        onChange={(e) =>
+                          setEditedMessages({
+                            ...editedMessages,
+                            [activeMessageFormat]: e.target.value,
+                          })
+                        }
+                        className="w-full font-mono text-xs sm:text-sm p-4 rounded-xl bg-slate-950 text-slate-200 border border-slate-800 focus:outline-none focus:ring-1 focus:ring-blue-500 leading-relaxed resize-y"
+                      />
+                    ) : (
+                      <pre className="font-mono text-xs sm:text-sm whitespace-pre-wrap leading-relaxed max-h-[380px] overflow-y-auto text-slate-200 scrollbar-thin">
+                        {editedMessages[activeMessageFormat] || 'No message contents.'}
+                      </pre>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Review Table with 11 custom columns */}
             {result.successfulJobs.length > 0 && (
               <div className="bg-white rounded-3xl border border-slate-200/90 shadow-xs overflow-hidden">
                 
-                {/* Step 6 Control Bar */}
+                {/* Actions Panel: Publish Selected, Publish All, Delete Selected, Cancel */}
                 <div className="p-5 sm:p-6 border-b border-slate-100 flex flex-col md:flex-row md:items-center justify-between gap-4 bg-slate-50/50">
                   <div className="flex items-center gap-3">
                     <button
@@ -621,8 +838,8 @@ https://jobs.lever.co/company/example-role`}
                     </span>
                   </div>
 
-                  {/* Step 6 Action Buttons: Publish Selected, Publish All, Delete Selected */}
                   <div className="flex flex-wrap items-center gap-2">
+                    {/* Publish Selected */}
                     <button
                       type="button"
                       onClick={handlePublishSelected}
@@ -633,6 +850,7 @@ https://jobs.lever.co/company/example-role`}
                       <span>Publish Selected ({selectedJobIds.size})</span>
                     </button>
 
+                    {/* Publish All */}
                     <button
                       type="button"
                       onClick={handlePublishAll}
@@ -643,6 +861,7 @@ https://jobs.lever.co/company/example-role`}
                       <span>Publish All ({result.successfulJobs.length})</span>
                     </button>
 
+                    {/* Delete Selected */}
                     <button
                       type="button"
                       onClick={handleDeleteSelected}
@@ -652,29 +871,35 @@ https://jobs.lever.co/company/example-role`}
                       <Trash2 className="w-3.5 h-3.5 text-rose-600" />
                       <span>Delete Selected</span>
                     </button>
+
+                    {/* Cancel action resets the form */}
+                    <button
+                      type="button"
+                      onClick={handleClear}
+                      className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-bold text-slate-700 bg-white hover:bg-slate-100 border border-slate-300 rounded-xl transition-all cursor-pointer"
+                    >
+                      <X className="w-3.5 h-3.5 text-slate-500" />
+                      <span>Cancel</span>
+                    </button>
                   </div>
                 </div>
 
-                {/* Step 4 Review Table: Job Title, Company, Location, Experience, Skills, Status */}
+                {/* Review Table (Exactly 11 Columns requested by user) */}
                 <div className="overflow-x-auto">
                   <table className="w-full text-left text-xs border-collapse">
                     <thead className="bg-slate-100/70 border-b border-slate-200 text-slate-700 font-bold uppercase tracking-wider text-[11px]">
                       <tr>
-                        <th className="py-3.5 px-4 w-10 text-center">
-                          <input
-                            type="checkbox"
-                            checked={selectedJobIds.size === result.successfulJobs.length && result.successfulJobs.length > 0}
-                            onChange={handleToggleSelectAll}
-                            className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
-                          />
-                        </th>
+                        <th className="py-3.5 px-4 text-center">Select</th>
                         <th className="py-3.5 px-4">Job Title</th>
                         <th className="py-3.5 px-4">Company</th>
-                        <th className="py-3.5 px-4">Location</th>
                         <th className="py-3.5 px-4">Experience</th>
+                        <th className="py-3.5 px-4">Salary</th>
+                        <th className="py-3.5 px-4">Location</th>
+                        <th className="py-3.5 px-4">Job Type</th>
                         <th className="py-3.5 px-4">Skills</th>
                         <th className="py-3.5 px-4">Status</th>
-                        <th className="py-3.5 px-4 text-right">Actions</th>
+                        <th className="py-3.5 px-4 text-center">Edit</th>
+                        <th className="py-3.5 px-4 text-center">Delete</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
@@ -689,7 +914,7 @@ https://jobs.lever.co/company/example-role`}
                               isSelected ? 'bg-blue-50/40' : 'hover:bg-slate-50/70'
                             }`}
                           >
-                            {/* Select Checkbox */}
+                            {/* Select Column */}
                             <td className="py-3.5 px-4 text-center">
                               <input
                                 type="checkbox"
@@ -699,9 +924,9 @@ https://jobs.lever.co/company/example-role`}
                               />
                             </td>
 
-                            {/* Job Title */}
+                            {/* Job Title Column */}
                             <td className="py-3.5 px-4 font-semibold text-slate-900 max-w-xs">
-                              <div className="truncate font-display text-sm font-bold text-slate-900">
+                              <div className="font-display text-sm font-bold text-slate-900 truncate">
                                 {job.title}
                               </div>
                               <div className="text-[11px] text-slate-400 font-mono truncate">
@@ -709,24 +934,34 @@ https://jobs.lever.co/company/example-role`}
                               </div>
                             </td>
 
-                            {/* Company */}
+                            {/* Company Column */}
                             <td className="py-3.5 px-4 text-slate-800 font-medium whitespace-nowrap">
                               <span className="px-2 py-0.5 rounded-md bg-slate-100 font-semibold text-slate-700">
                                 {job.company}
                               </span>
                             </td>
 
-                            {/* Location */}
-                            <td className="py-3.5 px-4 text-slate-600 whitespace-nowrap">
-                              📍 {job.location}
-                            </td>
-
-                            {/* Experience */}
+                            {/* Experience Column */}
                             <td className="py-3.5 px-4 text-slate-600 whitespace-nowrap">
                               ⏳ {job.experience}
                             </td>
 
-                            {/* Skills */}
+                            {/* Salary Column */}
+                            <td className="py-3.5 px-4 text-slate-600 whitespace-nowrap">
+                              💰 {job.salary || 'Best in Industry'}
+                            </td>
+
+                            {/* Location Column */}
+                            <td className="py-3.5 px-4 text-slate-600 whitespace-nowrap">
+                              📍 {job.location}
+                            </td>
+
+                            {/* Job Type Column */}
+                            <td className="py-3.5 px-4 text-slate-600 whitespace-nowrap font-semibold text-blue-700">
+                              {job.jobType || 'Full Time'}
+                            </td>
+
+                            {/* Skills Column */}
                             <td className="py-3.5 px-4 max-w-xs">
                               <div className="flex flex-wrap gap-1">
                                 {job.skills && job.skills.length > 0 ? (
@@ -741,15 +976,10 @@ https://jobs.lever.co/company/example-role`}
                                 ) : (
                                   <span className="text-slate-400 text-[11px]">General</span>
                                 )}
-                                {job.skills && job.skills.length > 3 && (
-                                  <span className="text-[10px] text-slate-400 px-1 py-0.5">
-                                    +{job.skills.length - 3}
-                                  </span>
-                                )}
                               </div>
                             </td>
 
-                            {/* Status */}
+                            {/* Status Column */}
                             <td className="py-3.5 px-4 whitespace-nowrap">
                               {isDraft ? (
                                 <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-purple-50 text-purple-900 border border-purple-300">
@@ -764,72 +994,30 @@ https://jobs.lever.co/company/example-role`}
                               )}
                             </td>
 
-                            {/* Step 5: Admin Actions (Preview, Edit, Delete) */}
-                            <td className="py-3.5 px-4 text-right whitespace-nowrap">
-                              <div className="inline-flex items-center gap-1">
-                                
-                                {/* Preview */}
-                                <button
-                                  type="button"
-                                  onClick={() => setPreviewJob(job)}
-                                  className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-semibold text-slate-700 hover:text-blue-700 bg-white hover:bg-slate-100 border border-slate-200 rounded-lg shadow-2xs transition-colors cursor-pointer"
-                                  title="Preview Job Requisition"
-                                >
-                                  <Eye className="w-3.5 h-3.5 text-blue-600" />
-                                  <span>Preview</span>
-                                </button>
-
-                                {/* Edit */}
-                                <button
-                                  type="button"
-                                  onClick={() => handleOpenEditModal(job)}
-                                  className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-semibold text-indigo-700 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 rounded-lg transition-colors cursor-pointer"
-                                  title="Edit Extracted Parameters"
-                                >
-                                  <Edit3 className="w-3.5 h-3.5" />
-                                  <span>Edit</span>
-                                </button>
-
-                                {/* Publish individual if draft */}
-                                {isDraft && (
-                                  <button
-                                    type="button"
-                                    onClick={async () => {
-                                      setIsActionLoading(true);
-                                      const res = await bulkImportService.publishJobs([job.id]);
-                                      if (res.success) {
-                                        setResult((prev) => {
-                                          if (!prev) return null;
-                                          return {
-                                            ...prev,
-                                            successfulJobs: prev.successfulJobs.map((j) =>
-                                              j.id === job.id ? { ...j, status: 'active' } : j
-                                            ),
-                                          };
-                                        });
-                                        setToastMessage(`✓ Job "${job.title}" is now active!`);
-                                      }
-                                      setIsActionLoading(false);
-                                    }}
-                                    className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg transition-colors cursor-pointer"
-                                    title="Publish this job to live site"
-                                  >
-                                    <UploadCloud className="w-3.5 h-3.5" />
-                                    <span>Publish</span>
-                                  </button>
-                                )}
-
-                                {/* Delete */}
-                                <button
-                                  type="button"
-                                  onClick={() => handleDeleteSingle(job.id, job.title)}
-                                  className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
-                                  title="Delete Job"
-                                >
-                                  <Trash2 className="w-3.5 h-3.5" />
-                                </button>
-                              </div>
+                            {/* Edit Action Button Column */}
+                            <td className="py-3.5 px-4 text-center whitespace-nowrap">
+                              <button
+                                type="button"
+                                onClick={() => handleOpenEditModal(job)}
+                                className="inline-flex items-center justify-center p-2 text-indigo-750 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 rounded-lg transition-colors cursor-pointer"
+                                title="Edit parameters"
+                              >
+                                <Edit3 className="w-3.5 h-3.5" />
+                              </button>
                             </td>
+
+                            {/* Delete Action Button Column */}
+                            <td className="py-3.5 px-4 text-center whitespace-nowrap">
+                              <button
+                                type="button"
+                                onClick={() => handleDeleteSingle(job.id, job.title)}
+                                className="inline-flex items-center justify-center p-2 text-rose-750 bg-rose-50 hover:bg-rose-100 border border-rose-200 rounded-lg transition-colors cursor-pointer"
+                                title="Delete job"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            </td>
+
                           </tr>
                         );
                       })}
@@ -837,11 +1025,11 @@ https://jobs.lever.co/company/example-role`}
                   </table>
                 </div>
 
-                {/* Footer notes */}
+                {/* Footer options */}
                 <div className="p-4 bg-slate-50 border-t border-slate-100 flex flex-col sm:flex-row items-center justify-between text-xs text-slate-500 gap-2">
                   <span className="flex items-center gap-1.5">
                     <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0" />
-                    <span>Draft jobs remain invisible to public users until published.</span>
+                    <span>Jobs remain invisible on the public portal until published.</span>
                   </span>
                   <button
                     type="button"
@@ -855,155 +1043,9 @@ https://jobs.lever.co/company/example-role`}
               </div>
             )}
 
-            {/* Distribution Broadcast Center (Only for Active / Published Jobs) */}
-            {publishedJobs.length > 0 && (
-              <div className="bg-white rounded-3xl border border-slate-200/90 p-6 sm:p-8 shadow-xs">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b border-slate-100">
-                  <div>
-                    <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-bold mb-2">
-                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
-                      <span>{publishedJobs.length} Active Job(s) Ready to Broadcast</span>
-                    </div>
-                    <h3 className="text-xl font-black font-display text-slate-900">
-                      Social &amp; Community Broadcast Center
-                    </h3>
-                    <p className="text-xs sm:text-sm text-slate-500 mt-0.5">
-                      Generate shareable announcements for WhatsApp, LinkedIn, and Telegram using strictly verified Mana Naukari URLs.
-                    </p>
-                  </div>
-                </div>
-
-                <div className="pt-6">
-                  <div className="flex flex-wrap items-center gap-2 mb-4">
-                    <span className="text-xs font-bold text-slate-700 mr-2">Select Shareable Channel:</span>
-                    
-                    <button
-                      type="button"
-                      onClick={() => setActiveMessageFormat('whatsapp')}
-                      className={`inline-flex items-center gap-2 px-4 py-2 text-xs font-bold rounded-xl transition-all cursor-pointer ${
-                        activeMessageFormat === 'whatsapp'
-                          ? 'bg-emerald-600 text-white shadow-xs'
-                          : 'bg-emerald-50 text-emerald-800 hover:bg-emerald-100 border border-emerald-200'
-                      }`}
-                    >
-                      <MessageSquare className="w-3.5 h-3.5" />
-                      <span>WhatsApp Broadcast</span>
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => setActiveMessageFormat('linkedin')}
-                      className={`inline-flex items-center gap-2 px-4 py-2 text-xs font-bold rounded-xl transition-all cursor-pointer ${
-                        activeMessageFormat === 'linkedin'
-                          ? 'bg-blue-700 text-white shadow-xs'
-                          : 'bg-blue-50 text-blue-800 hover:bg-blue-100 border border-blue-200'
-                      }`}
-                    >
-                      <Linkedin className="w-3.5 h-3.5" />
-                      <span>LinkedIn Post</span>
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => setActiveMessageFormat('telegram')}
-                      className={`inline-flex items-center gap-2 px-4 py-2 text-xs font-bold rounded-xl transition-all cursor-pointer ${
-                        activeMessageFormat === 'telegram'
-                          ? 'bg-sky-600 text-white shadow-xs'
-                          : 'bg-sky-50 text-sky-800 hover:bg-sky-100 border border-sky-200'
-                      }`}
-                    >
-                      <SendHorizontal className="w-3.5 h-3.5" />
-                      <span>Telegram Post</span>
-                    </button>
-                  </div>
-
-                  <div className="p-3 rounded-xl bg-blue-50/70 border border-blue-200 text-xs text-blue-900 flex items-center justify-between mb-4">
-                    <div className="flex items-center gap-2">
-                      <ShieldCheck className="w-4 h-4 text-blue-700 shrink-0" />
-                      <span className="font-semibold">
-                        Security Policy Enforced: Generated messages contain <u>ONLY Mana Naukari job page URLs</u>. External corporate links are strictly hidden.
-                      </span>
-                    </div>
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-blue-700 bg-blue-100 px-2 py-0.5 rounded">
-                      100% Protected
-                    </span>
-                  </div>
-
-                  {/* Shareable Message Preview Box */}
-                  <div className="relative rounded-2xl border border-slate-300 bg-slate-900 text-slate-100 p-5 shadow-inner">
-                    <div className="flex items-center justify-between pb-3 border-b border-slate-800 mb-3 text-xs text-slate-400">
-                      <div className="flex items-center gap-2">
-                        <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
-                        <span className="font-bold text-slate-200 capitalize">
-                          {activeMessageFormat} Output Preview ({publishedJobs.length} active jobs)
-                        </span>
-                      </div>
-
-                      <div className="flex items-center gap-2">
-                        <button
-                          type="button"
-                          onClick={() => handleCopyMessage(activeMessageFormat)}
-                          className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-white rounded-lg text-xs font-bold transition-colors cursor-pointer border border-slate-700"
-                        >
-                          {copiedFormat === activeMessageFormat ? (
-                            <>
-                              <Check className="w-3.5 h-3.5 text-emerald-400" />
-                              <span className="text-emerald-400">Copied!</span>
-                            </>
-                          ) : (
-                            <>
-                              <Copy className="w-3.5 h-3.5" />
-                              <span>Copy Text</span>
-                            </>
-                          )}
-                        </button>
-
-                        {activeMessageFormat === 'whatsapp' && (
-                          <button
-                            type="button"
-                            onClick={handleOpenWhatsApp}
-                            className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold transition-colors cursor-pointer"
-                          >
-                            <ExternalLink className="w-3.5 h-3.5" />
-                            <span>Send to WhatsApp</span>
-                          </button>
-                        )}
-
-                        {activeMessageFormat === 'linkedin' && (
-                          <button
-                            type="button"
-                            onClick={handleOpenLinkedIn}
-                            className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold transition-colors cursor-pointer"
-                          >
-                            <ExternalLink className="w-3.5 h-3.5" />
-                            <span>Share on LinkedIn</span>
-                          </button>
-                        )}
-
-                        {activeMessageFormat === 'telegram' && (
-                          <button
-                            type="button"
-                            onClick={handleOpenTelegram}
-                            className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-sky-600 hover:bg-sky-700 text-white rounded-lg text-xs font-bold transition-colors cursor-pointer"
-                          >
-                            <ExternalLink className="w-3.5 h-3.5" />
-                            <span>Post to Telegram</span>
-                          </button>
-                        )}
-                      </div>
-                    </div>
-
-                    <pre className="font-mono text-xs sm:text-sm whitespace-pre-wrap leading-relaxed max-h-[380px] overflow-y-auto text-slate-200 scrollbar-thin">
-                      {getGeneratedMessage(activeMessageFormat)}
-                    </pre>
-                  </div>
-                </div>
-              </div>
-            )}
-
             {/* List of Failed URLs (if any) */}
             {result.failedJobs.length > 0 && (
-              <div className="bg-white rounded-3xl border border-rose-200 p-6 sm:p-8 shadow-xs">
+              <div className="bg-white rounded-3xl border border-rose-200 p-6 sm:p-8 shadow-xs animate-fadeIn">
                 <div className="flex items-center gap-2 text-rose-800 mb-3">
                   <AlertCircle className="w-5 h-5 text-rose-600 shrink-0" />
                   <h4 className="text-base font-bold font-display">
@@ -1011,7 +1053,7 @@ https://jobs.lever.co/company/example-role`}
                   </h4>
                 </div>
                 <p className="text-xs text-slate-600 mb-4">
-                  The following URLs could not be completed. You can adjust the URL or import them manually via the single URL assistant.
+                  The following URLs could not be processed. You can adjust the URL or import them manually via the single URL assistant.
                 </p>
 
                 <div className="space-y-2">
@@ -1047,7 +1089,7 @@ https://jobs.lever.co/company/example-role`}
               </div>
             )}
 
-            {/* Reset / New Batch Button */}
+            {/* Reset Batch Button */}
             <div className="flex justify-center pt-2">
               <button
                 type="button"
@@ -1064,10 +1106,10 @@ https://jobs.lever.co/company/example-role`}
 
       </div>
 
-      {/* Step 5: Preview Modal */}
+      {/* Preview Modal */}
       {previewJob && (
-        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl max-w-2xl w-full max-h-[85vh] flex flex-col shadow-2xl border border-slate-200 animate-scaleUp">
+        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 animate-fadeIn">
+          <div className="bg-white rounded-3xl max-w-2xl w-full max-h-[85vh] flex flex-col shadow-2xl border border-slate-200 overflow-hidden">
             
             {/* Modal Header */}
             <div className="p-6 border-b border-slate-100 flex items-center justify-between">
@@ -1144,7 +1186,7 @@ https://jobs.lever.co/company/example-role`}
 
               <div className="pt-2 border-t border-slate-100 flex flex-col gap-1 text-[11px] font-mono text-slate-500">
                 <p><strong>Original Career URL:</strong> {previewJob.originalUrl}</p>
-                <p><strong>Mana Naukari Slug:</strong> {previewJob.manaNaukariUrl}</p>
+                <p><strong>Mana Naukari Link:</strong> {previewJob.manaNaukariUrl}</p>
               </div>
             </div>
 
@@ -1207,10 +1249,10 @@ https://jobs.lever.co/company/example-role`}
         </div>
       )}
 
-      {/* Step 5: Quick Edit Modal */}
+      {/* Quick Edit Modal */}
       {editingJob && (
-        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl max-w-xl w-full shadow-2xl border border-slate-200 animate-scaleUp overflow-hidden">
+        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 animate-fadeIn">
+          <div className="bg-white rounded-3xl max-w-xl w-full shadow-2xl border border-slate-200 overflow-hidden">
             <div className="p-6 border-b border-slate-100 flex items-center justify-between">
               <div>
                 <h3 className="text-base font-bold font-display text-slate-900">
@@ -1263,13 +1305,23 @@ https://jobs.lever.co/company/example-role`}
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-3 gap-3">
                 <div>
                   <label className="block font-bold text-slate-700 mb-1">Experience</label>
                   <input
                     type="text"
                     value={editFormData.experience}
                     onChange={(e) => setEditFormData({ ...editFormData, experience: e.target.value })}
+                    className="w-full p-2.5 rounded-xl border border-slate-300 focus:ring-2 focus:ring-blue-600 focus:outline-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">Job Type</label>
+                  <input
+                    type="text"
+                    value={editFormData.jobType}
+                    onChange={(e) => setEditFormData({ ...editFormData, jobType: e.target.value })}
                     className="w-full p-2.5 rounded-xl border border-slate-300 focus:ring-2 focus:ring-blue-600 focus:outline-none"
                   />
                 </div>

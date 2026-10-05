@@ -430,6 +430,8 @@ export const bulkImportService = {
       lines.push(`🏢 *Company:* ${job.company}`);
       lines.push(`📍 *Location:* ${job.location}`);
       lines.push(`⏳ *Experience:* ${job.experience || 'Fresher'}`);
+      lines.push(`💼 *Job Type:* ${job.jobType || 'Full Time'}`);
+      lines.push(`💰 *Salary:* ${job.salary || 'Best in Industry'}`);
       
       const skillsStr = job.skills.length > 0 ? job.skills.slice(0, 4).join(', ') : 'Technical Skills, Problem Solving';
       lines.push(`🛠️ *Key Skills:* ${skillsStr}`);
@@ -457,10 +459,12 @@ export const bulkImportService = {
     lines.push('We have aggregated the latest verified hiring requisitions from top tech employers. Explore roles below and apply directly through our official verified links:');
     lines.push('');
 
-    jobs.forEach((job) => {
-      lines.push(`🔹 ${job.title} at ${job.company}`);
+    jobs.forEach((job, index) => {
+      lines.push(`🔹 ${index + 1}. ${job.title} at ${job.company}`);
       lines.push(`📍 Location: ${job.location}`);
       lines.push(`⏳ Experience: ${job.experience || 'Fresher'}`);
+      lines.push(`💼 Job Type: ${job.jobType || 'Full Time'}`);
+      lines.push(`💰 Salary: ${job.salary || 'Best in Industry'}`);
       const skillsStr = job.skills.length > 0 ? job.skills.slice(0, 4).join(', ') : 'Core Engineering, Problem Solving';
       lines.push(`🛠️ Key Skills: ${skillsStr}`);
       lines.push(`👉 Apply on Mana Naukari: ${job.manaNaukariUrl}`);
@@ -493,6 +497,8 @@ export const bulkImportService = {
       lines.push(`💼 **${index + 1}. ${job.title} — ${job.company}**`);
       lines.push(`📍 Location: ${job.location}`);
       lines.push(`⏳ Experience: ${job.experience || 'Fresher'}`);
+      lines.push(`💼 Job Type: ${job.jobType || 'Full Time'}`);
+      lines.push(`💰 Salary: ${job.salary || 'Best in Industry'}`);
       const skillsStr = job.skills.length > 0 ? job.skills.slice(0, 4).join(', ') : 'Technical Skills, Problem Solving';
       lines.push(`🛠️ Skills: ${skillsStr}`);
       lines.push(`🔗 Apply: ${job.manaNaukariUrl}`);

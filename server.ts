@@ -22,6 +22,7 @@ import {
   KNOWLEDGE_CATEGORIES,
 } from './src/server/knowledgeEngine';
 import { calculateFallbackAtsMatch } from './src/utils/atsKeywordMatcher';
+import { jobAvailabilityService } from './src/services/jobAvailabilityService';
 
 const app = express();
 const port = 3000;
@@ -1164,6 +1165,44 @@ app.post('/api/knowledge/chat', async (req, res) => {
     });
   }
 });
+
+// --- Job Availability Health Checker API & Scheduler ---
+
+// 1. Endpoint to trigger manual/instant health check
+app.post('/api/admin/check-availability', async (req, res) => {
+  try {
+    console.log('[API Admin] Manually triggering active jobs availability check...');
+    const result = await jobAvailabilityService.checkAllActiveJobs();
+    return res.json(result);
+  } catch (err: any) {
+    console.error('[API Admin Error] Availability check failed:', err);
+    return res.status(500).json({
+      success: false,
+      error: err.message || 'Job availability check failed.'
+    });
+  }
+});
+
+// 2. Set up daily job health check cron in the background (every 24 hours)
+const TWENTY_FOUR_HOURS = 24 * 60 * 60 * 1000;
+setInterval(async () => {
+  console.log('[Scheduler] Running automatic daily job availability health check...');
+  try {
+    await jobAvailabilityService.checkAllActiveJobs();
+  } catch (err) {
+    console.error('[Scheduler Error] Automatic job availability check failed:', err);
+  }
+}, TWENTY_FOUR_HOURS);
+
+// Run a check on startup after a 10 second delay to avoid impacting startup speed
+setTimeout(async () => {
+  console.log('[Scheduler] Running startup job availability health check...');
+  try {
+    await jobAvailabilityService.checkAllActiveJobs();
+  } catch (err) {
+    console.error('[Scheduler Error] Startup job availability check failed:', err);
+  }
+}, 10000);
 
 // Mount Vite middleware in development
 async function startServer() {

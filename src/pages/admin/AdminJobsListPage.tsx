@@ -35,18 +35,22 @@ export const AdminJobsListPage: React.FC<AdminJobsListPageProps> = ({ onNavigate
     all: number;
     active: number;
     draft: number;
+    needs_review: number;
     paused: number;
     expired: number;
-    deleted: number;
     closed: number;
+    deleted: number;
+    checked_today: number;
   }>({
     all: 0,
     active: 0,
     draft: 0,
+    needs_review: 0,
     paused: 0,
     expired: 0,
-    deleted: 0,
     closed: 0,
+    deleted: 0,
+    checked_today: 0,
   });
 
   // Soft Delete Architecture info panel toggle & SQL copy
@@ -88,24 +92,41 @@ export const AdminJobsListPage: React.FC<AdminJobsListPageProps> = ({ onNavigate
   // Fetch status summary counts
   const loadStatusCounts = async () => {
     try {
-      const [allRes, activeRes, draftRes, pausedRes, expiredRes, deletedRes, closedRes] = await Promise.all([
+      const todayPrefix = new Date().toISOString().split('T')[0];
+      const [allRes, activeRes, draftRes, needsReviewRes, pausedRes, expiredRes, closedRes, deletedRes] = await Promise.all([
         supabase.from('jobs').select('id', { count: 'exact', head: true }),
         supabase.from('jobs').select('id', { count: 'exact', head: true }).eq('status', 'active'),
         supabase.from('jobs').select('id', { count: 'exact', head: true }).eq('status', 'draft'),
+        supabase.from('jobs').select('id', { count: 'exact', head: true }).eq('status', 'needs_review'),
         supabase.from('jobs').select('id', { count: 'exact', head: true }).eq('status', 'paused'),
         supabase.from('jobs').select('id', { count: 'exact', head: true }).eq('status', 'expired'),
-        supabase.from('jobs').select('id', { count: 'exact', head: true }).eq('status', 'deleted'),
         supabase.from('jobs').select('id', { count: 'exact', head: true }).eq('status', 'closed'),
+        supabase.from('jobs').select('id', { count: 'exact', head: true }).eq('status', 'deleted'),
       ]);
+
+      let checkedTodayCount = 0;
+      try {
+        const { count, error } = await supabase
+          .from('jobs')
+          .select('id', { count: 'exact', head: true })
+          .gte('review_date', todayPrefix);
+        if (!error) {
+          checkedTodayCount = count || 0;
+        }
+      } catch (err) {
+        console.warn('Could not query checked_today counts:', err);
+      }
 
       setStatusCounts({
         all: allRes.count || 0,
         active: activeRes.count || 0,
         draft: draftRes.count || 0,
+        needs_review: needsReviewRes.count || 0,
         paused: pausedRes.count || 0,
         expired: expiredRes.count || 0,
-        deleted: deletedRes.count || 0,
         closed: closedRes.count || 0,
+        deleted: deletedRes.count || 0,
+        checked_today: checkedTodayCount,
       });
     } catch (err) {
       console.warn('Could not load job status counts:', err);
@@ -214,6 +235,59 @@ export const AdminJobsListPage: React.FC<AdminJobsListPageProps> = ({ onNavigate
     }
   };
 
+  const [scanning, setScanning] = useState(false);
+
+  const handleRunHealthCheck = async () => {
+    setScanning(true);
+    setToastMessage('Initiating live job availability checks on active postings...');
+    setTimeout(() => setToastMessage(null), 3000);
+
+    try {
+      const res = await fetch('/api/admin/check-availability', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+      });
+      const data = await res.json();
+      if (data.success) {
+        setToastMessage(`Job scan complete! Checked ${data.totalChecked} jobs. Flagged ${data.flaggedCount} potential closures.`);
+        setTimeout(() => setToastMessage(null), 5000);
+        loadJobs();
+      } else {
+        alert(`Error running health check: ${data.error || 'Unknown error'}`);
+      }
+    } catch (err: any) {
+      console.error('Failed to run availability checks:', err);
+      alert(`Network error running health check: ${err.message}`);
+    } finally {
+      setScanning(false);
+    }
+  };
+
+  const handleUpdateStatus = async (job: Job, newStatus: string) => {
+    const payload: any = { status: newStatus };
+    if (newStatus === 'active') {
+      payload.review_reason = null;
+      payload.review_date = null;
+    }
+
+    let { error } = await adminJobsService.updateJob(job.id, payload);
+    
+    // Fallback if review columns are missing in the remote database schema cache
+    if (error && (error.message?.includes('review_date') || error.message?.includes('review_reason') || error.message?.includes('schema cache'))) {
+      console.warn('[Admin] Review columns are missing in Supabase schema. Retrying status update only.');
+      const fallbackRes = await adminJobsService.updateJob(job.id, { status: newStatus });
+      error = fallbackRes.error;
+    }
+
+    if (!error) {
+      setToastMessage(`Job "${job.title}" status updated to "${newStatus}".`);
+      setTimeout(() => setToastMessage(null), 4000);
+      loadJobs();
+    } else {
+      alert(`Could not update job status: ${error.message}`);
+    }
+  };
+
   const softDeleteSqlMigration = `-- Remove ON DELETE CASCADE & Enforce Soft-Delete Data Preservation
 ALTER TABLE public.applicants DROP CONSTRAINT IF EXISTS fk_applicants_job;
 ALTER TABLE public.applicants ADD CONSTRAINT fk_applicants_job FOREIGN KEY (job_id) REFERENCES public.jobs(id) ON UPDATE CASCADE ON DELETE RESTRICT;
@@ -309,14 +383,86 @@ CREATE OR REPLACE VIEW public.applications AS SELECT * FROM public.applicants;`;
         )}
       </div>
 
-      {/* Quick Status Filter Tabs: Active, Draft, Paused, Expired, Deleted */}
+      {/* Automated Availability Checker Dashboard Summary */}
+      <div className="bg-white border border-slate-200 rounded-2xl p-4 sm:p-5 shadow-xs">
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
+          <div className="space-y-1">
+            <h2 className="text-sm font-bold text-slate-900 tracking-tight flex items-center gap-2">
+              <span className="flex h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
+              <span>Job Availability Automation Control Panel</span>
+            </h2>
+            <p className="text-xs text-slate-500 max-w-xl">
+              Our automated checker daily visits each active job’s official apply link to detect 404 pages, removed postings, or closed applications. Flagged jobs are moved to <span className="font-semibold text-orange-700 bg-orange-50 px-1 py-0.2 rounded border border-orange-200 text-[10px]">Needs Review</span> for human verification.
+            </p>
+          </div>
+
+          <div className="flex items-center gap-3 self-end lg:self-auto shrink-0">
+            <button
+              onClick={handleRunHealthCheck}
+              disabled={scanning}
+              className={`inline-flex items-center gap-2 px-4 py-2 text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 disabled:bg-blue-300 rounded-xl transition-all shadow-xs cursor-pointer ${
+                scanning ? 'animate-pulse' : ''
+              }`}
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${scanning ? 'animate-spin' : ''}`} />
+              <span>{scanning ? 'Scanning Live Postings...' : 'Run Availability Checker Now'}</span>
+            </button>
+          </div>
+        </div>
+
+        {/* Metric Grid */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-5">
+          {/* Active Jobs */}
+          <div className="bg-slate-50/55 rounded-xl p-4 border border-slate-200/50 flex items-center justify-between">
+            <div className="space-y-1">
+              <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider text-[10px]">Active Jobs</span>
+              <div className="text-2xl font-black text-slate-900 tracking-tight">
+                {statusCounts.active}
+              </div>
+            </div>
+            <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 border border-emerald-100 flex items-center justify-center font-bold">
+              🟢
+            </div>
+          </div>
+
+          {/* Potentially Closed Jobs */}
+          <div className="bg-slate-50/55 rounded-xl p-4 border border-slate-200/50 flex items-center justify-between">
+            <div className="space-y-1">
+              <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider text-[10px]">Potentially Closed Jobs</span>
+              <div className="text-2xl font-black text-slate-900 tracking-tight">
+                {statusCounts.needs_review}
+              </div>
+            </div>
+            <div className="w-10 h-10 rounded-xl bg-orange-50 text-orange-600 border border-orange-100 flex items-center justify-center font-bold">
+              ⚠️
+            </div>
+          </div>
+
+          {/* Jobs Checked Today */}
+          <div className="bg-slate-50/55 rounded-xl p-4 border border-slate-200/50 flex items-center justify-between">
+            <div className="space-y-1">
+              <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider text-[10px]">Jobs Checked Today</span>
+              <div className="text-2xl font-black text-slate-900 tracking-tight">
+                {statusCounts.checked_today}
+              </div>
+            </div>
+            <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 border border-blue-100 flex items-center justify-center font-bold">
+              🔍
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Quick Status Filter Tabs: Active, Needs Review, Draft, Paused, Expired, Closed, Deleted */}
       <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none">
         {[
           { key: 'all', label: 'All Jobs', count: statusCounts.all, emoji: '📋' },
           { key: 'active', label: 'Active', count: statusCounts.active, emoji: '🟢' },
+          { key: 'needs_review', label: 'Needs Review', count: statusCounts.needs_review, emoji: '⚠️' },
           { key: 'draft', label: 'Drafts', count: statusCounts.draft, emoji: '📝' },
           { key: 'paused', label: 'Paused', count: statusCounts.paused, emoji: '🟡' },
           { key: 'expired', label: 'Expired', count: statusCounts.expired, emoji: '🔴' },
+          { key: 'closed', label: 'Closed', count: statusCounts.closed, emoji: '🔒' },
           { key: 'deleted', label: 'Deleted', count: statusCounts.deleted, emoji: '🗑️' },
         ].map((tab) => {
           const isSelected = selectedStatus === tab.key;
@@ -434,6 +580,7 @@ CREATE OR REPLACE VIEW public.applications AS SELECT * FROM public.applicants;`;
         onDelete={(job) => setDeleteTarget(job)}
         onRestore={handleRestoreJob}
         onShare={(job) => setShareTarget(job)}
+        onUpdateStatus={handleUpdateStatus}
       />
 
       {/* Pagination Bar */}
