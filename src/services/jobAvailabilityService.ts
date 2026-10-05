@@ -196,12 +196,12 @@ export const jobAvailabilityService = {
         }
 
         if (updateErr) {
-          console.error(`[Job Checker] Failed to update job ID ${job.id}:`, updateErr.message);
+          console.log(`[Job Checker] Update issue on job ID ${job.id}:`, updateErr.message);
           errorsCount++;
         }
       }
 
-      console.log(`[Job Checker] Availability check complete. Checked: ${activeJobs.length}, Flagged: ${flaggedCount}, Unverified/Skipped: ${unverifiedCount}, Update Errors: ${errorsCount}`);
+      console.log(`[Job Checker] Availability check complete. Checked: ${activeJobs.length}, Flagged: ${flaggedCount}, Unverified/Skipped: ${unverifiedCount}, Issues: ${errorsCount}`);
       
       return {
         success: true,
@@ -211,7 +211,7 @@ export const jobAvailabilityService = {
         errorsCount,
       };
     } catch (err: any) {
-      console.error('[Job Checker] Error in checkAllActiveJobs:', err);
+      console.log('[Job Checker] Exception in checkAllActiveJobs:', err.message || err);
       return {
         success: false,
         totalChecked: 0,

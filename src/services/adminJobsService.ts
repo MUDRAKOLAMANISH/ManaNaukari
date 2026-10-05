@@ -151,18 +151,22 @@ export const adminJobsService = {
         .select()
         .single();
 
-      // Fallback if is_featured column is not yet present in schema cache
-      if (error && (error.code === 'PGRST204' || error.message?.includes('is_featured'))) {
-        console.warn('[adminJobsService.createJob] is_featured column missing in schema cache, retrying with featured only');
-        const { is_featured: _, ...fallbackPayload } = payload as any;
+      // Fallback retry if schema columns are missing or cached incorrectly (such as review_date, review_reason, is_featured)
+      if (error && (error.code === 'PGRST204' || error.code === '42703' || error.message?.includes('review_date') || error.message?.includes('review_reason') || error.message?.includes('is_featured'))) {
+        console.warn('[adminJobsService.createJob] Schema mismatch detected. Stripping pending columns and retrying insertion.');
+        
+        const fallbackPayload: any = { ...payload };
+        delete fallbackPayload.review_date;
+        delete fallbackPayload.review_reason;
+        delete fallbackPayload.is_featured;
+        fallbackPayload.featured = isFeatured;
+
         const fallbackRes = await supabase
           .from('jobs')
-          .insert([{
-            ...fallbackPayload,
-            featured: isFeatured,
-          }])
+          .insert([fallbackPayload])
           .select()
           .single();
+        
         data = fallbackRes.data;
         error = fallbackRes.error;
       }
@@ -223,16 +227,22 @@ export const adminJobsService = {
         .select()
         .single();
 
-      // Fallback if is_featured column is not yet present in schema cache
-      if (error && (error.code === 'PGRST204' || error.message?.includes('is_featured'))) {
-        console.warn('[adminJobsService.updateJob] is_featured column missing in schema cache, retrying with featured only');
-        delete updates.is_featured;
+      // Fallback retry if schema columns are missing or cached incorrectly (such as review_date, review_reason, is_featured)
+      if (error && (error.code === 'PGRST204' || error.code === '42703' || error.message?.includes('review_date') || error.message?.includes('review_reason') || error.message?.includes('is_featured'))) {
+        console.warn('[adminJobsService.updateJob] Schema mismatch detected. Stripping pending columns and retrying update.');
+        
+        const fallbackUpdates = { ...updates };
+        delete fallbackUpdates.review_date;
+        delete fallbackUpdates.review_reason;
+        delete fallbackUpdates.is_featured;
+
         const fallbackRes = await supabase
           .from('jobs')
-          .update(updates)
+          .update(fallbackUpdates)
           .eq('id', cleanId)
           .select()
           .single();
+        
         data = fallbackRes.data;
         error = fallbackRes.error;
       }
