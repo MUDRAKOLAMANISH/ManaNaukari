@@ -21,6 +21,8 @@ import { RecruiterPostJobPage } from '../pages/RecruiterPostJobPage';
 import { RecruiterDashboardPage } from '../pages/RecruiterDashboardPage';
 import { ResumeReviewPage } from '../pages/ResumeReviewPage';
 import { PortfolioServicePage } from '../pages/PortfolioServicePage';
+import { MaterialsPage } from '../pages/MaterialsPage';
+import { AdminMaterialsPage } from '../pages/admin/AdminMaterialsPage';
 import { ProtectedRoute } from '../components/auth/ProtectedRoute';
 import { fromSlug } from '../utils/slugUtils';
 import { extractJobIdFromSlug } from '../utils/jobUrlUtils';
@@ -180,6 +182,18 @@ export function matchRoute(path: string, onNavigate: (targetPath: string) => voi
     };
   }
 
+  // 4g. Admin Study Materials Management (/admin/materials)
+  if (cleanPath === '/admin/materials') {
+    return {
+      component: (
+        <ProtectedRoute onNavigate={onNavigate}>
+          <AdminMaterialsPage onNavigate={onNavigate} />
+        </ProtectedRoute>
+      ),
+      title: 'Study Materials Management | Mana Naukari Admin',
+    };
+  }
+
   // 4c. Recruiter Portal Job Submission (/post-job or /recruiter/post-job)
   if (cleanPath === '/post-job' || cleanPath === '/recruiter/post-job') {
     return {
@@ -238,6 +252,11 @@ export function matchRoute(path: string, onNavigate: (targetPath: string) => voi
       return {
         component: <ResumeReviewPage onNavigate={onNavigate} />,
         title: 'ATS Resume Review & Optimization | Mana Naukari',
+      };
+    case '/materials':
+      return {
+        component: <MaterialsPage onNavigate={onNavigate} />,
+        title: 'Study Notes & Materials | Mana Naukari',
       };
     case '/jobs':
       return {

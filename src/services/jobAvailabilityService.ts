@@ -157,89 +157,109 @@ export const jobAvailabilityService = {
         };
       }
 
-      console.log(`[Job Checker] Found ${activeJobs.length} active jobs to process.`);
+      console.log(`[Job Checker] Found ${activeJobs.length} active jobs to process in parallel.`);
       let flaggedCount = 0;
       let unverifiedCount = 0;
       let errorsCount = 0;
 
-      for (const job of activeJobs as Job[]) {
-        const result = await this.checkSingleJob(job);
-        
-        if (result.status === 'needs_review') {
-          flaggedCount++;
-        } else if (result.reason === 'Unable to verify') {
-          unverifiedCount++;
-        }
-
-        // Update the job details in Supabase with resilient fallbacks
-        let { error: updateErr } = await supabase
-          .from('jobs')
-          .update({
-            status: result.status,
-            review_reason: result.reason,
-            review_date: result.lastChecked,
-            updated_at: new Date().toISOString(),
-          })
-          .eq('id', job.id);
-
-        // Fallback 1: If columns (review_date / review_reason) are missing in the schema
-        if (updateErr && (updateErr.message?.includes('review_date') || updateErr.message?.includes('review_reason') || updateErr.message?.includes('schema cache'))) {
-          console.warn(`[Job Checker] Database schema columns are missing. Falling back to status-only update for ID ${job.id}`);
-          let fallbackRes = await supabase
-            .from('jobs')
-            .update({
-              status: result.status,
-              updated_at: new Date().toISOString(),
-            })
-            .eq('id', job.id);
+      // Process all active jobs concurrently to avoid timeout limits
+      const results = await Promise.all(
+        (activeJobs as Job[]).map(async (job) => {
+          let isFlagged = false;
+          let isUnverified = false;
           
-          // Fallback 1b: If status-only update fails due to 'needs_review' not being in check constraint
-          if (fallbackRes.error && (fallbackRes.error.message?.includes('check constraint') || fallbackRes.error.message?.includes('jobs_status_check')) && result.status === 'needs_review') {
-            console.warn(`[Job Checker] 'needs_review' status is restricted by constraint. Falling back to 'expired' status for ID ${job.id}`);
-            fallbackRes = await supabase
+          try {
+            const result = await this.checkSingleJob(job);
+            
+            if (result.status === 'needs_review') {
+              isFlagged = true;
+            } else if (result.reason === 'Unable to verify') {
+              isUnverified = true;
+            }
+
+            // Update the job details in Supabase with resilient fallbacks
+            let { error: updateErr } = await supabase
               .from('jobs')
               .update({
-                status: 'expired',
+                status: result.status,
+                review_reason: result.reason,
+                review_date: result.lastChecked,
                 updated_at: new Date().toISOString(),
               })
               .eq('id', job.id);
-          }
-          updateErr = fallbackRes.error;
-        }
 
-        // Fallback 2: If columns exist, but status 'needs_review' is restricted by constraint
-        if (updateErr && (updateErr.message?.includes('check constraint') || updateErr.message?.includes('jobs_status_check')) && result.status === 'needs_review') {
-          console.warn(`[Job Checker] 'needs_review' is restricted by constraint. Retrying update with status 'expired' and metadata for ID ${job.id}`);
-          const retryRes = await supabase
-            .from('jobs')
-            .update({
-              status: 'expired',
-              review_reason: result.reason,
-              review_date: result.lastChecked,
-              updated_at: new Date().toISOString(),
-            })
-            .eq('id', job.id);
-          
-          if (retryRes.error && (retryRes.error.message?.includes('review_date') || retryRes.error.message?.includes('review_reason') || retryRes.error.message?.includes('schema cache'))) {
-            // Missing columns, so fallback to status-only with 'expired'
-            const finalRes = await supabase
-              .from('jobs')
-              .update({
-                status: 'expired',
-                updated_at: new Date().toISOString(),
-              })
-              .eq('id', job.id);
-            updateErr = finalRes.error;
-          } else {
-            updateErr = retryRes.error;
-          }
-        }
+            // Fallback 1: If columns (review_date / review_reason) are missing in the schema
+            if (updateErr && (updateErr.message?.includes('review_date') || updateErr.message?.includes('review_reason') || updateErr.message?.includes('schema cache'))) {
+              console.warn(`[Job Checker] Database schema columns are missing. Falling back to status-only update for ID ${job.id}`);
+              let fallbackRes = await supabase
+                .from('jobs')
+                .update({
+                  status: result.status,
+                  updated_at: new Date().toISOString(),
+                })
+                .eq('id', job.id);
+              
+              // Fallback 1b: If status-only update fails due to 'needs_review' not being in check constraint
+              if (fallbackRes.error && (fallbackRes.error.message?.includes('check constraint') || fallbackRes.error.message?.includes('jobs_status_check')) && result.status === 'needs_review') {
+                console.warn(`[Job Checker] 'needs_review' status is restricted by constraint. Falling back to 'expired' status for ID ${job.id}`);
+                fallbackRes = await supabase
+                  .from('jobs')
+                  .update({
+                    status: 'expired',
+                    updated_at: new Date().toISOString(),
+                  })
+                  .eq('id', job.id);
+              }
+              updateErr = fallbackRes.error;
+            }
 
-        if (updateErr) {
-          console.log(`[Job Checker] Update issue on job ID ${job.id}:`, updateErr.message);
-          errorsCount++;
-        }
-      }
+            // Fallback 2: If columns exist, but status 'needs_review' is restricted by constraint
+            if (updateErr && (updateErr.message?.includes('check constraint') || updateErr.message?.includes('jobs_status_check')) && result.status === 'needs_review') {
+              console.warn(`[Job Checker] 'needs_review' is restricted by constraint. Retrying update with status 'expired' and metadata for ID ${job.id}`);
+              const retryRes = await supabase
+                .from('jobs')
+                .update({
+                  status: 'expired',
+                  review_reason: result.reason,
+                  review_date: result.lastChecked,
+                  updated_at: new Date().toISOString(),
+                })
+                .eq('id', job.id);
+              
+              if (retryRes.error && (retryRes.error.message?.includes('review_date') || retryRes.error.message?.includes('review_reason') || retryRes.error.message?.includes('schema cache'))) {
+                // Missing columns, so fallback to status-only with 'expired'
+                const finalRes = await supabase
+                  .from('jobs')
+                  .update({
+                    status: 'expired',
+                    updated_at: new Date().toISOString(),
+                  })
+                  .eq('id', job.id);
+                updateErr = finalRes.error;
+              } else {
+                updateErr = retryRes.error;
+              }
+            }
+
+            if (updateErr) {
+              console.log(`[Job Checker] Update issue on job ID ${job.id}:`, updateErr.message);
+              return { success: false, isFlagged, isUnverified };
+            }
+
+            return { success: true, isFlagged, isUnverified };
+          } catch (err: any) {
+            console.error(`[Job Checker] Exception processing job ID ${job.id}:`, err.message || err);
+            return { success: false, isFlagged, isUnverified: true };
+          }
+        })
+      );
+
+      // Aggregate totals from parallel results
+      results.forEach((res) => {
+        if (!res.success) errorsCount++;
+        if (res.isFlagged) flaggedCount++;
+        if (res.isUnverified) unverifiedCount++;
+      });
 
       console.log(`[Job Checker] Availability check complete. Checked: ${activeJobs.length}, Flagged: ${flaggedCount}, Unverified/Skipped: ${unverifiedCount}, Issues: ${errorsCount}`);
       

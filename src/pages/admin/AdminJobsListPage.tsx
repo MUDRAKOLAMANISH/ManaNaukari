@@ -248,10 +248,20 @@ export const AdminJobsListPage: React.FC<AdminJobsListPageProps> = ({ onNavigate
         headers: { 'Content-Type': 'application/json' },
       });
 
-      // Defensive Handling: Check Content-Type before calling response.json()
+      // Defensive Handling: Check response status and Content-Type before parsing JSON
       const contentType = res.headers.get('content-type') || '';
-      if (!contentType.includes('application/json')) {
-        alert("Availability checker service is unavailable.");
+      if (!res.ok || !contentType.includes('application/json')) {
+        console.error('[Admin] Health Check API failure details:', {
+          url: '/api/admin/check-availability',
+          status: res.status,
+          statusText: res.statusText,
+          contentType: contentType,
+          headers: Array.from(res.headers.entries()).reduce((acc: any, [k, v]) => {
+            acc[k] = v;
+            return acc;
+          }, {}),
+        });
+        alert("Production API endpoint is not responding correctly.");
         return;
       }
 

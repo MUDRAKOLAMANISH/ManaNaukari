@@ -18,6 +18,7 @@ export const Navbar: React.FC<NavbarProps> = ({ currentPath, onNavigate }) => {
     { label: 'Work From Home', path: '/jobs?location=Remote', matchPrefix: '/work-from-home' },
     { label: 'Resume Review', path: '/resume-review' },
     { label: 'Portfolio Service', path: '/portfolio-service' },
+    { label: 'Study Materials', path: '/materials' },
     { label: 'Recruiter Zone', path: '/recruiter/dashboard', matchPrefix: '/recruiter' },
   ];
 
@@ -75,7 +76,7 @@ export const Navbar: React.FC<NavbarProps> = ({ currentPath, onNavigate }) => {
 
         {/* Medium Desktop Navigation (Compact view for lg screens) */}
         <nav className="hidden lg:flex xl:hidden items-center gap-1 text-xs font-medium text-slate-600 bg-slate-100/70 p-1 rounded-2xl border border-slate-200/60">
-          {navLinks.slice(0, 5).map((link) => {
+          {navLinks.slice(0, 7).map((link) => {
             const active = isLinkActive(link);
             return (
               <button

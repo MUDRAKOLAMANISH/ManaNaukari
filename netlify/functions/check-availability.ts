@@ -93,138 +93,162 @@ export const handler = async (event: any) => {
       'submissions are closed'
     ];
 
-    for (const job of activeJobs) {
-      const url = job.apply_link;
-      const lastChecked = new Date().toISOString();
-      let status = 'active';
-      let reason = null;
+    console.log(`[Netlify Diagnostics] 🚀 Starting parallel execution of availability checks on ${activeJobs.length} active jobs...`);
+    const results = await Promise.all(
+      activeJobs.map(async (job) => {
+        const url = job.apply_link;
+        const lastChecked = new Date().toISOString();
+        let currentStatus = 'active';
+        let currentReason = null;
+        let isFlagged = false;
+        let isUnverified = false;
 
-      if (!url || typeof url !== 'string' || !url.startsWith('http')) {
-        status = 'needs_review';
-        reason = 'Invalid or missing official apply link';
-      } else {
-        try {
-          const res = await fetch(url, {
-            headers: {
-              'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
-              'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-              'Accept-Language': 'en-US,en;q=0.9',
-            },
-            signal: AbortSignal.timeout(10000),
-          });
+        console.log(`[Netlify Diagnostics] 🔍 Initiating check for job "${job.title}" at "${job.company}"`);
 
-          if (res.status === 404) {
-            status = 'needs_review';
-            reason = '404 - Page Not Found';
-          } else if (res.status >= 500) {
-            status = 'active';
-            reason = 'Unable to verify (Server Error)';
-          } else if (res.status >= 400 && res.status !== 403) {
-            status = 'needs_review';
-            reason = `HTTP ${res.status} - Access denied or page removed`;
-          } else {
-            const text = await res.text();
-            const cleanText = text
-              .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, ' ')
-              .replace(/<style\b[^<]*(?:(?!<\/style>)<[^<]*)*<\/style>/gi, ' ')
-              .replace(/<[^>]+>/g, ' ')
-              .replace(/\s+/g, ' ')
-              .toLowerCase();
+        if (!url || typeof url !== 'string' || !url.startsWith('http')) {
+          currentStatus = 'needs_review';
+          currentReason = 'Invalid or missing official apply link';
+          isFlagged = true;
+          console.warn(`[Netlify Diagnostics] ⚠️ Invalid URL for job ID ${job.id}`);
+        } else {
+          try {
+            const res = await fetch(url, {
+              headers: {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+                'Accept-Language': 'en-US,en;q=0.9',
+              },
+              signal: AbortSignal.timeout(10000), // 10s timeout
+            });
 
-            let foundIndicator = null;
-            for (const indicator of closedIndicators) {
-              if (cleanText.includes(indicator)) {
-                foundIndicator = indicator;
-                break;
+            if (res.status === 404) {
+              currentStatus = 'needs_review';
+              currentReason = '404 - Page Not Found';
+              isFlagged = true;
+              console.log(`[Netlify Diagnostics] ❌ 404 Not Found detected for job "${job.title}" (ID ${job.id})`);
+            } else if (res.status >= 500) {
+              currentStatus = 'active';
+              currentReason = 'Unable to verify (Server Error)';
+              isUnverified = true;
+              console.log(`[Netlify Diagnostics] ℹ️ 5xx Server Error (${res.status}) for job "${job.title}" (ID ${job.id})`);
+            } else if (res.status >= 400 && res.status !== 403) {
+              currentStatus = 'needs_review';
+              currentReason = `HTTP ${res.status} - Access denied or page removed`;
+              isFlagged = true;
+              console.log(`[Netlify Diagnostics] ❌ HTTP ${res.status} detected for job "${job.title}" (ID ${job.id})`);
+            } else {
+              const text = await res.text();
+              const cleanText = text
+                .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, ' ')
+                .replace(/<style\b[^<]*(?:(?!<\/style>)<[^<]*)*<\/style>/gi, ' ')
+                .replace(/<[^>]+>/g, ' ')
+                .replace(/\s+/g, ' ')
+                .toLowerCase();
+
+              let foundIndicator = null;
+              for (const indicator of closedIndicators) {
+                if (cleanText.includes(indicator)) {
+                  foundIndicator = indicator;
+                  break;
+                }
+              }
+
+              if (foundIndicator) {
+                currentStatus = 'needs_review';
+                currentReason = `Indicator found: "${foundIndicator}"`;
+                isFlagged = true;
+                console.log(`[Netlify Diagnostics] ❌ Closed indicator found ("${foundIndicator}") for job "${job.title}" (ID ${job.id})`);
+              } else {
+                console.log(`[Netlify Diagnostics] ✅ Active verified for job "${job.title}" (ID ${job.id})`);
               }
             }
-
-            if (foundIndicator) {
-              status = 'needs_review';
-              reason = `Indicator found: "${foundIndicator}"`;
-            }
+          } catch (err: any) {
+            currentStatus = 'active';
+            currentReason = 'Unable to verify';
+            isUnverified = true;
+            console.warn(`[Netlify Diagnostics] ℹ️ Failed to fetch apply link for job "${job.title}" (ID ${job.id}):`, err.message || err);
           }
-        } catch (err: any) {
-          status = 'active';
-          reason = 'Unable to verify';
         }
-      }
 
-      if (status === 'needs_review') {
-        flaggedCount++;
-      } else if (reason === 'Unable to verify') {
-        unverifiedCount++;
-      }
-
-      // Update status in database with resilient schema fallback retry
-      let { error: updateErr } = await supabase
-        .from('jobs')
-        .update({
-          status,
-          review_reason: reason,
-          review_date: lastChecked,
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', job.id);
-
-      // Fallback 1: Schema mismatch fallback retry (if review columns are missing)
-      if (updateErr && (updateErr.message?.includes('review_date') || updateErr.message?.includes('review_reason') || updateErr.message?.includes('schema cache'))) {
-        console.warn(`[Netlify Diagnostics] Schema columns missing for job ID ${job.id}. Retrying with status only.`);
-        let fallbackRes = await supabase
+        // Update status in database with resilient schema fallback retry
+        let { error: updateErr } = await supabase
           .from('jobs')
           .update({
-            status,
-            updated_at: new Date().toISOString(),
-          })
-          .eq('id', job.id);
-        
-        // Fallback 1b: If status-only update fails due to 'needs_review' check constraint restrict
-        if (fallbackRes.error && (fallbackRes.error.message?.includes('check constraint') || fallbackRes.error.message?.includes('jobs_status_check')) && status === 'needs_review') {
-          console.warn(`[Netlify Diagnostics] 'needs_review' status restricted by constraint. Falling back to 'expired' status for ID ${job.id}`);
-          fallbackRes = await supabase
-            .from('jobs')
-            .update({
-              status: 'expired',
-              updated_at: new Date().toISOString(),
-            })
-            .eq('id', job.id);
-        }
-        updateErr = fallbackRes.error;
-      }
-
-      // Fallback 2: If columns exist, but status 'needs_review' is restricted by constraint
-      if (updateErr && (updateErr.message?.includes('check constraint') || updateErr.message?.includes('jobs_status_check')) && status === 'needs_review') {
-        console.warn(`[Netlify Diagnostics] 'needs_review' restricted by constraint. Retrying with 'expired' status and metadata for ID ${job.id}`);
-        const retryRes = await supabase
-          .from('jobs')
-          .update({
-            status: 'expired',
-            review_reason: reason,
+            status: currentStatus,
+            review_reason: currentReason,
             review_date: lastChecked,
             updated_at: new Date().toISOString(),
           })
           .eq('id', job.id);
-        
-        if (retryRes.error && (retryRes.error.message?.includes('review_date') || retryRes.error.message?.includes('review_reason') || retryRes.error.message?.includes('schema cache'))) {
-          // Columns are also missing, so do status-only with 'expired'
-          const finalRes = await supabase
+
+        // Fallback 1: Schema mismatch fallback retry (if review columns are missing)
+        if (updateErr && (updateErr.message?.includes('review_date') || updateErr.message?.includes('review_reason') || updateErr.message?.includes('schema cache'))) {
+          console.warn(`[Netlify Diagnostics] Schema columns missing for job ID ${job.id}. Retrying with status only.`);
+          let fallbackRes = await supabase
+            .from('jobs')
+            .update({
+              status: currentStatus,
+              updated_at: new Date().toISOString(),
+            })
+            .eq('id', job.id);
+          
+          // Fallback 1b: If status-only update fails due to 'needs_review' check constraint restrict
+          if (fallbackRes.error && (fallbackRes.error.message?.includes('check constraint') || fallbackRes.error.message?.includes('jobs_status_check')) && currentStatus === 'needs_review') {
+            console.warn(`[Netlify Diagnostics] 'needs_review' status restricted by constraint. Falling back to 'expired' status for ID ${job.id}`);
+            fallbackRes = await supabase
+              .from('jobs')
+              .update({
+                status: 'expired',
+                updated_at: new Date().toISOString(),
+              })
+              .eq('id', job.id);
+          }
+          updateErr = fallbackRes.error;
+        }
+
+        // Fallback 2: If columns exist, but status 'needs_review' is restricted by constraint
+        if (updateErr && (updateErr.message?.includes('check constraint') || updateErr.message?.includes('jobs_status_check')) && currentStatus === 'needs_review') {
+          console.warn(`[Netlify Diagnostics] 'needs_review' restricted by constraint. Retrying with 'expired' status and metadata for ID ${job.id}`);
+          const retryRes = await supabase
             .from('jobs')
             .update({
               status: 'expired',
+              review_reason: currentReason,
+              review_date: lastChecked,
               updated_at: new Date().toISOString(),
-              })
+            })
             .eq('id', job.id);
-          updateErr = finalRes.error;
-        } else {
-          updateErr = retryRes.error;
+          
+          if (retryRes.error && (retryRes.error.message?.includes('review_date') || retryRes.error.message?.includes('review_reason') || retryRes.error.message?.includes('schema cache'))) {
+            // Columns are also missing, so do status-only with 'expired'
+            const finalRes = await supabase
+              .from('jobs')
+              .update({
+                status: 'expired',
+                updated_at: new Date().toISOString(),
+                })
+              .eq('id', job.id);
+            updateErr = finalRes.error;
+          } else {
+            updateErr = retryRes.error;
+          }
         }
-      }
 
-      if (updateErr) {
-        console.error(`[Netlify Diagnostics] Failed to update job ID ${job.id}:`, updateErr.message);
-        errorsCount++;
-      }
-    }
+        if (updateErr) {
+          console.error(`[Netlify Diagnostics] Failed to update job ID ${job.id}:`, updateErr.message);
+          return { success: false, isFlagged, isUnverified };
+        }
+
+        return { success: true, isFlagged, isUnverified };
+      })
+    );
+
+    // Aggregate totals from parallel results
+    results.forEach((res) => {
+      if (!res.success) errorsCount++;
+      if (res.isFlagged) flaggedCount++;
+      if (res.isUnverified) unverifiedCount++;
+    });
 
     console.log(`[Netlify Diagnostics] Check completed. Checked: ${activeJobs.length}, Flagged: ${flaggedCount}, Unverified: ${unverifiedCount}, Issues: ${errorsCount}`);
 

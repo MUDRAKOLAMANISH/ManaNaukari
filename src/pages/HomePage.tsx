@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { Job, Category } from '../types/database.types';
 import { jobsService, categoriesService, applicantsService } from '../services/supabaseService';
 import { resumeReviewService } from '../services/resumeReviewService';
+import { materialsService } from '../services/materialsService';
 import { JobCard } from '../components/jobs/JobCard';
 import { JobCardSkeleton } from '../components/jobs/JobCardSkeleton';
 import { HeroSection } from '../components/home/HeroSection';
@@ -17,7 +18,8 @@ import { Toast } from '../components/common/Toast';
 import { analyticsTracker } from '../services/analyticsTracker';
 import { 
   Laptop, GraduationCap, Briefcase, ChevronRight, Flame, 
-  ShieldCheck, CheckCircle2, Sparkles, Building2, Users, ArrowRight
+  ShieldCheck, CheckCircle2, Sparkles, Building2, Users, ArrowRight,
+  BookOpen, FileText, Download
 } from 'lucide-react';
 
 interface HomePageProps {
@@ -33,6 +35,7 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
   const [portfolioWebsitesDelivered, setPortfolioWebsitesDelivered] = useState<number>(0);
   const [distinctCompaniesList, setDistinctCompaniesList] = useState<string[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
+  const [latestMaterials, setLatestMaterials] = useState<any[]>([]);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   const handleCopyJobLink = (job: Job) => {
@@ -114,6 +117,16 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
           // 5. Real Resume Reviews Completed from DB
           if (resumeReviewsCountRes.status === 'fulfilled') {
             setResumeReviewsCompleted(resumeReviewsCountRes.value);
+          }
+
+          // 6. Latest study materials (resilient fetch)
+          try {
+            const matsRes = await materialsService.getMaterials({ limit: 3 });
+            if (!matsRes.error && matsRes.data) {
+              setLatestMaterials(matsRes.data);
+            }
+          } catch (matsErr) {
+            console.warn('[HomePage] Notice: Failed to load study materials:', matsErr);
           }
         }
       } catch (err) {
@@ -450,6 +463,74 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
           </div>
         )}
       </section>
+
+      {/* 6b. Latest Study Notes & Placement Materials Section */}
+      {latestMaterials.length > 0 && (
+        <section className="space-y-6">
+          <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-3">
+            <div>
+              <div className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-emerald-600 font-display">
+                <BookOpen className="w-4 h-4 text-emerald-600" />
+                <span>Placement Preparation &amp; Solved Papers</span>
+              </div>
+              <h2 className="text-2xl sm:text-3xl font-extrabold font-display text-slate-900 tracking-tight mt-0.5">
+                Latest Prep Notes &amp; Solved Guides
+              </h2>
+              <p className="text-xs text-slate-600 mt-1">
+                Grab verified solved placement question papers, interview prep notes, and free resume templates.
+              </p>
+            </div>
+
+            <button
+              onClick={() => onNavigate('/materials')}
+              className="inline-flex items-center gap-1 text-xs font-bold text-emerald-700 hover:text-emerald-800 transition-colors cursor-pointer"
+            >
+              <span>Explore All Study Materials</span>
+              <ChevronRight className="w-4 h-4" />
+            </button>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {latestMaterials.map((item) => (
+              <div
+                key={item.id}
+                onClick={() => onNavigate('/materials')}
+                className="group bg-white rounded-2xl border border-slate-200/80 hover:border-emerald-500/50 shadow-2xs hover:shadow-xs p-5 flex flex-col justify-between space-y-4 transition-all duration-300 cursor-pointer"
+              >
+                <div className="space-y-2.5">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="px-2 py-0.5 text-[9px] font-black tracking-wider uppercase border border-emerald-200 bg-emerald-50 text-emerald-700 rounded-md">
+                      {item.resource_type}
+                    </span>
+                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">
+                      {item.category}
+                    </span>
+                  </div>
+                  <div className="space-y-1">
+                    <h3 className="text-sm sm:text-base font-bold text-slate-800 group-hover:text-emerald-700 transition-colors line-clamp-1">
+                      {item.title}
+                    </h3>
+                    <p className="text-xs text-slate-500 line-clamp-2 leading-relaxed">
+                      {item.description || 'Verified study resource for placements.'}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="pt-3 border-t border-slate-100 flex items-center justify-between text-[11px] font-medium text-slate-400">
+                  <span className="flex items-center gap-1">
+                    <Download className="w-3.5 h-3.5" />
+                    {item.downloads} downloads
+                  </span>
+                  <span className="inline-flex items-center gap-1 text-emerald-700 font-extrabold group-hover:underline">
+                    Get Resource
+                    <ArrowRight className="w-3 h-3 transition-transform group-hover:translate-x-0.5" />
+                  </span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
 
       {/* 7. Why Choose Mana Naukari (3-Column Modern Feature Section) */}
       <WhyChooseUsSection onNavigate={onNavigate} />

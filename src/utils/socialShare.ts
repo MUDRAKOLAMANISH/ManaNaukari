@@ -4,6 +4,8 @@
  * and direct links / Telegram Bot API integrations for WhatsApp, Telegram, LinkedIn, X, and Facebook.
  */
 
+import { WEBSITE_URL } from '../constants/links';
+
 export interface ShareableJob {
   id?: string | number;
   title: string;
@@ -31,9 +33,8 @@ const STORAGE_KEY_TELEGRAM_CONFIG = 'mananaukari_telegram_config';
  * Gets absolute Mana Naukari URL for a specific job
  */
 export function getManaNaukariJobUrl(jobId?: string | number): string {
-  const origin = typeof window !== 'undefined' ? window.location.origin : 'https://mananaukari.in';
-  if (!jobId) return origin;
-  return `${origin}/jobs/${jobId}`;
+  if (!jobId) return WEBSITE_URL;
+  return `${WEBSITE_URL}/jobs/${jobId}`;
 }
 
 /**

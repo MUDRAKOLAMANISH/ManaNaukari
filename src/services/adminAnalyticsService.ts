@@ -281,26 +281,35 @@ export const adminAnalyticsService = {
       .sort((a, b) => b.views - a.views)
       .slice(0, 8);
 
-    // 8b. Aggregate WhatsApp Community Popup Events
+    // 8b. Aggregate WhatsApp Community Popup Events with new event types
     let whatsAppPopupStats = {
-      views: 0,
-      joins: 0,
-      dismisses: 0,
+      views: 0,       // Impressions
+      joins: 0,       // Join Clicks
+      dismissed: 0,   // Dismissed events
+      snoozed: 0,     // Snoozed events
+      dismisses: 0,   // Dismissed + Snoozed (for legacy UI support)
       conversionRate: 0,
     };
 
     try {
-      const [waViewsRes, waJoinsRes, waDismissRes] = await Promise.all([
-        supabase.from('whatsapp_popup_events').select('id', { count: 'exact', head: true }).eq('event_type', 'view'),
-        supabase.from('whatsapp_popup_events').select('id', { count: 'exact', head: true }).eq('event_type', 'join_click'),
-        supabase.from('whatsapp_popup_events').select('id', { count: 'exact', head: true }).in('event_type', ['close_click', 'maybe_later_click']),
+      const [waViewsRes, waJoinsRes, waDismissRes, waSnoozeRes] = await Promise.all([
+        supabase.from('whatsapp_popup_events').select('id', { count: 'exact', head: true }).in('event_type', ['view', 'popup_impression']),
+        supabase.from('whatsapp_popup_events').select('id', { count: 'exact', head: true }).in('event_type', ['join_click', 'popup_join_click']),
+        supabase.from('whatsapp_popup_events').select('id', { count: 'exact', head: true }).in('event_type', ['close_click', 'popup_dismiss']),
+        supabase.from('whatsapp_popup_events').select('id', { count: 'exact', head: true }).in('event_type', ['maybe_later_click', 'popup_snooze']),
       ]);
 
-      if (!waViewsRes.error) {
-        whatsAppPopupStats.views = waViewsRes.count || 0;
-        whatsAppPopupStats.joins = waJoinsRes.count || 0;
-        whatsAppPopupStats.dismisses = waDismissRes.count || 0;
-      } else {
+      if (waViewsRes.error) {
+        console.warn('[AdminAnalyticsService] whatsapp_popup_events query error:', waViewsRes.error);
+        if (
+          waViewsRes.error.code === '42P01' || 
+          waViewsRes.error.message?.includes('does not exist')
+        ) {
+          tablesReady = false;
+          tableErrorMessage = `Database table "whatsapp_popup_events" does not exist. Please run the SQL setup script. Details: ${waViewsRes.error.message}`;
+        }
+        
+        // Load fallback counts from local cache
         const localRaw = typeof window !== 'undefined' ? localStorage.getItem('cv_wa_popup_stats') : null;
         if (localRaw) {
           const parsed = JSON.parse(localRaw);
@@ -308,8 +317,15 @@ export const adminAnalyticsService = {
           whatsAppPopupStats.joins = parsed.joins || 0;
           whatsAppPopupStats.dismisses = parsed.dismisses || 0;
         }
+      } else {
+        whatsAppPopupStats.views = waViewsRes.count || 0;
+        whatsAppPopupStats.joins = waJoinsRes.count || 0;
+        whatsAppPopupStats.dismissed = waDismissRes.count || 0;
+        whatsAppPopupStats.snoozed = waSnoozeRes.count || 0;
+        whatsAppPopupStats.dismisses = (waDismissRes.count || 0) + (waSnoozeRes.count || 0);
       }
-    } catch {
+    } catch (err: any) {
+      console.warn('[AdminAnalyticsService] Exception aggregating whatsapp_popup_events:', err);
       const localRaw = typeof window !== 'undefined' ? localStorage.getItem('cv_wa_popup_stats') : null;
       if (localRaw) {
         const parsed = JSON.parse(localRaw);

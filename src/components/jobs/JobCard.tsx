@@ -3,6 +3,7 @@ import { motion } from 'framer-motion';
 import { Job } from '../../types/database.types';
 import { normalizeSkills } from '../../utils/skillUtils';
 import { candidateProfileService } from '../../services/candidateProfileService';
+import { getAbsoluteJobUrl, generateJobUrlPath } from '../../utils/jobUrlUtils';
 import { 
   Building2, MapPin, Briefcase, IndianRupee, Calendar, 
   ArrowUpRight, CheckCircle2, Bookmark, Copy, Check, Sparkles
@@ -50,8 +51,7 @@ export const JobCard: React.FC<JobCardProps> = ({ job, onViewDetails, onCopyLink
     if (onCopyLink) {
       onCopyLink(job);
     } else {
-      const path = `/jobs/${job.id}`;
-      const url = `${window.location.origin}${path}`;
+      const url = getAbsoluteJobUrl(generateJobUrlPath(job));
       navigator.clipboard.writeText(url).then(() => {
         setCopied(true);
         setTimeout(() => setCopied(false), 2000);

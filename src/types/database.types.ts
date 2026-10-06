@@ -343,7 +343,15 @@ export type JobViewInsert = {
 };
 
 // 12. Table: whatsapp_popup_events
-export type WhatsAppPopupEventType = 'view' | 'join_click' | 'close_click' | 'maybe_later_click';
+export type WhatsAppPopupEventType = 
+  | 'view' 
+  | 'join_click' 
+  | 'close_click' 
+  | 'maybe_later_click'
+  | 'popup_impression'
+  | 'popup_join_click'
+  | 'popup_dismiss'
+  | 'popup_snooze';
 
 export interface WhatsAppPopupEvent {
   id: string;
@@ -511,3 +519,32 @@ export interface ResumeMatchResultRecord {
   summary?: string | null;
   created_at: string;
 }
+
+// 13. Table: materials (Study Notes, Links & Materials)
+export type MaterialResourceType = 'PDF' | 'DOCX' | 'PPTX' | 'ZIP' | 'LINK';
+export type MaterialStatus = 'active' | 'draft';
+
+export interface Material {
+  id: string;
+  title: string;
+  description?: string | null;
+  resource_type: MaterialResourceType;
+  file_url?: string | null;
+  external_link?: string | null;
+  category: string;
+  status: MaterialStatus;
+  is_featured: boolean;
+  views: number;
+  downloads: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export type MaterialInsert = Omit<Material, 'id' | 'views' | 'downloads' | 'created_at' | 'updated_at'> & {
+  id?: string;
+  views?: number;
+  downloads?: number;
+  created_at?: string;
+  updated_at?: string;
+};
+

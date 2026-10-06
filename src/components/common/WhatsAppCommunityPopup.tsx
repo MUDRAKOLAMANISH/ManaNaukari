@@ -62,14 +62,15 @@ export const WhatsAppCommunityPopup: React.FC<WhatsAppCommunityPopupProps> = ({ 
       console.debug('[WhatsAppPopup] LocalStorage read notice:', e);
     }
 
-    // 3. Show popup automatically when website opens (smooth 600ms mount delay)
+    // 3. Show popup automatically when website opens (smooth 3000ms delay)
     const timer = setTimeout(() => {
       if (!isAdminRoute(window.location.pathname)) {
         setIsOpen(true);
         setHasChecked(true);
-        analyticsTracker.trackWhatsAppPopup('view');
+        console.log('[WhatsAppPopup] ⏰ 3-second delay completed. Showing popup and tracking impression.');
+        analyticsTracker.trackWhatsAppPopup('popup_impression');
       }
-    }, 600);
+    }, 3000);
 
     return () => clearTimeout(timer);
   }, [currentPath]);
@@ -80,7 +81,7 @@ export const WhatsAppCommunityPopup: React.FC<WhatsAppCommunityPopupProps> = ({ 
 
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
-        handleMaybeLater();
+        handleDismiss();
       }
     };
 
@@ -99,12 +100,12 @@ export const WhatsAppCommunityPopup: React.FC<WhatsAppCommunityPopupProps> = ({ 
       console.debug('[WhatsAppPopup] LocalStorage write notice:', e);
     }
 
-    analyticsTracker.trackWhatsAppPopup('join_click');
+    analyticsTracker.trackWhatsAppPopup('popup_join_click');
     window.open(OFFICIAL_LINKS.WHATSAPP_CHANNEL, '_blank', 'noopener,noreferrer');
     setIsOpen(false);
   };
 
-  // Click "Maybe Later":
+  // Click "Maybe Later" (Snooze):
   // - Save timestamp
   // - Show again after 24 hours
   const handleMaybeLater = () => {
@@ -114,7 +115,21 @@ export const WhatsAppCommunityPopup: React.FC<WhatsAppCommunityPopupProps> = ({ 
       console.debug('[WhatsAppPopup] LocalStorage write notice:', e);
     }
 
-    analyticsTracker.trackWhatsAppPopup('maybe_later_click');
+    analyticsTracker.trackWhatsAppPopup('popup_snooze');
+    setIsOpen(false);
+  };
+
+  // Click X close button, click backdrop, or ESC key (Dismiss):
+  // - Save timestamp
+  // - Show again after 24 hours
+  const handleDismiss = () => {
+    try {
+      localStorage.setItem(WA_MAYBE_LATER_KEY, Date.now().toString());
+    } catch (e) {
+      console.debug('[WhatsAppPopup] LocalStorage write notice:', e);
+    }
+
+    analyticsTracker.trackWhatsAppPopup('popup_dismiss');
     setIsOpen(false);
   };
 
@@ -137,7 +152,7 @@ export const WhatsAppCommunityPopup: React.FC<WhatsAppCommunityPopupProps> = ({ 
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               transition={{ duration: 0.25 }}
-              onClick={handleMaybeLater}
+              onClick={handleDismiss}
               className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm"
               aria-hidden="true"
             />
@@ -171,7 +186,7 @@ export const WhatsAppCommunityPopup: React.FC<WhatsAppCommunityPopupProps> = ({ 
 
                 <button
                   type="button"
-                  onClick={handleMaybeLater}
+                  onClick={handleDismiss}
                   className="p-2 -mr-1.5 -mt-1 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-full transition-colors cursor-pointer"
                   aria-label="Close"
                   title="Maybe Later"
@@ -281,7 +296,7 @@ export const WhatsAppCommunityPopup: React.FC<WhatsAppCommunityPopupProps> = ({ 
           <button
             type="button"
             onClick={() => {
-              analyticsTracker.trackWhatsAppPopup('join_click');
+              analyticsTracker.trackWhatsAppPopup('popup_join_click');
               window.open(OFFICIAL_LINKS.WHATSAPP_CHANNEL, '_blank', 'noopener,noreferrer');
             }}
             className="relative w-13 h-13 sm:w-14 sm:h-14 rounded-2xl bg-gradient-to-tr from-[#25D366] to-[#128C7E] hover:from-[#20bd5a] hover:to-[#0f7a6d] active:scale-95 text-white flex items-center justify-center shadow-xl shadow-emerald-600/35 hover:shadow-2xl hover:shadow-emerald-600/50 ring-4 ring-emerald-400/20 transition-all transform hover:scale-105 cursor-pointer"

@@ -142,15 +142,21 @@ function updateLocalWhatsAppStats(eventType: WhatsAppPopupEventType) {
   try {
     const raw = localStorage.getItem(STATS_KEY);
     const stats = raw ? JSON.parse(raw) : { views: 0, joins: 0, dismisses: 0, lastUpdated: Date.now() };
-    if (eventType === 'view') {
+    if (eventType === 'view' || eventType === 'popup_impression') {
       stats.views = (stats.views || 0) + 1;
-    } else if (eventType === 'join_click') {
+    } else if (eventType === 'join_click' || eventType === 'popup_join_click') {
       stats.joins = (stats.joins || 0) + 1;
-    } else if (eventType === 'close_click' || eventType === 'maybe_later_click') {
+    } else if (
+      eventType === 'close_click' || 
+      eventType === 'maybe_later_click' || 
+      eventType === 'popup_dismiss' || 
+      eventType === 'popup_snooze'
+    ) {
       stats.dismisses = (stats.dismisses || 0) + 1;
     }
     stats.lastUpdated = Date.now();
     localStorage.setItem(STATS_KEY, JSON.stringify(stats));
+    console.log(`[AnalyticsTracker] Updated local fallback stats for event "${eventType}":`, stats);
   } catch (err) {
     console.debug('[Analytics] Local storage stats update notice:', err);
   }
@@ -430,12 +436,12 @@ export const analyticsTracker = {
 
   /**
    * Tracks WhatsApp Community Join Popup interactions:
-   * 'view' | 'join_click' | 'close_click' | 'maybe_later_click'
    * Saves to Supabase `whatsapp_popup_events` and caches locally
    */
   trackWhatsAppPopup(eventType: WhatsAppPopupEventType, customPath?: string) {
     if (typeof window === 'undefined') return;
 
+    console.log(`[AnalyticsTracker] 🚀 Initiating event tracking for WhatsApp Popup: "${eventType}"`);
     updateLocalWhatsAppStats(eventType);
 
     setTimeout(async () => {
@@ -447,14 +453,15 @@ export const analyticsTracker = {
           path: (customPath || window.location.pathname).slice(0, 255),
         };
 
+        console.log('[AnalyticsTracker] 📤 Sending event payload to Supabase "whatsapp_popup_events":', payload);
         const { error } = await supabase.from('whatsapp_popup_events').insert(payload);
         if (error) {
-          console.debug('[AnalyticsTracker] whatsapp_popup_events notice:', error.message);
+          console.error('[AnalyticsTracker] ❌ Supabase whatsapp_popup_events insert error:', error.message, error.details);
         } else {
-          console.log('[AnalyticsTracker] ✅ WhatsApp popup event tracked:', eventType);
+          console.log(`[AnalyticsTracker] 🎉 SUCCESS: WhatsApp popup event "${eventType}" recorded successfully in Supabase!`);
         }
-      } catch (err) {
-        console.debug('[AnalyticsTracker] Failed to track whatsapp popup event:', err);
+      } catch (err: any) {
+        console.error('[AnalyticsTracker] ❌ Exception tracking whatsapp popup event:', err.message || err);
       }
     }, 50);
   },

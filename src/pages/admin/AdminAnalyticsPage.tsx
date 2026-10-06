@@ -105,7 +105,7 @@ ALTER TABLE public.job_views ADD COLUMN IF NOT EXISTS viewed_at TIMESTAMP WITH T
 CREATE TABLE IF NOT EXISTS public.whatsapp_popup_events (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     session_id VARCHAR(64) NOT NULL,
-    event_type VARCHAR(50) NOT NULL, -- 'view', 'join_click', 'close_click', 'maybe_later_click'
+    event_type VARCHAR(50) NOT NULL, -- 'popup_impression', 'popup_join_click', 'popup_dismiss', 'popup_snooze'
     path VARCHAR(255) NOT NULL,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
 );

@@ -116,6 +116,17 @@ export const AdminHeader: React.FC<AdminHeaderProps> = ({
             <Database className="w-3.5 h-3.5 text-blue-600" />
             <span>Knowledge Base (RAG)</span>
           </button>
+          <button
+            onClick={() => onNavigate('/admin/materials')}
+            className={`px-3 py-1.5 font-semibold rounded-xl transition-all cursor-pointer shrink-0 inline-flex items-center gap-1.5 text-xs ${
+              currentPath === '/admin/materials'
+                ? 'text-blue-700 bg-blue-50 border border-blue-200/60 font-bold shadow-2xs'
+                : 'text-slate-600 hover:text-blue-600 hover:bg-slate-100'
+            }`}
+          >
+            <FileText className="w-3.5 h-3.5 text-blue-600" />
+            <span>Materials Manager</span>
+          </button>
         </div>
 
         <div className="flex items-center gap-3">
