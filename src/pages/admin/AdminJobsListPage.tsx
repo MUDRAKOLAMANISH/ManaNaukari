@@ -203,7 +203,7 @@ export const AdminJobsListPage: React.FC<AdminJobsListPageProps> = ({ onNavigate
     }
   };
 
-  const handleConfirmDelete = async () => {
+  const handleConfirmSoftDelete = async () => {
     if (!deleteTarget) return;
 
     setIsDeleting(true);
@@ -213,11 +213,31 @@ export const AdminJobsListPage: React.FC<AdminJobsListPageProps> = ({ onNavigate
     if (success) {
       const deletedTitle = deleteTarget.title;
       setDeleteTarget(null);
-      setToastMessage(`Job "${deletedTitle}" was soft-deleted. All applications & analytics remain permanently preserved.`);
+      setToastMessage(`Job "${deletedTitle}" was hidden from the public site but retained in history.`);
       setTimeout(() => setToastMessage(null), 4000);
       loadJobs();
+      loadStatusCounts();
     } else if (error) {
-      alert(`Error deleting job: ${error.message}`);
+      alert(`Error soft-deleting job: ${error.message}`);
+    }
+  };
+
+  const handleConfirmHardDelete = async () => {
+    if (!deleteTarget) return;
+
+    setIsDeleting(true);
+    const { success, error } = await adminJobsService.deleteJobPermanently(deleteTarget.id);
+    setIsDeleting(false);
+
+    if (success) {
+      const deletedTitle = deleteTarget.title;
+      setDeleteTarget(null);
+      setToastMessage('Job permanently deleted.');
+      setTimeout(() => setToastMessage(null), 4000);
+      loadJobs();
+      loadStatusCounts();
+    } else if (error) {
+      alert(`Error permanently deleting job: ${error.message}`);
     }
   };
 
@@ -611,12 +631,13 @@ CREATE OR REPLACE VIEW public.applications AS SELECT * FROM public.applicants;`;
         />
       )}
 
-      {/* Delete Confirmation Modal (Soft Delete with Application Preservation Guarantee) */}
+      {/* Delete Confirmation Modal (Soft / Permanent Selection) */}
       <DeleteConfirmModal
         isOpen={Boolean(deleteTarget)}
         jobTitle={deleteTarget?.title || ''}
         isDeleting={isDeleting}
-        onConfirm={handleConfirmDelete}
+        onSoftDelete={handleConfirmSoftDelete}
+        onHardDelete={handleConfirmHardDelete}
         onCancel={() => setDeleteTarget(null)}
       />
 

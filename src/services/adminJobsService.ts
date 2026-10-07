@@ -356,6 +356,88 @@ export const adminJobsService = {
   },
 
   /**
+   * Permanently delete a job row from the jobs table.
+   * If there are applicants or views, we preserve them by transferring
+   * their references to an archived placeholder job before deleting the original row.
+   */
+  async deleteJobPermanently(id: string): Promise<{ success: boolean; error: Error | null }> {
+    try {
+      const ARCHIVE_JOB_ID = '00000000-0000-0000-0000-000000000000';
+      
+      // Let's check if the archive job already exists
+      const { data: existingArchive } = await supabase
+        .from('jobs')
+        .select('id')
+        .eq('id', ARCHIVE_JOB_ID)
+        .maybeSingle();
+
+      if (!existingArchive) {
+        console.log('[Admin Service] Archive placeholder job not found. Creating it now...');
+        
+        // Grab any existing category to satisfy foreign key link
+        const { data: firstCategory } = await supabase
+          .from('categories')
+          .select('category_name')
+          .limit(1)
+          .maybeSingle();
+        
+        const targetCategory = firstCategory?.category_name || 'General';
+
+        const { error: createErr } = await supabase
+          .from('jobs')
+          .insert({
+            id: ARCHIVE_JOB_ID,
+            title: 'Archived Job Opportunity (Original Deleted)',
+            company: 'Mana Naukari Archive',
+            status: 'deleted',
+            apply_link: 'https://mana-naukari.netlify.app',
+            category: targetCategory,
+            experience: 'Fresher',
+            job_type: 'Full Time',
+            location: 'Hyderabad, India',
+            salary: 'N/A',
+            description: 'Archived placeholder for permanently deleted jobs to preserve candidate application records.',
+          });
+        if (createErr) {
+          console.warn('[Admin Service] Notice: Could not create archive placeholder. Trying direct delete.', createErr.message);
+        }
+      }
+
+      // Transfer applicants of the target job to the archive placeholder to bypass RESTRICT
+      const { error: updateApplicantsErr } = await supabase
+        .from('applicants')
+        .update({ job_id: ARCHIVE_JOB_ID })
+        .eq('job_id', id);
+
+      if (updateApplicantsErr) {
+        console.warn('[Admin Service] Notice: Re-associating applicants encountered:', updateApplicantsErr.message);
+      }
+
+      // Transfer job views of the target job to the archive placeholder
+      const { error: updateViewsErr } = await supabase
+        .from('job_views')
+        .update({ job_id: ARCHIVE_JOB_ID })
+        .eq('job_id', id);
+
+      if (updateViewsErr) {
+        console.warn('[Admin Service] Notice: Re-associating job views encountered:', updateViewsErr.message);
+      }
+
+      // Safely perform hard delete on target job
+      const { error } = await supabase
+        .from('jobs')
+        .delete()
+        .eq('id', id);
+
+      if (error) throw error;
+      return { success: true, error: null };
+    } catch (err: any) {
+      console.error(`Error permanently deleting job ${id}:`, err);
+      return { success: false, error: err };
+    }
+  },
+
+  /**
    * Restore a soft-deleted or closed job back to active status
    */
   async restoreJob(id: string): Promise<{ success: boolean; error: Error | null }> {

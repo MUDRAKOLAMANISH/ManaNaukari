@@ -456,7 +456,11 @@ export const analyticsTracker = {
         console.log('[AnalyticsTracker] 📤 Sending event payload to Supabase "whatsapp_popup_events":', payload);
         const { error } = await supabase.from('whatsapp_popup_events').insert(payload);
         if (error) {
-          console.error('[AnalyticsTracker] ❌ Supabase whatsapp_popup_events insert error:', error.message, error.details);
+          if (error.message?.includes('schema cache') || error.message?.includes('relation')) {
+            console.warn('[AnalyticsTracker] ℹ️ Supabase table "whatsapp_popup_events" is missing. Stats are being securely cached in localStorage. To enable live analytics, please run the SQL migration script from the Admin Performance Analytics page.');
+          } else {
+            console.warn('[AnalyticsTracker] ⚠️ Supabase whatsapp_popup_events insert failed:', error.message);
+          }
         } else {
           console.log(`[AnalyticsTracker] 🎉 SUCCESS: WhatsApp popup event "${eventType}" recorded successfully in Supabase!`);
         }

@@ -242,13 +242,21 @@ export const jobAvailabilityService = {
             }
 
             if (updateErr) {
-              console.log(`[Job Checker] Update issue on job ID ${job.id}:`, updateErr.message);
+              if (updateErr.message?.includes('fetch') || updateErr.message?.includes('network') || updateErr.message?.includes('Failed to fetch')) {
+                console.warn(`[Job Checker] ⚠️ Temporary network interruption updating job ID ${job.id}. Will retry on next scheduled check.`);
+              } else {
+                console.log(`[Job Checker] Update issue on job ID ${job.id}:`, updateErr.message);
+              }
               return { success: false, isFlagged, isUnverified };
             }
 
             return { success: true, isFlagged, isUnverified };
           } catch (err: any) {
-            console.error(`[Job Checker] Exception processing job ID ${job.id}:`, err.message || err);
+            if (err.message?.includes('fetch') || err.message?.includes('network') || err.message?.includes('Failed to fetch')) {
+              console.warn(`[Job Checker] ⚠️ Network exception processing job ID ${job.id}.`);
+            } else {
+              console.error(`[Job Checker] Exception processing job ID ${job.id}:`, err.message || err);
+            }
             return { success: false, isFlagged, isUnverified: true };
           }
         })
