@@ -15,7 +15,7 @@ export interface ResumePlan {
 
 export const RESUME_PLANS: ResumePlan[] = [
   {
-    id: 'free_audit',
+    id: 'free_scan',
     name: 'Free ATS Quick Scan',
     price: 'Free',
     description: 'Quick automated check of your resume format and basic keyword matching.',
@@ -23,68 +23,78 @@ export const RESUME_PLANS: ResumePlan[] = [
     ctaText: 'Run Free Scan',
     features: [
       'Basic ATS parser compatibility test',
-      'Format & font structure check',
-      'Word count & length recommendation',
+      'Format and font structure check',
+      'Word count and length recommendation',
       'Instant online score summary',
     ],
   },
   {
-    id: 'comprehensive_review',
+    id: 'comprehensive_audit',
     name: 'Comprehensive ATS Audit',
-    price: '₹199',
+    price: '₹49',
     badge: 'Most Popular',
     popular: true,
-    description: 'Detailed manual inspection by recruitment experts with personalized feedback.',
-    turnaround: '24-48 Hours Delivery',
+    description: 'Detailed resume review with personalized feedback to improve your chances of passing ATS screening.',
+    turnaround: '24–48 Hours Delivery',
     ctaText: 'Get Audit Report',
     features: [
       'Everything in Free Scan',
-      'Human recruiter manual line-by-line review',
+      'Manual line-by-line resume review',
       'Domain-specific technical keyword mapping',
-      'Action verb & impact metrics optimization',
-      'Detailed PDF report with before/after fixes',
+      'Action verb and impact optimization',
+      'Detailed PDF report with before-and-after fixes',
       'Direct WhatsApp consultation support',
     ],
   },
   {
-    id: 'complete_rewrite',
+    id: 'placement_rewrite',
     name: 'Placement-Ready Re-Write',
-    price: '₹499',
+    price: '₹99',
     badge: 'Complete Makeover',
-    description: 'Complete professional resume redesign crafted to maximize interview calls.',
+    description: 'Professional resume makeover designed to present your skills and projects effectively to recruiters.',
     turnaround: '48 Hours Delivery',
-    ctaText: 'Book Full Re-Write',
+    ctaText: 'Get Placement-Ready Resume',
     features: [
-      'Everything in Comprehensive Audit',
-      'Complete ATS-compliant template reformatting',
-      'Customized executive summary & project framing',
-      'LinkedIn profile headline & summary copy',
-      'Targeted for TCS, Infosys, Wipro & Top Product Firms',
-      '2 rounds of free revisions included',
+      'Everything in Comprehensive ATS Audit',
+      'ATS-compliant resume template reformatting',
+      'Customized professional summary and project descriptions',
+      'LinkedIn profile headline and summary suggestions',
+      'Tailoring for TCS, Infosys, Wipro, and other technology companies',
+      'Two rounds of free revisions',
     ],
   },
 ];
 
 interface ResumeServiceCardProps {
   plan: ResumePlan;
+  isSelected?: boolean;
   onSelect: (plan: ResumePlan) => void;
 }
 
-export const ResumeServiceCard: React.FC<ResumeServiceCardProps> = ({ plan, onSelect }) => {
+export const ResumeServiceCard: React.FC<ResumeServiceCardProps> = ({ plan, isSelected, onSelect }) => {
   return (
     <div
       className={`relative bg-white rounded-3xl border transition-all duration-200 hover:-translate-y-1 hover:shadow-lg p-6 sm:p-7 flex flex-col justify-between ${
-        plan.popular
+        isSelected
+          ? 'border-blue-600 shadow-xl ring-2 ring-blue-500/30 bg-gradient-to-b from-blue-50/30 to-white'
+          : plan.popular
           ? 'border-blue-500 shadow-md ring-2 ring-blue-500/10'
           : 'border-slate-200 shadow-xs hover:border-blue-200'
       }`}
     >
       {/* Top Badge */}
-      {plan.badge && (
-        <div className="absolute -top-3 left-1/2 -translate-x-1/2">
-          <span className="px-3.5 py-1 rounded-full text-[11px] font-bold uppercase tracking-wider bg-orange-500 text-white shadow-xs">
-            {plan.badge}
-          </span>
+      {(plan.badge || isSelected) && (
+        <div className="absolute -top-3 left-1/2 -translate-x-1/2 flex items-center gap-1.5">
+          {isSelected && (
+            <span className="px-3 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-wider bg-blue-600 text-white shadow-xs">
+              Selected
+            </span>
+          )}
+          {plan.badge && !isSelected && (
+            <span className="px-3.5 py-1 rounded-full text-[11px] font-bold uppercase tracking-wider bg-orange-500 text-white shadow-xs">
+              {plan.badge}
+            </span>
+          )}
         </div>
       )}
 

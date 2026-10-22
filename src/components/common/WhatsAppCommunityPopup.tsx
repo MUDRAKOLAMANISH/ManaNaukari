@@ -477,33 +477,30 @@ export const WhatsAppCommunityPopup: React.FC<WhatsAppCommunityPopupProps> = ({ 
           ======================================================== */}
       <aside
         aria-label="WhatsApp Community Alerts"
-        className="fixed bottom-24 right-5 sm:bottom-24 sm:right-6 z-40 flex items-center group"
+        className="fixed bottom-18 right-4 sm:bottom-20 sm:right-5 z-40 flex items-center group"
       >
         {/* Tooltip on Hover */}
         <span
-          className="hidden sm:inline-block pointer-events-none opacity-0 group-hover:opacity-100 -translate-x-2 group-hover:translate-x-0 transition-all duration-200 mr-2.5 px-3 py-1.5 rounded-xl bg-slate-900/90 backdrop-blur-md text-white text-xs font-bold shadow-lg shadow-slate-900/20 whitespace-nowrap"
+          className="hidden sm:inline-block pointer-events-none opacity-0 group-hover:opacity-100 -translate-x-2 group-hover:translate-x-0 transition-all duration-200 mr-2 px-2.5 py-1 rounded-lg bg-slate-900/90 text-white text-[11px] font-bold shadow-md whitespace-nowrap"
         >
-          Join WhatsApp Channel
+          WhatsApp Alerts
         </span>
 
-        {/* Floating WhatsApp Action Button with subtle marigold pulse */}
+        {/* Small, clean WhatsApp Action Button */}
         <button
           type="button"
           onClick={() => {
             analyticsTracker.trackWhatsAppPopup('popup_join_click');
             window.open(OFFICIAL_LINKS.WHATSAPP_CHANNEL, '_blank', 'noopener,noreferrer');
           }}
-          className="relative w-13 h-13 sm:w-14 sm:h-14 rounded-2xl bg-gradient-to-tr from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 active:scale-95 text-white flex items-center justify-center shadow-xl shadow-orange-600/35 hover:shadow-2xl hover:shadow-orange-600/50 ring-4 ring-orange-400/20 transition-all transform hover:scale-105 cursor-pointer"
+          className="relative w-10 h-10 sm:w-11 sm:h-11 rounded-full bg-emerald-600 hover:bg-emerald-500 active:scale-95 text-white flex items-center justify-center shadow-md transition-all cursor-pointer"
           aria-label="Join WhatsApp Group for Daily Job Alerts"
           title="Join WhatsApp Group for Daily Job Alerts"
         >
-          <WhatsAppIcon className="w-7 h-7 text-white" />
+          <WhatsAppIcon className="w-5 h-5 text-white" />
 
-          {/* Glowing Animated Pulse Indicator */}
-          <span className="absolute -top-1 -right-1 flex h-3.5 w-3.5">
-            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-orange-400 opacity-75" />
-            <span className="relative inline-flex rounded-full h-3.5 w-3.5 bg-orange-500 border-2 border-white" />
-          </span>
+          {/* Small subtle status dot */}
+          <span className="absolute top-0 right-0 w-2.5 h-2.5 rounded-full bg-emerald-400 border-2 border-white" />
         </button>
       </aside>
     </>

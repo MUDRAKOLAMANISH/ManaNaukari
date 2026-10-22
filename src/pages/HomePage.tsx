@@ -9,6 +9,7 @@ import { HeroSection } from '../components/home/HeroSection';
 import { StatsSection } from '../components/home/StatsSection';
 import { FeaturedCategories } from '../components/home/FeaturedCategories';
 import { FeaturedCompanies } from '../components/home/FeaturedCompanies';
+import { MockInterviewBanner } from '../components/home/MockInterviewBanner';
 import { RecruiterHiringSection } from '../components/home/RecruiterHiringSection';
 import { CTASections } from '../components/home/CTASections';
 import { WhyChooseUsSection } from '../components/home/WhyChooseUsSection';
@@ -220,6 +221,9 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
         onSelectCategory={handleSelectCategory}
         categoryCounts={{}}
       />
+
+      {/* 3b. Premium ₹99 Mock Interview Service Promotional Banner */}
+      <MockInterviewBanner onNavigate={onNavigate} />
 
       {/* 4. Latest Verified Jobs Section with Workplace Imagery Banner */}
       <section className="space-y-6">

@@ -403,6 +403,560 @@ Return pure JSON.`;
   }
 });
 
+// --- AI MOCK INTERVIEW API ENDPOINTS ---
+
+// Endpoint 1: Generate AI Mock Interview Questions
+app.post('/api/ai/mock-interview/generate-questions', async (req, res) => {
+  try {
+    const { role = 'Software Engineer', customRole, experienceLevel = 'Fresher', companyType = 'IT Service', questionCount = 3, languageMode = 'English' } = req.body;
+    const targetRole = customRole || role;
+
+    const apiKey = process.env.GEMINI_API_KEY;
+    if (!apiKey) {
+      return res.json({ success: false, message: 'GEMINI_API_KEY not configured. Using client fallback.' });
+    }
+
+    const ai = new GoogleGenAI({ apiKey });
+    const systemInstruction = `You are an elite Technical Hiring Manager at an Indian technology company (${companyType} - e.g. TCS, Infosys, Wipro, Amazon, product startup).
+Generate realistic, high-yield interview questions for an entry-level / fresher candidate applying for ${targetRole} (${experienceLevel}).
+Language tone requested: ${languageMode}.
+
+Generate exactly ${questionCount} structured questions.
+Each question must include:
+- id: string (e.g. "q1", "q2")
+- questionText: clear, realistic interview question
+- hints: array of 2-3 helpful hints
+- expectedKeyPoints: array of 3-4 key concepts or terms the candidate should mention
+- category: topic category (e.g., "Technical Core", "Behavioral / HR", "System Design & Logic", "Coding / Project")
+- timeLimitSeconds: integer timer limit (120 or 180 seconds)
+
+Return PURE JSON in this schema:
+{
+  "questions": [
+    {
+      "id": "q1",
+      "questionText": "...",
+      "hints": ["...", "..."],
+      "expectedKeyPoints": ["...", "..."],
+      "category": "...",
+      "timeLimitSeconds": 120
+    }
+  ]
+}`;
+
+    const prompt = `Generate ${questionCount} realistic interview questions for:
+Role: ${targetRole}
+Experience: ${experienceLevel}
+Company Context: ${companyType}
+Language Preference: ${languageMode}`;
+
+    const candidateModels = ['gemini-3.1-flash-lite', 'gemini-3.8-flash'];
+    for (const model of candidateModels) {
+      try {
+        const response = await ai.models.generateContent({
+          model,
+          contents: [{ text: prompt }],
+          config: {
+            systemInstruction,
+            responseMimeType: 'application/json',
+          },
+        });
+
+        const rawText = response.text ? response.text.trim() : '';
+        if (rawText) {
+          const jsonResult = JSON.parse(rawText);
+          if (jsonResult.questions && Array.isArray(jsonResult.questions)) {
+            return res.json({ success: true, questions: jsonResult.questions });
+          }
+        }
+      } catch (mErr: any) {
+        console.warn(`[MockInterview] Model ${model} question gen failed:`, mErr?.message);
+      }
+    }
+
+    return res.json({ success: false, message: 'AI model unavailable. Using fallback.' });
+  } catch (err: any) {
+    console.error('[MockInterview] Question generation error:', err);
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// Endpoint 2: Evaluate Answer for a Single Question
+app.post('/api/ai/mock-interview/evaluate-answer', async (req, res) => {
+  try {
+    const { questionText, candidateAnswer, role, experienceLevel, expectedKeyPoints = [], languageMode = 'English' } = req.body;
+
+    if (!candidateAnswer || typeof candidateAnswer !== 'string' || candidateAnswer.trim().length === 0) {
+      return res.status(400).json({ success: false, error: 'Candidate answer is required.' });
+    }
+
+    const apiKey = process.env.GEMINI_API_KEY;
+    if (!apiKey) {
+      return res.json({ success: false, message: 'GEMINI_API_KEY not configured. Using client fallback.' });
+    }
+
+    const ai = new GoogleGenAI({ apiKey });
+    const systemInstruction = `You are an expert interviewer scoring a candidate's answer for the role of ${role} (${experienceLevel}).
+Evaluate the response constructively and strictly based on clarity, technical accuracy, communication, and STAR method (Situation, Task, Action, Result) structure.
+
+Return PURE JSON in this schema:
+{
+  "score": 0-100 integer overall quality,
+  "clarityScore": 0-100 integer,
+  "technicalAccuracy": 0-100 integer,
+  "communication": 0-100 integer,
+  "starStructureScore": 0-100 integer,
+  "strengths": ["string", "string"],
+  "weaknesses": ["string", "string"],
+  "improvedAnswer": "Comprehensive step-by-step model answer showing how to answer this question brilliantly using STAR method",
+  "feedbackSummary": "Encouraging, actionable 2-sentence feedback summary"
+}`;
+
+    const prompt = `Question Asked: "${questionText}"
+Expected Key Concepts: ${JSON.stringify(expectedKeyPoints)}
+
+Candidate Answer:
+"""
+${candidateAnswer.trim()}
+"""`;
+
+    const candidateModels = ['gemini-3.1-flash-lite', 'gemini-3.8-flash'];
+    for (const model of candidateModels) {
+      try {
+        const response = await ai.models.generateContent({
+          model,
+          contents: [{ text: prompt }],
+          config: {
+            systemInstruction,
+            responseMimeType: 'application/json',
+          },
+        });
+
+        const rawText = response.text ? response.text.trim() : '';
+        if (rawText) {
+          const evalJson = JSON.parse(rawText);
+          return res.json({ success: true, evaluation: evalJson });
+        }
+      } catch (mErr: any) {
+        console.warn(`[MockInterview] Model ${model} answer eval failed:`, mErr?.message);
+      }
+    }
+
+    return res.json({ success: false, message: 'AI model unavailable. Using fallback.' });
+  } catch (err: any) {
+    console.error('[MockInterview] Answer evaluation error:', err);
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// Endpoint 3: Generate Overall Interview Final Report
+app.post('/api/ai/mock-interview/final-report', async (req, res) => {
+  try {
+    const { evaluations = [], config = {} } = req.body;
+
+    const apiKey = process.env.GEMINI_API_KEY;
+    if (!apiKey) {
+      return res.json({ success: false, message: 'GEMINI_API_KEY not configured. Using client fallback.' });
+    }
+
+    const ai = new GoogleGenAI({ apiKey });
+    const systemInstruction = `You are an executive career coach for Indian tech graduates.
+Analyze all candidate answers and evaluations from this mock interview session and produce a comprehensive diagnostic report.
+
+Return PURE JSON in this schema:
+{
+  "overallScore": 0-100 integer average performance,
+  "headline": "Short diagnostic headline e.g. 'Strong Technical Readiness with Minor Structure Gaps'",
+  "readinessStatus": "Ready" | "Almost Ready" | "Needs Practice",
+  "communicationRating": "e.g. Excellent / Good / Needs Work",
+  "technicalRating": "e.g. Proficient / Fundamental / Advanced",
+  "starMethodMastery": "e.g. 70% - Focus on explicitly stating Result metrics",
+  "topStrengths": ["string", "string", "string"],
+  "keySkillGaps": ["string", "string"],
+  "actionableTips": ["string", "string", "string"],
+  "recommendedStudyMaterials": ["string", "string", "string"]
+}`;
+
+    const prompt = `Candidate Session Details:
+Role: ${config.customRole || config.role || 'Software Engineer'}
+Experience: ${config.experienceLevel || 'Fresher'}
+Evaluations JSON:
+${JSON.stringify(evaluations)}`;
+
+    const response = await ai.models.generateContent({
+      model: 'gemini-3.8-flash',
+      contents: [{ text: prompt }],
+      config: {
+        systemInstruction,
+        responseMimeType: 'application/json',
+      },
+    });
+
+    const rawText = response.text ? response.text.trim() : '';
+    if (rawText) {
+      const reportJson = JSON.parse(rawText);
+      reportJson.createdAt = new Date().toISOString();
+      return res.json({ success: true, report: reportJson });
+    }
+
+    return res.json({ success: false, message: 'AI model unavailable. Using fallback.' });
+  } catch (err: any) {
+    console.error('[MockInterview] Final report error:', err);
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// --- AI CAREER ROADMAP GENERATION ENDPOINT ---
+app.post('/api/ai/career-roadmap/generate', async (req, res) => {
+  try {
+    const { profile } = req.body;
+    if (!profile) {
+      return res.status(400).json({ success: false, error: 'Career profile data is required.' });
+    }
+
+    const apiKey = process.env.GEMINI_API_KEY;
+    if (!apiKey) {
+      return res.json({ success: false, message: 'GEMINI_API_KEY not configured. Using client fallback.' });
+    }
+
+    const ai = new GoogleGenAI({ apiKey });
+    const roleName = profile.careerGoal?.primaryRole === 'Other' && profile.careerGoal?.customRole
+      ? profile.careerGoal.customRole
+      : profile.careerGoal?.primaryRole || 'Software Engineer';
+
+    const systemInstruction = `You are an elite Indian Tech Career Strategist & Technical Hiring Advisor.
+Generate a structured, highly actionable, beginner-friendly Personal Career Roadmap for a candidate in India.
+
+Rules:
+1. Tailor every phase, project, task, and resource specifically to the candidate's target role: "${roleName}".
+2. Do NOT generate a generic roadmap. If target role is Data Analyst, use SQL, Excel, Pandas, Power BI. If Python Developer, use Python, REST APIs, Git, PostgreSQL. If AI Application Developer, use Python, Gemini API, RAG, ChromaDB, FastAPI.
+3. Be realistic about the timeline (${profile.careerGoal?.targetTimeline || '90 days'}) and weekly learning hours (${profile.careerGoal?.weeklyHours || '6-10 hours'}).
+4. Breakdown into 3 distinct phases. Each phase must contain 3 actionable tasks with timeframe and description.
+5. Provide 2 practical portfolio project ideas with problem statement, core features, tech stack, and interview tips.
+6. Provide specific technical topics, coding exercises, HR prep tips, and a weekly schedule.
+7. Output pure JSON matching the requested schema exactly.
+
+JSON Schema format:
+{
+  "id": "roadmap-string",
+  "createdAt": "ISO string",
+  "updatedAt": "ISO string",
+  "targetRole": "${roleName}",
+  "targetTimeline": "${profile.careerGoal?.targetTimeline || '90 days'}",
+  "weeklyHours": "${profile.careerGoal?.weeklyHours || '6-10 hours'}",
+  "readinessScore": 0-100 integer,
+  "readinessAssessment": "2-3 sentence honest, encouraging summary of candidate readiness and path forward",
+  "existingSkillsSummary": ["string"],
+  "topSkillGaps": ["string"],
+  "recommendedNextAction": "string (e.g., Start Phase 1: Python Syntax & Logic)",
+  "phases": [
+    {
+      "id": "p1",
+      "title": "Phase 1: ...",
+      "duration": "3 Weeks",
+      "objectives": ["string"],
+      "topicsToStudy": ["string"],
+      "practicalExercises": ["string"],
+      "expectedOutcome": "string",
+      "tasks": [
+        {
+          "id": "t1",
+          "phaseId": "p1",
+          "title": "string",
+          "description": "string",
+          "estimatedHours": 8,
+          "status": "not_started",
+          "timeframe": "Week 1"
+        }
+      ]
+    }
+  ],
+  "projects": [
+    {
+      "id": "proj1",
+      "name": "string",
+      "problem": "string",
+      "requiredSkills": ["string"],
+      "coreFeatures": ["string"],
+      "techStack": ["string"],
+      "deliverable": "string",
+      "interviewTip": "string"
+    }
+  ],
+  "interviewPrep": {
+    "technicalTopics": ["string"],
+    "commonQuestions": ["string"],
+    "codingExercises": ["string"],
+    "hrPrepTips": ["string"],
+    "weeklyMockTip": "string"
+  },
+  "resumePortfolioPlan": {
+    "resumeHighlights": ["string"],
+    "portfolioMustHaves": ["string"],
+    "githubTips": ["string"],
+    "honestDescriptionTips": ["string"]
+  },
+  "jobSearchStrategy": {
+    "whenToStart": "string",
+    "targetJobTitles": ["string"],
+    "applicationPriorities": ["string"],
+    "tailoringTips": ["string"],
+    "trackingTips": ["string"]
+  },
+  "weeklySchedule": {
+    "monday": "string",
+    "tuesday": "string",
+    "wednesday": "string",
+    "thursday": "string",
+    "friday": "string",
+    "saturday": "string",
+    "sunday": "string"
+  },
+  "learningResources": [
+    {
+      "title": "string",
+      "type": "official_doc",
+      "url": "https://...",
+      "description": "string",
+      "isFree": true
+    }
+  ],
+  "manaServicesConnections": [
+    {
+      "title": "ATS Resume Review & Audit",
+      "description": "Get an expert line-by-line review and technical keyword audit.",
+      "route": "/resume-review",
+      "badgeText": "Free ATS Check",
+      "ctaText": "Scan My Resume",
+      "priceTag": "Free / ₹49"
+    },
+    {
+      "title": "AI & 1-on-1 Mock Interview Room",
+      "description": "Practice role-specific questions with instant feedback or book a live mentor.",
+      "route": "/mock-interview",
+      "badgeText": "₹99 Human Mock",
+      "ctaText": "Start Interview Practice",
+      "priceTag": "Free / ₹99"
+    },
+    {
+      "title": "Personal Developer Portfolio Service",
+      "description": "Deploy a fast, responsive personal portfolio displaying live projects.",
+      "route": "/portfolio-service",
+      "badgeText": "Free Hosting",
+      "ctaText": "Explore Portfolio Service",
+      "priceTag": "From ₹499"
+    },
+    {
+      "title": "Explore Verified Job Openings",
+      "description": "Browse off-campus drives, internships, and entry-level positions.",
+      "route": "/jobs",
+      "badgeText": "100% Official Links",
+      "ctaText": "Browse Jobs Now",
+      "priceTag": "Free"
+    }
+  ]
+}`;
+
+    const prompt = `Candidate Profile:
+- Target Role: ${roleName}
+- Highest Education: ${profile.education?.qualification || 'Graduate'} in ${profile.education?.branch || 'Tech'} (${profile.education?.graduationYear || '2025'})
+- Current Status: ${profile.education?.currentStatus || 'Student'}
+- Selected Skills: ${JSON.stringify(profile.skills || [])}
+- No Skills Yet: ${profile.noSkillsYet ? 'Yes' : 'No'}
+- Target Timeline: ${profile.careerGoal?.targetTimeline || '90 days'}
+- Weekly Learning Hours: ${profile.careerGoal?.weeklyHours || '6-10 hours'}
+- Preferred Location: ${profile.careerGoal?.preferredLocation || 'Anywhere in India'}
+- Preferred Work Arrangement: ${profile.careerGoal?.workArrangement || 'Any'}
+- Biggest Challenge: ${profile.preferences?.biggestChallenge || 'Lack of projects'}
+- Preferred Learning Style: ${profile.preferences?.learningStyle || 'Step-by-step roadmap'}
+- Additional Notes: ${profile.preferences?.additionalGoals || 'None'}
+
+Generate a complete, customized, zero-fluff JSON career roadmap for this user.`;
+
+    const candidateModels = ['gemini-3.1-flash-lite', 'gemini-3.8-flash'];
+    for (const model of candidateModels) {
+      try {
+        const response = await ai.models.generateContent({
+          model,
+          contents: [{ text: prompt }],
+          config: {
+            systemInstruction,
+            responseMimeType: 'application/json',
+          },
+        });
+
+        const rawText = response.text ? response.text.trim() : '';
+        if (rawText) {
+          const jsonResult = JSON.parse(rawText);
+          if (jsonResult && jsonResult.phases && Array.isArray(jsonResult.phases)) {
+            return res.json({ success: true, roadmap: jsonResult });
+          }
+        }
+      } catch (mErr: any) {
+        console.warn(`[CareerRoadmap] Model ${model} generation failed:`, mErr?.message);
+      }
+    }
+
+    return res.json({ success: false, message: 'AI model response empty. Using client fallback.' });
+  } catch (err: any) {
+    console.error('[CareerRoadmap] Endpoint error:', err);
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+
+// In-memory idempotency tracker for welcome emails
+const sentWelcomeEmailsSet = new Set<string>();
+
+// Endpoint to send New User Registration Welcome Email via Resend
+app.post('/api/auth/send-welcome-email', async (req, res) => {
+  const { email, name } = req.body || {};
+
+  if (!email || typeof email !== 'string' || !email.includes('@')) {
+    return res.status(400).json({ error: 'Valid email address is required.' });
+  }
+
+  const cleanEmail = email.trim().toLowerCase();
+  const cleanName = (name || '').trim();
+  const greetingName = cleanName ? cleanName : 'there';
+
+  if (sentWelcomeEmailsSet.has(cleanEmail)) {
+    console.log(`[Welcome Email] Already sent welcome email to ${cleanEmail}. Skipping duplicate.`);
+    return res.json({
+      success: true,
+      message: 'Welcome email already sent for this account.',
+      skipped: true,
+    });
+  }
+
+  const resendApiKey = process.env.RESEND_API_KEY;
+  if (!resendApiKey) {
+    console.warn('[Welcome Email] RESEND_API_KEY is not configured in server environment.');
+    return res.json({
+      success: false,
+      message: 'RESEND_API_KEY not configured.',
+      skipped: true,
+    });
+  }
+
+  const fromEmail = process.env.RESEND_FROM_EMAIL || 'onboarding@resend.dev';
+
+  const plainTextContent = `Hi ${greetingName},
+
+Welcome to Mana Naukari!
+
+We're excited to help you take the next step in your career.
+
+With Mana Naukari, you can explore:
+• Job opportunities for freshers and experienced candidates.
+• Internships and work-from-home opportunities.
+• Career development resources.
+• Resume and portfolio services.
+• AI-powered career planning and interview preparation, where available.
+
+Visit Mana Naukari to explore the opportunities and services available to you.
+
+Website: https://mana-naukari.netlify.app/
+
+Wishing you success in your career journey!
+
+Best regards,
+Team Mana Naukari`;
+
+  const htmlContent = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Welcome to Mana Naukari</title>
+</head>
+<body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #f8fafc; color: #1e293b; padding: 24px; margin: 0; line-height: 1.6;">
+  <div style="max-width: 580px; margin: 0 auto; background: #ffffff; border: 1px solid #e2e8f0; border-radius: 20px; padding: 32px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);">
+    <div style="margin-bottom: 24px; border-bottom: 1px solid #f1f5f9; padding-bottom: 16px;">
+      <h2 style="color: #2563eb; margin: 0 0 6px 0; font-size: 24px; font-weight: 800;">Mana Naukari</h2>
+      <span style="display: inline-block; background-color: #eff6ff; color: #1d4ed8; font-size: 11px; font-weight: 700; padding: 4px 10px; border-radius: 9999px;">
+        Career Account Activated 🚀
+      </span>
+    </div>
+
+    <p style="font-size: 15px; margin-top: 0; margin-bottom: 16px; font-weight: 600;">
+      Hi ${greetingName},
+    </p>
+
+    <p style="font-size: 15px; margin-bottom: 20px; color: #334155;">
+      Welcome to <strong>Mana Naukari</strong>! We're excited to help you take the next step in your career.
+    </p>
+
+    <p style="font-size: 15px; margin-bottom: 12px; font-weight: 700; color: #0f172a;">
+      With Mana Naukari, you can explore:
+    </p>
+
+    <ul style="padding-left: 0; list-style: none; margin: 0 0 24px 0;">
+      <li style="padding: 8px 0; font-size: 14px; border-bottom: 1px border-dashed #f1f5f9;">• Job opportunities for freshers and experienced candidates.</li>
+      <li style="padding: 8px 0; font-size: 14px; border-bottom: 1px border-dashed #f1f5f9;">• Internships and work-from-home opportunities.</li>
+      <li style="padding: 8px 0; font-size: 14px; border-bottom: 1px border-dashed #f1f5f9;">• Career development resources.</li>
+      <li style="padding: 8px 0; font-size: 14px; border-bottom: 1px border-dashed #f1f5f9;">• Resume and portfolio services.</li>
+      <li style="padding: 8px 0; font-size: 14px;">• AI-powered career planning and interview preparation, where available.</li>
+    </ul>
+
+    <div style="background-color: #f8fafc; border: 1px solid #cbd5e1; border-radius: 14px; padding: 20px; margin-bottom: 24px; text-align: center;">
+      <p style="font-size: 14px; color: #334155; margin: 0 0 14px 0;">
+        Visit Mana Naukari to explore the opportunities and services available to you.
+      </p>
+      <a href="https://mana-naukari.netlify.app/" target="_blank" style="display: inline-block; background-color: #2563eb; color: #ffffff; text-decoration: none; font-weight: 700; font-size: 14px; padding: 12px 28px; border-radius: 12px; box-shadow: 0 2px 4px rgba(37, 99, 235, 0.2);">
+        Explore Mana Naukari ↗
+      </a>
+    </div>
+
+    <div style="border-top: 1px solid #e2e8f0; padding-top: 20px; font-size: 14px;">
+      <p style="margin: 0 0 4px 0; color: #64748b;">Wishing you success in your career journey!</p>
+      <p style="margin: 0; font-weight: 700; color: #0f172a;">Best regards,<br>Team Mana Naukari</p>
+    </div>
+  </div>
+</body>
+</html>`;
+
+  try {
+    const resendResponse = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${resendApiKey.trim()}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        from: fromEmail,
+        to: cleanEmail,
+        subject: 'Welcome to Mana Naukari – Your Career Journey Starts Here!',
+        text: plainTextContent,
+        html: htmlContent,
+      }),
+    });
+
+    const responseText = await resendResponse.text();
+    let resendData: any = null;
+    try {
+      resendData = JSON.parse(responseText);
+    } catch {
+      resendData = { raw: responseText };
+    }
+
+    if (!resendResponse.ok) {
+      console.warn('[Welcome Email] Resend error:', resendResponse.status, resendData?.message || responseText);
+      return res.json({
+        success: false,
+        error: `Resend error (${resendResponse.status}): ${resendData?.message || responseText}`,
+        skipped: true,
+      });
+    }
+
+    sentWelcomeEmailsSet.add(cleanEmail);
+    console.log(`[Welcome Email] Dispatched welcome email to ${cleanEmail}`);
+    return res.json({ success: true, data: resendData });
+  } catch (err: any) {
+    console.error('[Welcome Email Exception]:', err?.message || err);
+    return res.json({ success: false, error: err?.message || 'Failed to dispatch welcome email.' });
+  }
+});
+
 // Endpoint to send Welcome Job Alerts Email via Resend
 app.post('/api/alerts/send-welcome-email', async (req, res) => {
   const { email, categories, frequency } = req.body;
@@ -1179,6 +1733,25 @@ app.post('/api/admin/check-availability', async (req, res) => {
     return res.status(500).json({
       success: false,
       error: err.message || 'Job availability check failed.'
+    });
+  }
+});
+
+// 1b. Endpoint to trigger single job verification
+app.post('/api/admin/check-single-availability', async (req, res) => {
+  try {
+    const { jobId } = req.body || {};
+    if (!jobId) {
+      return res.status(400).json({ success: false, error: 'jobId is required' });
+    }
+    console.log(`[API Admin] Single job availability check requested for ID ${jobId}`);
+    const result = await jobAvailabilityService.checkAndUpdateJobById(jobId);
+    return res.json(result);
+  } catch (err: any) {
+    console.error('[API Admin Error] Single job availability check failed:', err);
+    return res.status(500).json({
+      success: false,
+      error: err.message || 'Single job availability check failed.'
     });
   }
 });

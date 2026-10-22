@@ -1,6 +1,6 @@
 import React from 'react';
 import { useAuth } from '../../context/AuthContext';
-import { ArrowLeft, LogOut, Plus, ShieldCheck, Sparkles, UserCheck, Layers, BarChart3, FileText, Users, Database } from 'lucide-react';
+import { ArrowLeft, LogOut, Plus, ShieldCheck, Sparkles, UserCheck, Layers, BarChart3, FileText, Users, Database, Globe, Route } from 'lucide-react';
 import { BrandLogo } from '../common/BrandLogo';
 
 interface AdminHeaderProps {
@@ -61,6 +61,19 @@ export const AdminHeader: React.FC<AdminHeaderProps> = ({
           >
             All Live Jobs
           </button>
+
+          <button
+            onClick={() => onNavigate('/admin/website-leads')}
+            className={`px-3 py-1.5 font-semibold rounded-xl transition-all cursor-pointer shrink-0 inline-flex items-center gap-1.5 text-xs ${
+              currentPath === '/admin/website-leads' || currentPath === '/admin/website-development-leads'
+                ? 'text-indigo-700 bg-indigo-50 font-bold border border-indigo-200/60 shadow-2xs'
+                : 'text-slate-600 hover:text-indigo-600 hover:bg-slate-100'
+            }`}
+          >
+            <Globe className="w-3.5 h-3.5 text-indigo-600" />
+            <span>Website Dev Leads</span>
+          </button>
+
           <button
             onClick={() => onNavigate('/admin/recruiters')}
             className={`px-3 py-1.5 font-semibold rounded-xl transition-all cursor-pointer shrink-0 inline-flex items-center gap-1.5 text-xs ${
@@ -72,6 +85,7 @@ export const AdminHeader: React.FC<AdminHeaderProps> = ({
             <UserCheck className="w-3.5 h-3.5" />
             <span>Recruiter Approvals</span>
           </button>
+
           <button
             onClick={() => onNavigate('/admin/applicants')}
             className={`px-3 py-1.5 font-semibold rounded-xl transition-all cursor-pointer shrink-0 inline-flex items-center gap-1.5 text-xs ${
@@ -83,6 +97,7 @@ export const AdminHeader: React.FC<AdminHeaderProps> = ({
             <Users className="w-3.5 h-3.5 text-blue-600" />
             <span>Applicants</span>
           </button>
+
           <button
             onClick={() => onNavigate('/admin/resume-orders')}
             className={`px-3 py-1.5 font-semibold rounded-xl transition-all cursor-pointer shrink-0 inline-flex items-center gap-1.5 text-xs ${
@@ -94,6 +109,31 @@ export const AdminHeader: React.FC<AdminHeaderProps> = ({
             <FileText className="w-3.5 h-3.5 text-blue-600" />
             <span>Resume Orders</span>
           </button>
+
+          <button
+            onClick={() => onNavigate('/admin/mock-interviews')}
+            className={`px-3 py-1.5 font-semibold rounded-xl transition-all cursor-pointer shrink-0 inline-flex items-center gap-1.5 text-xs ${
+              currentPath === '/admin/mock-interviews' || currentPath === '/admin/mock-interview'
+                ? 'text-blue-700 bg-blue-50 border border-blue-200/60 font-bold shadow-2xs'
+                : 'text-slate-600 hover:text-blue-600 hover:bg-slate-100'
+            }`}
+          >
+            <Sparkles className="w-3.5 h-3.5 text-amber-600" />
+            <span>Mock Interviews (₹99)</span>
+          </button>
+
+          <button
+            onClick={() => onNavigate('/admin/career-roadmaps')}
+            className={`px-3 py-1.5 font-semibold rounded-xl transition-all cursor-pointer shrink-0 inline-flex items-center gap-1.5 text-xs ${
+              currentPath === '/admin/career-roadmaps'
+                ? 'text-indigo-700 bg-indigo-50 border border-indigo-200/60 font-bold shadow-2xs'
+                : 'text-slate-600 hover:text-indigo-600 hover:bg-slate-100'
+            }`}
+          >
+            <Route className="w-3.5 h-3.5 text-indigo-600" />
+            <span>Career Roadmaps</span>
+          </button>
+
           <button
             onClick={() => onNavigate('/admin/analytics')}
             className={`px-3 py-1.5 font-semibold rounded-xl transition-all cursor-pointer shrink-0 inline-flex items-center gap-1.5 text-xs ${
@@ -105,6 +145,7 @@ export const AdminHeader: React.FC<AdminHeaderProps> = ({
             <BarChart3 className="w-3.5 h-3.5 text-blue-600" />
             <span>Analytics</span>
           </button>
+
           <button
             onClick={() => onNavigate('/admin/knowledge-base')}
             className={`px-3 py-1.5 font-semibold rounded-xl transition-all cursor-pointer shrink-0 inline-flex items-center gap-1.5 text-xs ${
@@ -116,6 +157,7 @@ export const AdminHeader: React.FC<AdminHeaderProps> = ({
             <Database className="w-3.5 h-3.5 text-blue-600" />
             <span>Knowledge Base (RAG)</span>
           </button>
+
           <button
             onClick={() => onNavigate('/admin/materials')}
             className={`px-3 py-1.5 font-semibold rounded-xl transition-all cursor-pointer shrink-0 inline-flex items-center gap-1.5 text-xs ${

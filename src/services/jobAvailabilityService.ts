@@ -1,144 +1,118 @@
 import { supabase } from '../lib/supabase';
 import { Job } from '../types/database.types';
+import { verifyJobAvailability, VerificationResult } from './jobVerificationEngine';
 
-export interface CheckResult {
-  status: 'active' | 'needs_review';
-  reason?: string | null;
-  lastChecked: string;
+export interface BatchCheckSummary {
+  success: boolean;
+  totalChecked: number;
+  openCount: number;
+  closedCount: number;
+  needsReviewCount: number;
+  unverifiedCount: number;
+  errorsCount: number;
 }
 
 export const jobAvailabilityService = {
   /**
-   * Check a single job's apply link for availability
+   * Run multi-stage verification on a single job object
    */
-  async checkSingleJob(job: Job): Promise<CheckResult> {
-    const url = job.apply_link;
-    const lastChecked = new Date().toISOString();
+  async checkSingleJob(job: Job): Promise<VerificationResult> {
+    return await verifyJobAvailability({
+      id: job.id,
+      title: job.title,
+      company: job.company,
+      apply_link: job.apply_link,
+      posted_date: job.posted_date,
+      expiry_date: job.expiry_date,
+      status: job.status,
+    });
+  },
 
-    if (!url || typeof url !== 'string' || !url.startsWith('http')) {
-      return {
-        status: 'needs_review',
-        reason: 'Invalid or missing official apply link',
-        lastChecked,
-      };
-    }
-
+  /**
+   * Verify and update a single job by ID in Supabase
+   */
+  async checkAndUpdateJobById(jobId: string): Promise<{ success: boolean; result?: VerificationResult; error?: string }> {
     try {
-      console.log(`[Job Checker] Fetching apply link for job: "${job.title}" at "${job.company}" -> ${url}`);
-      const res = await fetch(url, {
-        headers: {
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
-          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
-          'Accept-Language': 'en-US,en;q=0.5',
-        },
-        signal: AbortSignal.timeout(10000), // 10s timeout
-      });
+      const { data: job, error: fetchErr } = await supabase
+        .from('jobs')
+        .select('*')
+        .eq('id', jobId)
+        .single();
 
-      if (res.status === 404) {
-        console.log(`[Job Checker] 404 detected for: "${job.title}" at "${job.company}"`);
-        return {
-          status: 'needs_review',
-          reason: '404 - Page Not Found',
-          lastChecked,
-        };
+      if (fetchErr || !job) {
+        return { success: false, error: fetchErr?.message || 'Job not found in database.' };
       }
 
-      if (res.status >= 500) {
-        // Keep active, log unable to verify
-        console.log(`[Job Checker] Unable to verify (HTTP ${res.status}): "${job.title}" at "${job.company}"`);
-        return {
-          status: 'active',
-          reason: 'Unable to verify (Server Error)',
-          lastChecked,
-        };
-      }
+      const result = await this.checkSingleJob(job as Job);
 
-      if (res.status >= 400 && res.status !== 403) {
-        console.log(`[Job Checker] HTTP status ${res.status} for: "${job.title}" at "${job.company}"`);
-        return {
-          status: 'needs_review',
-          reason: `HTTP ${res.status} - Access denied or page removed`,
-          lastChecked,
-        };
-      }
-
-      // Read page content (up to 200KB for indicator scan)
-      const text = await res.text();
-      const cleanText = text
-        .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, ' ')
-        .replace(/<style\b[^<]*(?:(?!<\/style>)<[^<]*)*<\/style>/gi, ' ')
-        .replace(/<[^>]+>/g, ' ')
-        .replace(/\s+/g, ' ')
-        .toLowerCase();
-
-      // Expired or closure indicators
-      const closedIndicators = [
-        'job is no longer available',
-        'this job has expired',
-        'job posting has expired',
-        'no longer accepting applications',
-        'is closed to new applications',
-        'application has closed',
-        'applications are closed',
-        'this position is closed',
-        'no longer active',
-        'has been filled',
-        'job is closed',
-        'this job is closed',
-        'no longer open',
-        'posting is no longer available',
-        'has expired',
-        'this job opening has been filled',
-        'position is no longer open',
-        'application closed',
-        'vacancy is closed',
-        'job expired',
-        'no longer accepting responses',
-        'closed for applications',
-        'submissions are closed'
-      ];
-
-      for (const indicator of closedIndicators) {
-        if (cleanText.includes(indicator)) {
-          console.log(`[Job Checker] Closure indicator found ("${indicator}") for: "${job.title}" at "${job.company}"`);
-          return {
-            status: 'needs_review',
-            reason: `Indicator found: "${indicator}"`,
-            lastChecked,
-          };
-        }
-      }
-
-      console.log(`[Job Checker] Active verified for: "${job.title}" at "${job.company}"`);
-      return {
-        status: 'active',
-        reason: null,
-        lastChecked,
+      // Persist update in Supabase with schema fallbacks
+      const updatePayload: any = {
+        status: result.dbStatus,
+        review_reason: result.reason,
+        review_date: result.lastChecked,
+        verification_confidence: result.confidence,
+        verification_evidence: result.evidence.evidenceSummary,
+        final_url: result.evidence.finalUrl,
+        updated_at: new Date().toISOString(),
       };
+
+      let { error: updateErr } = await supabase
+        .from('jobs')
+        .update(updatePayload)
+        .eq('id', jobId);
+
+      // Fallback 1: If new columns missing, retry with basic review columns
+      if (updateErr && (
+        updateErr.message?.includes('verification_confidence') ||
+        updateErr.message?.includes('verification_evidence') ||
+        updateErr.message?.includes('final_url') ||
+        updateErr.message?.includes('schema cache')
+      )) {
+        console.warn(`[Job Checker] Optional verification columns missing in DB. Retrying with standard review columns for ID ${jobId}`);
+        const fallbackRes = await supabase
+          .from('jobs')
+          .update({
+            status: result.dbStatus,
+            review_reason: result.reason,
+            review_date: result.lastChecked,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', jobId);
+        updateErr = fallbackRes.error;
+      }
+
+      // Fallback 2: If 'needs_review' restricted by constraint
+      if (updateErr && (updateErr.message?.includes('check constraint') || updateErr.message?.includes('jobs_status_check'))) {
+        console.warn(`[Job Checker] Status constraint triggered. Retrying update with status 'expired' for ID ${jobId}`);
+        const constraintFallback = await supabase
+          .from('jobs')
+          .update({
+            status: 'expired',
+            review_reason: result.reason,
+            review_date: result.lastChecked,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', jobId);
+        updateErr = constraintFallback.error;
+      }
+
+      if (updateErr) {
+        return { success: false, error: updateErr.message, result };
+      }
+
+      return { success: true, result };
     } catch (err: any) {
-      console.log(`[Job Checker] Unable to verify: "${job.title}" at "${job.company}". Details: ${err.message || err}`);
-      return {
-        status: 'active',
-        reason: 'Unable to verify',
-        lastChecked,
-      };
+      return { success: false, error: err.message || 'Verification exception' };
     }
   },
 
   /**
-   * Run availability check on all active jobs in the database
+   * Run availability check pipeline on all active jobs in the database
    */
-  async checkAllActiveJobs(): Promise<{
-    success: boolean;
-    totalChecked: number;
-    flaggedCount: number;
-    unverifiedCount: number;
-    errorsCount: number;
-  }> {
+  async checkAllActiveJobs(): Promise<BatchCheckSummary> {
     try {
-      console.log('[Job Checker] Starting automatic job availability check for all active jobs...');
+      console.log('[Job Checker Engine] Initiating automated availability audit for active postings...');
       
-      // Fetch active jobs from Supabase
       const { data: activeJobs, error: fetchErr } = await supabase
         .from('jobs')
         .select('*')
@@ -147,146 +121,86 @@ export const jobAvailabilityService = {
       if (fetchErr) throw fetchErr;
 
       if (!activeJobs || activeJobs.length === 0) {
-        console.log('[Job Checker] No active jobs found to monitor.');
+        console.log('[Job Checker Engine] No active jobs found to audit.');
         return {
           success: true,
           totalChecked: 0,
-          flaggedCount: 0,
+          openCount: 0,
+          closedCount: 0,
+          needsReviewCount: 0,
           unverifiedCount: 0,
           errorsCount: 0,
         };
       }
 
-      console.log(`[Job Checker] Found ${activeJobs.length} active jobs to process in parallel.`);
-      let flaggedCount = 0;
+      console.log(`[Job Checker Engine] Auditing ${activeJobs.length} active jobs in parallel batches...`);
+
+      let openCount = 0;
+      let closedCount = 0;
+      let needsReviewCount = 0;
       let unverifiedCount = 0;
       let errorsCount = 0;
 
-      // Process all active jobs concurrently to avoid timeout limits
-      const results = await Promise.all(
-        (activeJobs as Job[]).map(async (job) => {
-          let isFlagged = false;
-          let isUnverified = false;
-          
-          try {
-            const result = await this.checkSingleJob(job);
-            
-            if (result.status === 'needs_review') {
-              isFlagged = true;
-            } else if (result.reason === 'Unable to verify') {
-              isUnverified = true;
-            }
+      const results: { success: boolean; result: VerificationResult }[] = [];
+      const batchSize = 5;
 
-            // Update the job details in Supabase with resilient fallbacks
-            let { error: updateErr } = await supabase
-              .from('jobs')
-              .update({
-                status: result.status,
-                review_reason: result.reason,
-                review_date: result.lastChecked,
-                updated_at: new Date().toISOString(),
-              })
-              .eq('id', job.id);
-
-            // Fallback 1: If columns (review_date / review_reason) are missing in the schema
-            if (updateErr && (updateErr.message?.includes('review_date') || updateErr.message?.includes('review_reason') || updateErr.message?.includes('schema cache'))) {
-              console.warn(`[Job Checker] Database schema columns are missing. Falling back to status-only update for ID ${job.id}`);
-              let fallbackRes = await supabase
-                .from('jobs')
-                .update({
-                  status: result.status,
-                  updated_at: new Date().toISOString(),
-                })
-                .eq('id', job.id);
-              
-              // Fallback 1b: If status-only update fails due to 'needs_review' not being in check constraint
-              if (fallbackRes.error && (fallbackRes.error.message?.includes('check constraint') || fallbackRes.error.message?.includes('jobs_status_check')) && result.status === 'needs_review') {
-                console.warn(`[Job Checker] 'needs_review' status is restricted by constraint. Falling back to 'expired' status for ID ${job.id}`);
-                fallbackRes = await supabase
-                  .from('jobs')
-                  .update({
-                    status: 'expired',
-                    updated_at: new Date().toISOString(),
-                  })
-                  .eq('id', job.id);
-              }
-              updateErr = fallbackRes.error;
-            }
-
-            // Fallback 2: If columns exist, but status 'needs_review' is restricted by constraint
-            if (updateErr && (updateErr.message?.includes('check constraint') || updateErr.message?.includes('jobs_status_check')) && result.status === 'needs_review') {
-              console.warn(`[Job Checker] 'needs_review' is restricted by constraint. Retrying update with status 'expired' and metadata for ID ${job.id}`);
-              const retryRes = await supabase
-                .from('jobs')
-                .update({
-                  status: 'expired',
-                  review_reason: result.reason,
-                  review_date: result.lastChecked,
-                  updated_at: new Date().toISOString(),
-                })
-                .eq('id', job.id);
-              
-              if (retryRes.error && (retryRes.error.message?.includes('review_date') || retryRes.error.message?.includes('review_reason') || retryRes.error.message?.includes('schema cache'))) {
-                // Missing columns, so fallback to status-only with 'expired'
-                const finalRes = await supabase
-                  .from('jobs')
-                  .update({
-                    status: 'expired',
-                    updated_at: new Date().toISOString(),
-                  })
-                  .eq('id', job.id);
-                updateErr = finalRes.error;
+      for (let i = 0; i < activeJobs.length; i += batchSize) {
+        const batch = activeJobs.slice(i, i + batchSize);
+        const batchResults = await Promise.all(
+          (batch as Job[]).map(async (job) => {
+            try {
+              const res = await this.checkAndUpdateJobById(job.id);
+              if (res.success && res.result) {
+                return { success: true, result: res.result };
               } else {
-                updateErr = retryRes.error;
+                return {
+                  success: false,
+                  result: await this.checkSingleJob(job),
+                };
               }
+            } catch (err) {
+              return {
+                success: false,
+                result: await this.checkSingleJob(job),
+              };
             }
+          })
+        );
+        results.push(...batchResults);
+      }
 
-            if (updateErr) {
-              if (updateErr.message?.includes('fetch') || updateErr.message?.includes('network') || updateErr.message?.includes('Failed to fetch')) {
-                console.warn(`[Job Checker] ⚠️ Temporary network interruption updating job ID ${job.id}. Will retry on next scheduled check.`);
-              } else {
-                console.log(`[Job Checker] Update issue on job ID ${job.id}:`, updateErr.message);
-              }
-              return { success: false, isFlagged, isUnverified };
-            }
-
-            return { success: true, isFlagged, isUnverified };
-          } catch (err: any) {
-            if (err.message?.includes('fetch') || err.message?.includes('network') || err.message?.includes('Failed to fetch')) {
-              console.warn(`[Job Checker] ⚠️ Network exception processing job ID ${job.id}.`);
-            } else {
-              console.error(`[Job Checker] Exception processing job ID ${job.id}:`, err.message || err);
-            }
-            return { success: false, isFlagged, isUnverified: true };
-          }
-        })
-      );
-
-      // Aggregate totals from parallel results
-      results.forEach((res) => {
-        if (!res.success) errorsCount++;
-        if (res.isFlagged) flaggedCount++;
-        if (res.isUnverified) unverifiedCount++;
+      results.forEach(({ success, result }) => {
+        if (!success) errorsCount++;
+        if (result.status === 'OPEN') openCount++;
+        else if (result.status === 'CLOSED' || result.status === 'EXPIRED') closedCount++;
+        else if (result.status === 'NEEDS_REVIEW') needsReviewCount++;
+        else if (result.status === 'UNVERIFIED') unverifiedCount++;
       });
 
-      console.log(`[Job Checker] Availability check complete. Checked: ${activeJobs.length}, Flagged: ${flaggedCount}, Unverified/Skipped: ${unverifiedCount}, Issues: ${errorsCount}`);
-      
+      console.log(
+        `[Job Checker Engine] Audit complete. Total: ${activeJobs.length}, Open: ${openCount}, Closed: ${closedCount}, Needs Review: ${needsReviewCount}, Unverified: ${unverifiedCount}, Issues: ${errorsCount}`
+      );
+
       return {
         success: true,
         totalChecked: activeJobs.length,
-        flaggedCount,
+        openCount,
+        closedCount,
+        needsReviewCount,
         unverifiedCount,
         errorsCount,
       };
     } catch (err: any) {
-      console.log('[Job Checker] Exception in checkAllActiveJobs:', err.message || err);
+      console.error('[Job Checker Engine] Batch check exception:', err.message || err);
       return {
         success: false,
         totalChecked: 0,
-        flaggedCount: 0,
+        openCount: 0,
+        closedCount: 0,
+        needsReviewCount: 0,
         unverifiedCount: 0,
         errorsCount: 1,
       };
     }
-  }
+  },
 };

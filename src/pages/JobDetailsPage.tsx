@@ -528,7 +528,7 @@ export const JobDetailsPage: React.FC<JobDetailsPageProps> = ({ jobId, onNavigat
                     <span>🟢</span>
                     <span>Active</span>
                   </span>
-                ) : job.status === 'paused' ? (
+                ) : (job.status === 'paused' || (job.status === 'expired' && job.review_reason?.includes('[Paused]'))) ? (
                   <span className="text-xs font-bold text-amber-900 bg-amber-50 border border-amber-300 px-3 py-1 rounded-full flex items-center gap-1.5 shadow-2xs">
                     <span>🟡</span>
                     <span>Paused</span>

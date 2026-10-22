@@ -128,7 +128,7 @@ BEGIN
     BEGIN
         ALTER TABLE public.jobs 
             ADD CONSTRAINT jobs_status_check 
-            CHECK (status IN ('active', 'closed', 'deleted', 'expired', 'draft'));
+            CHECK (status IN ('active', 'closed', 'deleted', 'expired', 'draft', 'needs_review', 'paused'));
     EXCEPTION WHEN OTHERS THEN
         RAISE NOTICE 'Notice: jobs_status_check constraint encountered: %', SQLERRM;
     END;

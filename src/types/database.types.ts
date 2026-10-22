@@ -28,6 +28,9 @@ export interface Job {
   status: JobStatus;
   review_reason?: string | null;
   review_date?: string | null;
+  verification_confidence?: 'HIGH' | 'MEDIUM' | 'LOW' | null;
+  verification_evidence?: string | null;
+  final_url?: string | null;
   posted_date: string;
   expiry_date?: string | null;
   created_at: string;
@@ -548,3 +551,88 @@ export type MaterialInsert = Omit<Material, 'id' | 'views' | 'downloads' | 'crea
   updated_at?: string;
 };
 
+// 14. Table: mock_interview_bookings (₹99 Tech Mock Interview Practice)
+export type MockInterviewPaymentStatus = 'pending' | 'paid' | 'refunded' | 'cancelled';
+export type MockInterviewBookingStatus = 
+  | 'pending_payment' 
+  | 'payment_received' 
+  | 'scheduled' 
+  | 'in_progress' 
+  | 'completed' 
+  | 'result_sent' 
+  | 'cancelled';
+
+export interface MockInterviewBooking {
+  id: string;
+  full_name: string;
+  email: string;
+  whatsapp_number: string;
+  interview_topic: string;
+  custom_topic?: string | null;
+  experience_level: string;
+  interview_mode: string;
+  preferred_availability?: string | null;
+  additional_information?: string | null;
+  price_inr: number;
+  payment_status: MockInterviewPaymentStatus;
+  booking_status: MockInterviewBookingStatus;
+  admin_notes?: string | null;
+  scheduled_at?: string | null;
+  interview_result?: string | null;
+  technical_score?: string | number | null;
+  communication_score?: string | number | null;
+  problem_solving_score?: string | number | null;
+  strengths?: string | null;
+  areas_for_improvement?: string | null;
+  recommended_next_steps?: string | null;
+  result_sent_at?: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export type MockInterviewBookingInsert = Omit<MockInterviewBooking, 'id' | 'price_inr' | 'payment_status' | 'booking_status' | 'created_at' | 'updated_at'> & {
+  id?: string;
+  price_inr?: number;
+  payment_status?: MockInterviewPaymentStatus;
+  booking_status?: MockInterviewBookingStatus;
+  created_at?: string;
+  updated_at?: string;
+};
+
+
+
+// 15. Table: website_development_leads (AI Website Development Enquiries)
+export type WebsiteLeadStatus = 
+  | 'new'
+  | 'contacted'
+  | 'demo_in_progress'
+  | 'demo_shared'
+  | 'approved'
+  | 'completed'
+  | 'cancelled';
+
+export interface WebsiteDevelopmentLead {
+  id: string;
+  customer_name: string;
+  email: string;
+  whatsapp_number: string;
+  website_type: string;
+  website_idea: string;
+  required_features?: string | null;
+  number_of_pages?: string | null;
+  budget_range?: string | null;
+  preferred_delivery_time?: string | null;
+  reference_website_url?: string | null;
+  additional_requirements?: string | null;
+  status: WebsiteLeadStatus;
+  admin_notes?: string | null;
+  created_at: string;
+  updated_at?: string;
+}
+
+export type WebsiteDevelopmentLeadInsert = Omit<WebsiteDevelopmentLead, 'id' | 'created_at' | 'updated_at'> & {
+  id?: string;
+  status?: WebsiteLeadStatus;
+  created_at?: string;
+  updated_at?: string;
+};

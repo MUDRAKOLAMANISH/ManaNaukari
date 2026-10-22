@@ -337,54 +337,25 @@ export const FloatingChatbot: React.FC<FloatingChatbotProps> = ({ onNavigate }) 
         </div>
       )}
 
-      {/* 2. Floating Action Button with Blinking "Any Doubts?" text */}
-      <div className="flex items-center gap-3">
-        {/* Blinking "Any Doubts?" Pill */}
-        {!isOpen && (
-          <button
-            type="button"
-            onClick={() => setIsOpen(true)}
-            className="group relative cursor-pointer"
-            aria-label="Any doubts? Ask Mana Naukari AI"
-          >
-            {/* Blinking container with glowing animated pulse */}
-            <div className="relative inline-flex items-center gap-2 px-3.5 py-2 bg-white/95 backdrop-blur-md rounded-2xl border-2 border-blue-500 shadow-xl transition-all transform hover:scale-105">
-              <span className="relative flex h-2.5 w-2.5">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75" />
-                <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-blue-600" />
-              </span>
-
-              <span className="text-xs font-black tracking-tight text-blue-900 font-display flex items-center gap-1">
-                <span>Any Doubts?</span>
-                <span className="text-blue-600 font-normal hidden sm:inline">• Ask AI</span>
-              </span>
-
-              {/* Triangle speech pointer */}
-              <div className="absolute right-[-6px] top-1/2 -translate-y-1/2 w-0 h-0 border-t-[6px] border-t-transparent border-b-[6px] border-b-transparent border-l-[6px] border-l-blue-500" />
-            </div>
-          </button>
-        )}
-
-        {/* Circular Floating Toggle Button */}
+      {/* 2. Small, Clean Floating Action Button */}
+      <div className="flex items-center gap-2">
         <button
           type="button"
           onClick={() => setIsOpen(!isOpen)}
-          className={`relative w-14 h-14 rounded-2xl flex items-center justify-center text-white shadow-xl transition-all transform hover:scale-105 active:scale-95 cursor-pointer ${
+          className={`relative w-10 h-10 sm:w-11 sm:h-11 rounded-full flex items-center justify-center text-white shadow-md transition-all cursor-pointer ${
             isOpen
               ? 'bg-slate-800 hover:bg-slate-900 rotate-90'
-              : 'bg-gradient-to-tr from-blue-600 via-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 ring-4 ring-blue-500/20'
+              : 'bg-blue-600 hover:bg-blue-500 active:scale-95'
           }`}
-          aria-label={isOpen ? 'Close AI Chat' : 'Open AI Chat'}
+          aria-label={isOpen ? 'Close AI Chat' : 'Ask AI Assistant'}
+          title={isOpen ? 'Close AI Chat' : 'Ask AI Assistant'}
         >
           {isOpen ? (
-            <X className="w-6 h-6 text-white" />
+            <X className="w-5 h-5 text-white" />
           ) : (
             <>
-              <MessageSquare className="w-6 h-6 text-white" />
-              {/* Little sparkle icon */}
-              <span className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-amber-400 text-slate-950 flex items-center justify-center text-[10px] font-bold shadow-xs">
-                <Sparkles className="w-3 h-3 text-amber-900" />
-              </span>
+              <Bot className="w-5 h-5 text-white" />
+              <span className="absolute top-0 right-0 w-2.5 h-2.5 rounded-full bg-cyan-400 border-2 border-white" />
             </>
           )}
         </button>

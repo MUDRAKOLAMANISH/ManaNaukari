@@ -111,6 +111,8 @@ export const ResumeReviewPage: React.FC<ResumeReviewPageProps> = ({ onNavigate }
         email: email.trim(),
         phone: phoneClean,
         file: selectedFile,
+        planName: selectedPlan.name,
+        planPrice: selectedPlan.price,
       });
 
       if (!result.success) {
@@ -212,6 +214,7 @@ export const ResumeReviewPage: React.FC<ResumeReviewPageProps> = ({ onNavigate }
               <ResumeServiceCard
                 key={plan.id}
                 plan={plan}
+                isSelected={selectedPlan?.id === plan.id}
                 onSelect={(p) => {
                   setSelectedPlan(p);
                   const formEl = document.getElementById('resume-submit-form');
@@ -234,10 +237,10 @@ export const ResumeReviewPage: React.FC<ResumeReviewPageProps> = ({ onNavigate }
 
               <div className="space-y-2">
                 <h3 className="text-xl sm:text-2xl font-bold font-display text-slate-900">
-                  Submission Received!
+                  Submission Received for {selectedPlan.name}!
                 </h3>
                 <p className="text-sm text-slate-700 font-medium bg-emerald-50 border border-emerald-200/80 py-3 px-4 rounded-xl leading-relaxed">
-                  Your resume has been submitted successfully. Our team will contact you on WhatsApp.
+                  Your resume has been submitted successfully for the <strong>{selectedPlan.name} ({selectedPlan.price})</strong>. Our team will contact you on WhatsApp.
                 </p>
               </div>
 
@@ -248,7 +251,8 @@ export const ResumeReviewPage: React.FC<ResumeReviewPageProps> = ({ onNavigate }
                 </div>
                 <ul className="space-y-1.5 list-disc pl-4 text-slate-600">
                   <li>Our technical recruiters will analyze your resume against top ATS filters.</li>
-                  <li>You will receive an actionable feedback breakdown on your WhatsApp number within 24-48 hours.</li>
+                  <li>Turnaround time: <strong>{selectedPlan.turnaround}</strong>.</li>
+                  <li>You will receive your report &amp; feedback breakdown on WhatsApp.</li>
                 </ul>
               </div>
 
@@ -274,13 +278,18 @@ export const ResumeReviewPage: React.FC<ResumeReviewPageProps> = ({ onNavigate }
             /* Resume Review Form */
             <form onSubmit={handleSubmit} className="space-y-6">
               
-              <div className="border-b border-slate-100 pb-5">
-                <h2 className="text-xl font-bold font-display text-slate-900">
-                  Submit Your Resume for Review
-                </h2>
-                <p className="text-xs text-slate-500 mt-1">
-                  Fill in your details below and upload your current resume. There are no fees or payments required.
-                </p>
+              <div className="border-b border-slate-100 pb-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div>
+                  <h2 className="text-xl font-bold font-display text-slate-900">
+                    Submit Resume for {selectedPlan.name}
+                  </h2>
+                  <p className="text-xs text-slate-500 mt-1">
+                    Fill in your contact details below and upload your CV ({selectedPlan.price} • {selectedPlan.turnaround}).
+                  </p>
+                </div>
+                <div className="px-3.5 py-1.5 rounded-xl bg-blue-50 border border-blue-200 text-blue-700 text-xs font-extrabold shrink-0 self-start sm:self-auto">
+                  Selected: {selectedPlan.name} ({selectedPlan.price})
+                </div>
               </div>
 
               {/* Error Alert */}

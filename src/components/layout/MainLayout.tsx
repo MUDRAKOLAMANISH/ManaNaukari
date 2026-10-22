@@ -1,8 +1,10 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Navbar } from './Navbar';
+import { Sidebar } from './Sidebar';
 import { Footer } from './Footer';
 import { WhatsAppCommunityPopup } from '../common/WhatsAppCommunityPopup';
 import { FloatingChatbot } from '../chat/FloatingChatbot';
+import { FloatingOfferWidget } from '../common/FloatingOfferWidget';
 import { TopJobAnnouncementTicker } from '../home/TopJobAnnouncementTicker';
 
 interface MainLayoutProps {
@@ -12,29 +14,73 @@ interface MainLayoutProps {
 }
 
 export const MainLayout: React.FC<MainLayoutProps> = ({ children, currentPath, onNavigate }) => {
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('mana_sidebar_collapsed') === 'true';
+    }
+    return false;
+  });
+  const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
+
+  const toggleSidebarCollapse = () => {
+    setIsSidebarCollapsed((prev) => {
+      const next = !prev;
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('mana_sidebar_collapsed', String(next));
+      }
+      return next;
+    });
+  };
+
+  const toggleMobileSidebar = () => {
+    setIsMobileSidebarOpen(!isMobileSidebarOpen);
+  };
+
   return (
-    <div className="min-h-screen flex flex-col bg-slate-50 text-slate-900 font-sans antialiased selection:bg-blue-600 selection:text-white">
-      {/* 1. Global Navigation Bar */}
-      <Navbar currentPath={currentPath} onNavigate={onNavigate} />
+    <div className="min-h-screen flex bg-slate-50 text-slate-900 font-sans antialiased selection:bg-blue-600 selection:text-white">
+      {/* 1. Left Sidebar Navigation */}
+      <Sidebar
+        currentPath={currentPath}
+        onNavigate={onNavigate}
+        isCollapsed={isSidebarCollapsed}
+        onToggleCollapse={toggleSidebarCollapse}
+        isMobileOpen={isMobileSidebarOpen}
+        onCloseMobile={() => setIsMobileSidebarOpen(false)}
+      />
 
-      {/* 2. Top Job Announcement Ticker (Top of homepage below navbar) */}
-      {(currentPath === '/' || currentPath === '') && (
-        <TopJobAnnouncementTicker onNavigate={onNavigate} />
-      )}
+      {/* 2. Main Content Wrapper */}
+      <div
+        className={`flex-1 flex flex-col min-w-0 transition-all duration-300 ${
+          isSidebarCollapsed ? 'lg:pl-20' : 'lg:pl-64'
+        }`}
+      >
+        {/* Top Header Navbar */}
+        <Navbar
+          currentPath={currentPath}
+          onNavigate={onNavigate}
+          onToggleMobileSidebar={toggleMobileSidebar}
+          onToggleSidebarCollapse={toggleSidebarCollapse}
+          isSidebarCollapsed={isSidebarCollapsed}
+        />
 
-      {/* 3. Main Page Content Container */}
-      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {children}
-      </main>
+        {/* Top Job Announcement Ticker (Homepage only) */}
+        {(currentPath === '/' || currentPath === '') && (
+          <TopJobAnnouncementTicker onNavigate={onNavigate} />
+        )}
 
-      {/* 3. Global WhatsApp Community Join Popup (Public Pages only) */}
+        {/* Main Page Content */}
+        <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8">
+          {children}
+        </main>
+
+        {/* Footer */}
+        <Footer onNavigate={onNavigate} />
+      </div>
+
+      {/* Global Overlays & Floating Widgets */}
       <WhatsAppCommunityPopup currentPath={currentPath} />
-
-      {/* 4. Global Floating AI RAG Chatbot */}
       <FloatingChatbot onNavigate={onNavigate} />
-
-      {/* 5. Global Footer */}
-      <Footer onNavigate={onNavigate} />
+      <FloatingOfferWidget onNavigate={onNavigate} />
     </div>
   );
 };

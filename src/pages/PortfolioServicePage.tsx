@@ -169,8 +169,12 @@ export const PortfolioServicePage: React.FC<PortfolioServicePageProps> = ({ onNa
 
       {/* 4. Consultation & Ordering Modal */}
       {selectedPlan && (
-        <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl max-w-lg w-full p-6 sm:p-8 shadow-2xl space-y-5 animate-scaleUp">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 animate-fadeIn font-sans">
+          <div 
+            className="fixed inset-0 bg-slate-950/60 backdrop-blur-xs transition-opacity cursor-pointer"
+            onClick={() => setSelectedPlan(null)}
+          />
+          <div className="bg-white rounded-3xl max-w-lg w-full p-6 sm:p-8 shadow-2xl space-y-5 animate-scaleUp relative z-10 max-h-[88vh] overflow-y-auto my-auto custom-scrollbar">
             <div className="flex items-center justify-between border-b border-slate-100 pb-4">
               <div>
                 <span className="text-[11px] font-bold text-indigo-600 uppercase tracking-wider block">

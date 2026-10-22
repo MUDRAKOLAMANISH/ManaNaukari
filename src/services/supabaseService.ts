@@ -279,10 +279,34 @@ export const jobsService = {
 
   async setStatus(id: string, status: JobStatus): Promise<{ error: Error | null }> {
     try {
-      const { error } = await supabase
+      let { error } = await supabase
         .from('jobs')
         .update({ status, updated_at: new Date().toISOString() })
         .eq('id', id);
+
+      if (error && (error.code === '23514' || error.message?.includes('jobs_status_check') || error.message?.includes('check constraint'))) {
+        console.warn(`[supabaseService.setStatus] Status '${status}' restricted by DB constraint. Falling back to status 'expired'.`);
+        let fallbackStatus = 'expired';
+        let reviewNote = `[${status}] Applications status updated`;
+
+        if (status === 'paused') {
+          reviewNote = '[Paused] Applications temporarily paused by admin';
+        } else if (status === 'needs_review') {
+          reviewNote = '[Needs Review] Flagged for manual review';
+        }
+
+        const res = await supabase
+          .from('jobs')
+          .update({
+            status: fallbackStatus as JobStatus,
+            review_reason: reviewNote,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', id);
+
+        error = res.error;
+      }
+
       return { error };
     } catch (err: any) {
       return { error: err };

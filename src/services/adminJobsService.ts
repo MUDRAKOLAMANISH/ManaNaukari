@@ -151,6 +151,31 @@ export const adminJobsService = {
         .select()
         .single();
 
+      // Fallback retry if status check constraint violated (e.g. 'paused' or 'needs_review' restricted by DB constraint)
+      if (error && (error.code === '23514' || error.message?.includes('jobs_status_check') || error.message?.includes('check constraint'))) {
+        console.warn('[adminJobsService.createJob] Status constraint triggered during insertion. Adjusting status and retrying.');
+
+        const fallbackPayload: any = { ...payload };
+        if (fallbackPayload.status === 'paused') {
+          fallbackPayload.status = 'expired';
+          fallbackPayload.review_reason = fallbackPayload.review_reason || '[Paused] Applications temporarily paused by admin';
+        } else if (fallbackPayload.status === 'needs_review') {
+          fallbackPayload.status = 'expired';
+          fallbackPayload.review_reason = fallbackPayload.review_reason || '[Needs Review] Flagged for manual review';
+        } else {
+          fallbackPayload.status = 'expired';
+        }
+
+        const fallbackRes = await supabase
+          .from('jobs')
+          .insert([fallbackPayload])
+          .select()
+          .single();
+
+        data = fallbackRes.data;
+        error = fallbackRes.error;
+      }
+
       // Fallback retry if schema columns are missing or cached incorrectly (such as review_date, review_reason, is_featured)
       if (error && (error.code === 'PGRST204' || error.code === '42703' || error.message?.includes('review_date') || error.message?.includes('review_reason') || error.message?.includes('is_featured'))) {
         console.warn('[adminJobsService.createJob] Schema mismatch detected. Stripping pending columns and retrying insertion.');
@@ -227,6 +252,32 @@ export const adminJobsService = {
         .select()
         .single();
 
+      // Fallback retry if status check constraint violated (e.g. 'paused' or 'needs_review' restricted by DB constraint)
+      if (error && (error.code === '23514' || error.message?.includes('jobs_status_check') || error.message?.includes('check constraint'))) {
+        console.warn('[adminJobsService.updateJob] Status constraint triggered. Retrying update with safe fallback status.');
+
+        const fallbackUpdates = { ...updates };
+        if (fallbackUpdates.status === 'paused') {
+          fallbackUpdates.status = 'expired';
+          fallbackUpdates.review_reason = fallbackUpdates.review_reason || '[Paused] Applications temporarily paused by admin';
+        } else if (fallbackUpdates.status === 'needs_review') {
+          fallbackUpdates.status = 'expired';
+          fallbackUpdates.review_reason = fallbackUpdates.review_reason || '[Needs Review] Flagged for manual review';
+        } else {
+          fallbackUpdates.status = 'expired';
+        }
+
+        const fallbackRes = await supabase
+          .from('jobs')
+          .update(fallbackUpdates)
+          .eq('id', cleanId)
+          .select()
+          .single();
+
+        data = fallbackRes.data;
+        error = fallbackRes.error;
+      }
+
       // Fallback retry if schema columns are missing or cached incorrectly (such as review_date, review_reason, is_featured)
       if (error && (error.code === 'PGRST204' || error.code === '42703' || error.message?.includes('review_date') || error.message?.includes('review_reason') || error.message?.includes('is_featured'))) {
         console.warn('[adminJobsService.updateJob] Schema mismatch detected. Stripping pending columns and retrying update.');
@@ -298,17 +349,41 @@ export const adminJobsService = {
    */
   async togglePauseJob(id: string, currentStatus: string): Promise<{ success: boolean; newStatus: string; error: Error | null }> {
     try {
-      const newStatus = currentStatus === 'paused' ? 'active' : 'paused';
-      const { error } = await supabase
+      const isCurrentlyPaused = currentStatus === 'paused' || currentStatus === 'expired';
+      const targetStatus = isCurrentlyPaused ? 'active' : 'paused';
+
+      let { error } = await supabase
         .from('jobs')
         .update({
-          status: newStatus,
+          status: targetStatus,
           updated_at: new Date().toISOString(),
         })
         .eq('id', id);
 
+      // Fallback if 'paused' violates DB status check constraint (Postgres 23514 / jobs_status_check)
+      if (error && (error.code === '23514' || error.message?.includes('jobs_status_check') || error.message?.includes('check constraint'))) {
+        console.warn(`[adminJobsService.togglePauseJob] 'paused' status restricted by DB constraint. Falling back to status 'expired' for ID ${id}`);
+
+        const fallbackStatus = targetStatus === 'active' ? 'active' : 'expired';
+        const fallbackReason = targetStatus === 'paused' ? '[Paused] Applications temporarily paused by admin' : null;
+
+        const fallbackRes = await supabase
+          .from('jobs')
+          .update({
+            status: fallbackStatus,
+            review_reason: fallbackReason,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', id);
+
+        if (!fallbackRes.error) {
+          return { success: true, newStatus: targetStatus, error: null };
+        }
+        error = fallbackRes.error;
+      }
+
       if (error) throw error;
-      return { success: true, newStatus, error: null };
+      return { success: true, newStatus: targetStatus, error: null };
     } catch (err: any) {
       console.error(`Error toggling pause status ${id}:`, err);
       return { success: false, newStatus: currentStatus, error: err };
@@ -320,13 +395,43 @@ export const adminJobsService = {
    */
   async updateJobStatus(id: string, status: string): Promise<{ success: boolean; error: Error | null }> {
     try {
-      const { error } = await supabase
+      let { error } = await supabase
         .from('jobs')
         .update({
           status,
           updated_at: new Date().toISOString(),
         })
         .eq('id', id);
+
+      // Fallback if target status violates DB status check constraint (Postgres 23514 / jobs_status_check)
+      if (error && (error.code === '23514' || error.message?.includes('jobs_status_check') || error.message?.includes('check constraint'))) {
+        console.warn(`[adminJobsService.updateJobStatus] Status '${status}' restricted by DB constraint for ID ${id}. Attempting safe fallback.`);
+
+        let fallbackStatus = 'expired';
+        let reviewNote = `[${status}] Applications updated`;
+
+        if (status === 'paused') {
+          fallbackStatus = 'expired';
+          reviewNote = '[Paused] Applications temporarily paused by admin';
+        } else if (status === 'needs_review') {
+          fallbackStatus = 'expired';
+          reviewNote = '[Needs Review] Flagged for manual review';
+        }
+
+        const fallbackRes = await supabase
+          .from('jobs')
+          .update({
+            status: fallbackStatus,
+            review_reason: reviewNote,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', id);
+
+        if (!fallbackRes.error) {
+          return { success: true, error: null };
+        }
+        error = fallbackRes.error;
+      }
 
       if (error) throw error;
       return { success: true, error: null };

@@ -7,6 +7,7 @@ import { JobTable } from '../../components/admin/JobTable';
 import { JobTablePagination } from '../../components/admin/JobTablePagination';
 import { DeleteConfirmModal } from '../../components/admin/DeleteConfirmModal';
 import { SocialShareModal } from '../../components/admin/SocialShareModal';
+import { JobVerificationModal } from '../../components/admin/JobVerificationModal';
 import { 
   Search, RefreshCw, AlertCircle, CheckCircle2, 
   ShieldCheck, Database, Copy, Check, ChevronDown, ChevronUp, RotateCcw, Trash2
@@ -56,6 +57,9 @@ export const AdminJobsListPage: React.FC<AdminJobsListPageProps> = ({ onNavigate
   // Soft Delete Architecture info panel toggle & SQL copy
   const [showArchitectureDetails, setShowArchitectureDetails] = useState(false);
   const [copiedSql, setCopiedSql] = useState(false);
+
+  // Verification Audit Modal
+  const [auditModalJob, setAuditModalJob] = useState<Job | null>(null);
 
   // Deletion modal state
   const [deleteTarget, setDeleteTarget] = useState<Job | null>(null);
@@ -619,6 +623,7 @@ CREATE OR REPLACE VIEW public.applications AS SELECT * FROM public.applicants;`;
         onRestore={handleRestoreJob}
         onShare={(job) => setShareTarget(job)}
         onUpdateStatus={handleUpdateStatus}
+        onVerifyJob={(job) => setAuditModalJob(job)}
       />
 
       {/* Pagination Bar */}
@@ -649,6 +654,21 @@ CREATE OR REPLACE VIEW public.applications AS SELECT * FROM public.applicants;`;
         onToast={(msg) => {
           setToastMessage(msg);
           setTimeout(() => setToastMessage(null), 4000);
+        }}
+      />
+
+      {/* Job Availability Verification Modal */}
+      <JobVerificationModal
+        job={auditModalJob}
+        isOpen={Boolean(auditModalJob)}
+        onClose={() => setAuditModalJob(null)}
+        onJobUpdated={() => {
+          loadJobs();
+          loadStatusCounts();
+        }}
+        onUpdateStatus={(jobToUpdate, newStatus) => {
+          handleUpdateStatus(jobToUpdate, newStatus);
+          setAuditModalJob(null);
         }}
       />
 

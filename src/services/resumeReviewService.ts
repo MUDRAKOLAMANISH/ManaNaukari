@@ -6,6 +6,8 @@ export interface SubmitResumeOrderInput {
   email: string;
   phone: string;
   file: File;
+  planName?: string;
+  planPrice?: string;
 }
 
 export interface SubmitResumeOrderResult {
@@ -105,6 +107,8 @@ export const resumeReviewService = {
     email,
     phone,
     file,
+    planName,
+    planPrice,
   }: SubmitResumeOrderInput): Promise<SubmitResumeOrderResult> {
     const cleanFullName = fullName.trim();
     const cleanEmail = email.trim().toLowerCase();
@@ -136,13 +140,15 @@ export const resumeReviewService = {
       };
     }
 
+    const planTag = planName ? `Plan: ${planName} (${planPrice || 'Free'}) | ` : '';
+
     // Step 2: Insert into resume_orders table with the real Supabase Storage URL
     return this.insertOrderRecord({
       full_name: cleanFullName,
       email: cleanEmail,
       phone: cleanPhone,
       resume_file_url: fileUrl,
-      notes: `File: ${file.name} (${(file.size / 1024).toFixed(1)} KB)`,
+      notes: `${planTag}File: ${file.name} (${(file.size / 1024).toFixed(1)} KB)`,
     });
   },
 

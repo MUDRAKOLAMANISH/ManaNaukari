@@ -2,7 +2,7 @@ import React from 'react';
 import { Job } from '../../types/database.types';
 import { 
   Building2, MapPin, Calendar, Clock, 
-  ExternalLink, Edit, Trash2, PowerOff, CheckCircle2, Share2, RotateCcw, Pause, Play 
+  ExternalLink, Edit, Trash2, PowerOff, CheckCircle2, Share2, RotateCcw, Pause, Play, ShieldCheck 
 } from 'lucide-react';
 
 interface JobTableProps {
@@ -15,6 +15,7 @@ interface JobTableProps {
   onRestore?: (job: Job) => void;
   onShare?: (job: Job) => void;
   onUpdateStatus?: (job: Job, newStatus: string) => void;
+  onVerifyJob?: (job: Job) => void;
 }
 
 export const JobTable: React.FC<JobTableProps> = ({
@@ -27,6 +28,7 @@ export const JobTable: React.FC<JobTableProps> = ({
   onRestore,
   onShare,
   onUpdateStatus,
+  onVerifyJob,
 }) => {
   if (loading) {
     return (
@@ -253,6 +255,17 @@ export const JobTable: React.FC<JobTableProps> = ({
                         </div>
                       ) : (
                         <>
+                          {/* Verify / Audit Button */}
+                          {onVerifyJob && (
+                            <button
+                              onClick={() => onVerifyJob(job)}
+                              className="p-1.5 text-indigo-600 hover:text-indigo-800 hover:bg-indigo-50 rounded-lg transition-colors cursor-pointer"
+                              title="Audit Availability Evidence & Live Check"
+                            >
+                              <ShieldCheck className="w-3.5 h-3.5" />
+                            </button>
+                          )}
+
                           {/* Pause / Resume Button */}
                           {onTogglePause && (
                             <button

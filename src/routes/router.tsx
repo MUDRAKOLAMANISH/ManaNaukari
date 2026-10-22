@@ -17,13 +17,25 @@ import { AdminAnalyticsPage } from '../pages/admin/AdminAnalyticsPage';
 import { AdminResumeOrdersPage } from '../pages/admin/AdminResumeOrdersPage';
 import { AdminApplicantsPage } from '../pages/admin/AdminApplicantsPage';
 import { AdminKnowledgeBasePage } from '../pages/admin/AdminKnowledgeBasePage';
+import { AdminWebsiteLeadsPage } from '../pages/admin/AdminWebsiteLeadsPage';
 import { RecruiterPostJobPage } from '../pages/RecruiterPostJobPage';
 import { RecruiterDashboardPage } from '../pages/RecruiterDashboardPage';
 import { ResumeReviewPage } from '../pages/ResumeReviewPage';
 import { PortfolioServicePage } from '../pages/PortfolioServicePage';
 import { MaterialsPage } from '../pages/MaterialsPage';
 import { AdminMaterialsPage } from '../pages/admin/AdminMaterialsPage';
+import { MockInterviewPage } from '../pages/MockInterviewPage';
+import { AiWebsiteDevelopmentPage } from '../pages/AiWebsiteDevelopmentPage';
+import { AdminMockInterviewsPage } from '../pages/admin/AdminMockInterviewsPage';
+import { CareerRoadmapPage } from '../pages/CareerRoadmapPage';
+import { AdminCareerRoadmapsPage } from '../pages/admin/AdminCareerRoadmapsPage';
+import { GmailPage } from '../pages/GmailPage';
+import { LoginPage } from '../pages/auth/LoginPage';
+import { SignUpPage } from '../pages/auth/SignUpPage';
+import { ForgotPasswordPage } from '../pages/auth/ForgotPasswordPage';
+import { UpdatePasswordPage } from '../pages/auth/UpdatePasswordPage';
 import { ProtectedRoute } from '../components/auth/ProtectedRoute';
+import { UserProtectedRoute } from '../components/auth/UserProtectedRoute';
 import { fromSlug } from '../utils/slugUtils';
 import { extractJobIdFromSlug } from '../utils/jobUrlUtils';
 
@@ -33,10 +45,60 @@ export interface RouteMatch {
   isBareLayout?: boolean;
 }
 
+function getRedirectQueryParam(pathWithQuery: string): string | undefined {
+  const parts = pathWithQuery.split('?');
+  if (parts.length > 1) {
+    const params = new URLSearchParams(parts[1]);
+    const redirect = params.get('redirect');
+    if (redirect && redirect.startsWith('/') && !redirect.startsWith('/login')) {
+      return redirect;
+    }
+  }
+  return undefined;
+}
+
 export function matchRoute(path: string, onNavigate: (targetPath: string) => void): RouteMatch {
   const cleanPath = path.split('?')[0];
+  const redirectParam = getRedirectQueryParam(path);
 
-  // 1. Admin Authentication Route
+  // ========================================================
+  // 1. PUBLIC AUTHENTICATION ROUTES (BARE LAYOUT)
+  // ========================================================
+  if (cleanPath === '/login') {
+    return {
+      component: <LoginPage onNavigate={onNavigate} redirectPath={redirectParam} />,
+      title: 'Sign In | Mana Naukari',
+      isBareLayout: true,
+    };
+  }
+
+  if (cleanPath === '/signup' || cleanPath === '/register') {
+    return {
+      component: <SignUpPage onNavigate={onNavigate} />,
+      title: 'Create Account | Mana Naukari',
+      isBareLayout: true,
+    };
+  }
+
+  if (cleanPath === '/forgot-password' || cleanPath === '/reset-password-request') {
+    return {
+      component: <ForgotPasswordPage onNavigate={onNavigate} />,
+      title: 'Reset Password | Mana Naukari',
+      isBareLayout: true,
+    };
+  }
+
+  if (cleanPath === '/update-password' || cleanPath === '/set-new-password') {
+    return {
+      component: <UpdatePasswordPage onNavigate={onNavigate} />,
+      title: 'Set New Password | Mana Naukari',
+      isBareLayout: true,
+    };
+  }
+
+  // ========================================================
+  // 2. ADMIN PORTAL ROUTES (ADMIN AUTHENTICATION)
+  // ========================================================
   if (cleanPath === '/admin/login') {
     return {
       component: <AdminLoginPage onNavigate={onNavigate} />,
@@ -45,7 +107,6 @@ export function matchRoute(path: string, onNavigate: (targetPath: string) => voi
     };
   }
 
-  // 2. Admin Create Job Route
   if (cleanPath === '/admin/jobs/new') {
     return {
       component: (
@@ -57,7 +118,6 @@ export function matchRoute(path: string, onNavigate: (targetPath: string) => voi
     };
   }
 
-  // 2b. AI Job Import Assistant Route
   if (cleanPath === '/admin/import-job') {
     return {
       component: (
@@ -69,7 +129,6 @@ export function matchRoute(path: string, onNavigate: (targetPath: string) => voi
     };
   }
 
-  // 2c. Bulk Job Import & Broadcast Center Route (Up to 10 URLs)
   if (cleanPath === '/admin/bulk-import' || cleanPath === '/admin/bulk-jobs') {
     return {
       component: (
@@ -81,11 +140,9 @@ export function matchRoute(path: string, onNavigate: (targetPath: string) => voi
     };
   }
 
-  // 3. Admin Edit Job Route: /admin/jobs/edit/:jobId (or legacy /admin/jobs/:id/edit)
   if (cleanPath.startsWith('/admin/jobs/edit/')) {
     const rawId = cleanPath.replace('/admin/jobs/edit/', '').split('/')[0];
     const jobId = decodeURIComponent(rawId || '');
-    console.log('[Router] Matched Admin Edit Job Route (/admin/jobs/edit/:jobId) with jobId:', jobId);
     return {
       component: (
         <ProtectedRoute onNavigate={onNavigate}>
@@ -96,21 +153,6 @@ export function matchRoute(path: string, onNavigate: (targetPath: string) => voi
     };
   }
 
-  if (cleanPath.startsWith('/admin/jobs/') && cleanPath.endsWith('/edit')) {
-    const segments = cleanPath.split('/');
-    const jobId = decodeURIComponent(segments[3] || '');
-    console.log('[Router] Matched Admin Edit Job Route (/admin/jobs/:id/edit) with jobId:', jobId);
-    return {
-      component: (
-        <ProtectedRoute onNavigate={onNavigate}>
-          <EditJobPage jobId={jobId} onNavigate={onNavigate} />
-        </ProtectedRoute>
-      ),
-      title: 'Edit Job Opening | Mana Naukari Admin',
-    };
-  }
-
-  // 4. Admin Jobs Management Dashboard
   if (cleanPath === '/admin/jobs' || cleanPath === '/admin') {
     return {
       component: (
@@ -118,11 +160,10 @@ export function matchRoute(path: string, onNavigate: (targetPath: string) => voi
           <AdminJobsListPage onNavigate={onNavigate} />
         </ProtectedRoute>
       ),
-      title: 'Job Management | Mana Naukari Admin',
+      title: 'Manage Job Listings | Mana Naukari Admin',
     };
   }
 
-  // 4b. Admin Recruiter Submissions & Approvals
   if (cleanPath === '/admin/recruiters' || cleanPath === '/admin/approvals') {
     return {
       component: (
@@ -130,11 +171,21 @@ export function matchRoute(path: string, onNavigate: (targetPath: string) => voi
           <RecruiterJobsAdminPage onNavigate={onNavigate} />
         </ProtectedRoute>
       ),
-      title: 'Recruiter Job Approvals | Mana Naukari Admin',
+      title: 'Recruiter Approvals | Mana Naukari Admin',
     };
   }
 
-  // 4c. Admin Performance Analytics Dashboard
+  if (cleanPath === '/admin/website-leads' || cleanPath === '/admin/website-development-leads') {
+    return {
+      component: (
+        <ProtectedRoute onNavigate={onNavigate}>
+          <AdminWebsiteLeadsPage onNavigate={onNavigate} />
+        </ProtectedRoute>
+      ),
+      title: 'Website Development Leads | Mana Naukari Admin',
+    };
+  }
+
   if (cleanPath === '/admin/analytics') {
     return {
       component: (
@@ -146,7 +197,6 @@ export function matchRoute(path: string, onNavigate: (targetPath: string) => voi
     };
   }
 
-  // 4d. Admin ATS Resume Review Orders Management
   if (cleanPath === '/admin/resume-orders') {
     return {
       component: (
@@ -158,7 +208,6 @@ export function matchRoute(path: string, onNavigate: (targetPath: string) => voi
     };
   }
 
-  // 4e. Admin Applicants Management System
   if (cleanPath === '/admin/applicants') {
     return {
       component: (
@@ -170,7 +219,6 @@ export function matchRoute(path: string, onNavigate: (targetPath: string) => voi
     };
   }
 
-  // 4f. Admin Knowledge Base & AI RAG Management (/admin/knowledge-base)
   if (cleanPath === '/admin/knowledge-base' || cleanPath === '/admin/rag') {
     return {
       component: (
@@ -182,7 +230,6 @@ export function matchRoute(path: string, onNavigate: (targetPath: string) => voi
     };
   }
 
-  // 4g. Admin Study Materials Management (/admin/materials)
   if (cleanPath === '/admin/materials') {
     return {
       component: (
@@ -194,95 +241,148 @@ export function matchRoute(path: string, onNavigate: (targetPath: string) => voi
     };
   }
 
-  // 4c. Recruiter Portal Job Submission (/post-job or /recruiter/post-job)
+  if (cleanPath === '/admin/mock-interviews' || cleanPath === '/admin/mock-interview') {
+    return {
+      component: (
+        <ProtectedRoute onNavigate={onNavigate}>
+          <AdminMockInterviewsPage onNavigate={onNavigate} />
+        </ProtectedRoute>
+      ),
+      title: 'Mock Interview Bookings | Mana Naukari Admin',
+    };
+  }
+
+  if (cleanPath === '/admin/career-roadmaps' || cleanPath === '/admin/roadmaps') {
+    return {
+      component: (
+        <ProtectedRoute onNavigate={onNavigate}>
+          <AdminCareerRoadmapsPage onNavigate={onNavigate} />
+        </ProtectedRoute>
+      ),
+      title: 'Career Roadmap Analytics | Mana Naukari Admin',
+    };
+  }
+
+  // ========================================================
+  // 3. CANDIDATE PORTAL ROUTES (USER AUTHENTICATION GUARD)
+  // ========================================================
+
+  // Helper wrapper for user protected routes
+  const wrapUserProtected = (element: React.ReactNode): React.ReactNode => (
+    <UserProtectedRoute currentPath={path} onNavigate={onNavigate}>
+      {element}
+    </UserProtectedRoute>
+  );
+
   if (cleanPath === '/post-job' || cleanPath === '/recruiter/post-job') {
     return {
-      component: <RecruiterPostJobPage onNavigate={onNavigate} />,
+      component: wrapUserProtected(<RecruiterPostJobPage onNavigate={onNavigate} />),
       title: 'Post a Job (Verified Recruiter) | Mana Naukari',
     };
   }
 
-  // 4f. Recruiter Dashboard & Verification Management (/recruiter/dashboard)
   if (cleanPath === '/recruiter/dashboard' || cleanPath === '/recruiter') {
     return {
-      component: <RecruiterDashboardPage onNavigate={onNavigate} />,
+      component: wrapUserProtected(<RecruiterDashboardPage onNavigate={onNavigate} />),
       title: 'Recruiter Dashboard | Mana Naukari',
     };
   }
 
-  // 5. Dynamic Category Route: /categories/:category
   if (cleanPath.startsWith('/categories/') && cleanPath.length > '/categories/'.length) {
     const categorySlug = cleanPath.replace('/categories/', '');
     const readableTitle = fromSlug(categorySlug);
     return {
-      component: <CategoryDetailsPage categorySlug={categorySlug} onNavigate={onNavigate} />,
+      component: wrapUserProtected(<CategoryDetailsPage categorySlug={categorySlug} onNavigate={onNavigate} />),
       title: `${readableTitle} Jobs | Mana Naukari`,
     };
   }
 
-  // 6. Dynamic Public Route: /jobs/:id or /jobs/:slug-:id
   if (cleanPath.startsWith('/jobs/') && cleanPath.length > '/jobs/'.length) {
     const rawParam = cleanPath.replace('/jobs/', '');
     const jobId = extractJobIdFromSlug(rawParam);
     return {
-      component: <JobDetailsPage jobId={jobId} onNavigate={onNavigate} />,
+      component: wrapUserProtected(<JobDetailsPage jobId={jobId} onNavigate={onNavigate} />),
       title: 'Job Details | Mana Naukari',
     };
   }
 
-  // 7. Public Pages
   switch (cleanPath) {
+    case '/website-development':
+    case '/ai-website-development':
+      return {
+        component: wrapUserProtected(<AiWebsiteDevelopmentPage onNavigate={onNavigate} />),
+        title: 'AI Website Development Service (From ₹499) | Mana Naukari',
+      };
     case '/portfolio-service':
       return {
-        component: <PortfolioServicePage onNavigate={onNavigate} />,
+        component: wrapUserProtected(<PortfolioServicePage onNavigate={onNavigate} />),
         title: 'Portfolio Website Service | Mana Naukari',
       };
     case '/internships':
       return {
-        component: <JobsPage onNavigate={onNavigate} />,
+        component: wrapUserProtected(<JobsPage onNavigate={onNavigate} />),
         title: 'Internships in India | Mana Naukari',
       };
     case '/work-from-home':
     case '/wfh':
       return {
-        component: <JobsPage onNavigate={onNavigate} />,
+        component: wrapUserProtected(<JobsPage onNavigate={onNavigate} />),
         title: 'Work From Home (Remote) Jobs | Mana Naukari',
       };
     case '/resume-review':
       return {
-        component: <ResumeReviewPage onNavigate={onNavigate} />,
+        component: wrapUserProtected(<ResumeReviewPage onNavigate={onNavigate} />),
         title: 'ATS Resume Review & Optimization | Mana Naukari',
       };
     case '/materials':
       return {
-        component: <MaterialsPage onNavigate={onNavigate} />,
+        component: wrapUserProtected(<MaterialsPage onNavigate={onNavigate} />),
         title: 'Study Notes & Materials | Mana Naukari',
+      };
+    case '/career-roadmap':
+    case '/career-plan':
+    case '/roadmap':
+      return {
+        component: wrapUserProtected(<CareerRoadmapPage onNavigate={onNavigate} />),
+        title: 'Personal Career Roadmap & AI Learning Plan | Mana Naukari',
+      };
+    case '/mock-interview':
+    case '/mock-interviews':
+      return {
+        component: wrapUserProtected(<MockInterviewPage onNavigate={onNavigate} />),
+        title: 'Tech Mock Interview Practice (₹99) | Mana Naukari',
       };
     case '/jobs':
       return {
-        component: <JobsPage onNavigate={onNavigate} />,
-        title: 'Jobs | Mana Naukari',
+        component: wrapUserProtected(<JobsPage onNavigate={onNavigate} />),
+        title: 'Explore All Job Openings | Mana Naukari',
       };
     case '/categories':
       return {
-        component: <CategoriesPage onNavigate={onNavigate} />,
-        title: 'Categories | Mana Naukari',
+        component: wrapUserProtected(<CategoriesPage onNavigate={onNavigate} />),
+        title: 'Job Categories | Mana Naukari',
+      };
+    case '/gmail':
+    case '/email-outreach':
+      return {
+        component: wrapUserProtected(<GmailPage onNavigate={onNavigate} />),
+        title: 'Gmail Outreach Studio | Mana Naukari',
       };
     case '/about':
       return {
-        component: <AboutPage onNavigate={onNavigate} />,
+        component: wrapUserProtected(<AboutPage onNavigate={onNavigate} />),
         title: 'About Us | Mana Naukari',
       };
     case '/contact':
       return {
-        component: <ContactPage onNavigate={onNavigate} />,
-        title: 'Contact Us | Mana Naukari',
+        component: wrapUserProtected(<ContactPage onNavigate={onNavigate} />),
+        title: 'Contact & Support | Mana Naukari',
       };
     case '/':
     default:
       return {
-        component: <HomePage onNavigate={onNavigate} />,
-        title: 'Mana Naukari | Indian Job Portal for Freshers & Internships',
+        component: wrapUserProtected(<HomePage onNavigate={onNavigate} />),
+        title: 'Mana Naukari | Premier Tech & Fresher Job Portal',
       };
   }
 }

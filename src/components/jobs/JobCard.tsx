@@ -110,7 +110,7 @@ export const JobCard: React.FC<JobCardProps> = ({ job, onViewDetails, onCopyLink
                     <span>🟢</span>
                     <span>Active</span>
                   </span>
-                ) : job.status === 'paused' ? (
+                ) : (job.status === 'paused' || (job.status === 'expired' && job.review_reason?.includes('[Paused]'))) ? (
                   <span className="text-[11px] font-bold text-amber-900 bg-amber-50 px-2.5 py-0.5 rounded-full border border-amber-300 inline-flex items-center gap-1.5 shadow-2xs">
                     <span>🟡</span>
                     <span>Paused</span>

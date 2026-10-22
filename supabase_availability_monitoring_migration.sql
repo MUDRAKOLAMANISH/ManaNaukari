@@ -24,10 +24,10 @@ BEGIN
         ALTER TABLE public.jobs DROP CONSTRAINT IF EXISTS chk_jobs_status;
     END IF;
 
-    -- Add updated check constraint allowing 'needs_review'
+    -- Add updated check constraint allowing 'needs_review' and 'paused'
     ALTER TABLE public.jobs 
         ADD CONSTRAINT jobs_status_check 
-        CHECK (status IN ('active', 'closed', 'deleted', 'expired', 'draft', 'needs_review'));
+        CHECK (status IN ('active', 'closed', 'deleted', 'expired', 'draft', 'needs_review', 'paused'));
 EXCEPTION
     WHEN OTHERS THEN
         RAISE NOTICE 'Notice: jobs_status_check constraint encountered: %', SQLERRM;

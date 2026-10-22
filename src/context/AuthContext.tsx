@@ -2,6 +2,7 @@ import React, { createContext, useContext, useEffect, useState, useMemo } from '
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
 import { AdminProfile, AuthContextType } from '../types/auth.types';
+import { candidateProfileService } from '../services/candidateProfileService';
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
@@ -31,7 +32,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setAdminProfile(data as AdminProfile);
         setIsAdmin(true);
       } else {
-        // Fallback for primary setup or demo admin credentials
         setAdminProfile(null);
         setIsAdmin(false);
       }
@@ -65,8 +65,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     initAuth();
 
     // 2. Auth State Change Listener
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, currentSession) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, currentSession) => {
       if (!isMounted) return;
+      console.log(`[Mana Naukari Auth] Event: ${event} | User: ${currentSession?.user?.email || 'None'}`);
+
       setSession(currentSession);
       setUser(currentSession?.user ?? null);
 
@@ -86,6 +88,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
   }, []);
 
+  // 1. Sign In
   const signIn = async (email: string, password: string): Promise<{ error: Error | null }> => {
     try {
       const { data, error } = await supabase.auth.signInWithPassword({
@@ -99,6 +102,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       if (data.user?.email) {
         await verifyAdmin(data.user.email);
+
+        // Synchronize candidate profile upon successful login
+        const fullName = data.user.user_metadata?.full_name || 
+          data.user.user_metadata?.display_name || 
+          data.user.email.split('@')[0];
+
+        try {
+          await candidateProfileService.saveOrUpdateProfile({
+            name: fullName,
+            email: data.user.email,
+            mobile: data.user.user_metadata?.phone || '',
+            email_verified: Boolean(data.user.email_confirmed_at),
+          });
+        } catch (syncErr) {
+          console.warn('[AuthContext] Profile sync note on login:', syncErr);
+        }
       }
 
       return { error: null };
@@ -107,6 +126,68 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  // 2. Sign Up
+  const signUp = async (email: string, password: string, name?: string): Promise<{ error: Error | null; data?: any }> => {
+    try {
+      const { data, error } = await supabase.auth.signUp({
+        email: email.trim(),
+        password,
+        options: {
+          data: {
+            full_name: name || '',
+            display_name: name || '',
+          },
+        },
+      });
+
+      if (error) {
+        return { error };
+      }
+
+      if (data.user?.email) {
+        try {
+          await candidateProfileService.saveOrUpdateProfile({
+            name: name || email.split('@')[0],
+            email: data.user.email,
+            mobile: '',
+            email_verified: Boolean(data.user.email_confirmed_at),
+          });
+        } catch (syncErr) {
+          console.warn('[AuthContext] Profile sync note on signup:', syncErr);
+        }
+      }
+
+      return { error: null, data };
+    } catch (err: any) {
+      return { error: err };
+    }
+  };
+
+  // 3. Reset Password Email Link
+  const resetPassword = async (email: string, redirectTo: string): Promise<{ error: Error | null }> => {
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
+        redirectTo,
+      });
+      return { error };
+    } catch (err: any) {
+      return { error: err };
+    }
+  };
+
+  // 4. Update Password (for active session / recovery token)
+  const updatePassword = async (newPassword: string): Promise<{ error: Error | null }> => {
+    try {
+      const { error } = await supabase.auth.updateUser({
+        password: newPassword,
+      });
+      return { error };
+    } catch (err: any) {
+      return { error: err };
+    }
+  };
+
+  // 5. Sign Out
   const signOut = async (): Promise<void> => {
     try {
       await supabase.auth.signOut();
@@ -127,6 +208,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       isAdmin,
       loading,
       signIn,
+      signUp,
+      resetPassword,
+      updatePassword,
       signOut,
     }),
     [user, session, adminProfile, isAdmin, loading]

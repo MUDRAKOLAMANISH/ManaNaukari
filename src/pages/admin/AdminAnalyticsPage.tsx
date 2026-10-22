@@ -5,6 +5,7 @@ import { AdminHeader } from '../../components/admin/AdminHeader';
 import { AnalyticsMetricCard } from '../../components/admin/analytics/AnalyticsMetricCard';
 import { AnalyticsDailyBarChart } from '../../components/admin/analytics/AnalyticsDailyBarChart';
 import { TopViewedJobsTable } from '../../components/admin/analytics/TopViewedJobsTable';
+import { SupabaseConnectionTest } from '../../components/common/SupabaseConnectionTest';
 import { OFFICIAL_LINKS } from '../../constants/links';
 import { 
   Users, UserCheck, Calendar, Clock, FileText, 
@@ -258,6 +259,9 @@ CREATE POLICY "Allow admin full access to recruiter_jobs" ON public.recruiter_jo
             </button>
           </div>
         </div>
+
+        {/* Supabase Connectivity & Diagnostic Utility */}
+        <SupabaseConnectionTest />
 
         {/* Database Migration helper banner if tables need setup */}
         {showSqlSetup && (
