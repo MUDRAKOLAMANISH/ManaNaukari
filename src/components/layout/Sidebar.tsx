@@ -18,7 +18,6 @@ import {
   ShieldCheck,
   Cpu,
   Route,
-  Mail,
   X
 } from 'lucide-react';
 import { BrandLogo } from '../common/BrandLogo';
@@ -144,13 +143,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
     {
       title: 'RESOURCES',
       items: [
-        {
-          label: 'Gmail Outreach Studio',
-          path: '/gmail',
-          icon: Mail,
-          badge: 'Gmail API',
-          badgeColor: 'bg-red-50 text-red-700 border-red-200/80',
-        },
         {
           label: 'Study Materials',
           path: '/materials',

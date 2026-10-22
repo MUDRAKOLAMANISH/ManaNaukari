@@ -29,7 +29,6 @@ import { AiWebsiteDevelopmentPage } from '../pages/AiWebsiteDevelopmentPage';
 import { AdminMockInterviewsPage } from '../pages/admin/AdminMockInterviewsPage';
 import { CareerRoadmapPage } from '../pages/CareerRoadmapPage';
 import { AdminCareerRoadmapsPage } from '../pages/admin/AdminCareerRoadmapsPage';
-import { GmailPage } from '../pages/GmailPage';
 import { LoginPage } from '../pages/auth/LoginPage';
 import { SignUpPage } from '../pages/auth/SignUpPage';
 import { ForgotPasswordPage } from '../pages/auth/ForgotPasswordPage';
@@ -361,12 +360,6 @@ export function matchRoute(path: string, onNavigate: (targetPath: string) => voi
       return {
         component: wrapUserProtected(<CategoriesPage onNavigate={onNavigate} />),
         title: 'Job Categories | Mana Naukari',
-      };
-    case '/gmail':
-    case '/email-outreach':
-      return {
-        component: wrapUserProtected(<GmailPage onNavigate={onNavigate} />),
-        title: 'Gmail Outreach Studio | Mana Naukari',
       };
     case '/about':
       return {
