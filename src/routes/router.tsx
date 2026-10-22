@@ -66,7 +66,7 @@ export function matchRoute(path: string, onNavigate: (targetPath: string) => voi
   if (cleanPath === '/login') {
     return {
       component: <LoginPage onNavigate={onNavigate} redirectPath={redirectParam} />,
-      title: 'Sign In | Mana Naukari',
+      title: 'Sign In | Mana Career',
       isBareLayout: true,
     };
   }
@@ -74,7 +74,7 @@ export function matchRoute(path: string, onNavigate: (targetPath: string) => voi
   if (cleanPath === '/signup' || cleanPath === '/register') {
     return {
       component: <SignUpPage onNavigate={onNavigate} />,
-      title: 'Create Account | Mana Naukari',
+      title: 'Create Account | Mana Career',
       isBareLayout: true,
     };
   }
@@ -82,7 +82,7 @@ export function matchRoute(path: string, onNavigate: (targetPath: string) => voi
   if (cleanPath === '/forgot-password' || cleanPath === '/reset-password-request') {
     return {
       component: <ForgotPasswordPage onNavigate={onNavigate} />,
-      title: 'Reset Password | Mana Naukari',
+      title: 'Reset Password | Mana Career',
       isBareLayout: true,
     };
   }
@@ -90,7 +90,7 @@ export function matchRoute(path: string, onNavigate: (targetPath: string) => voi
   if (cleanPath === '/update-password' || cleanPath === '/set-new-password') {
     return {
       component: <UpdatePasswordPage onNavigate={onNavigate} />,
-      title: 'Set New Password | Mana Naukari',
+      title: 'Set New Password | Mana Career',
       isBareLayout: true,
     };
   }
@@ -101,7 +101,7 @@ export function matchRoute(path: string, onNavigate: (targetPath: string) => voi
   if (cleanPath === '/admin/login') {
     return {
       component: <AdminLoginPage onNavigate={onNavigate} />,
-      title: 'Admin Sign In | Mana Naukari',
+      title: 'Admin Sign In | Mana Career',
       isBareLayout: true,
     };
   }
@@ -113,7 +113,7 @@ export function matchRoute(path: string, onNavigate: (targetPath: string) => voi
           <AddJobPage onNavigate={onNavigate} />
         </ProtectedRoute>
       ),
-      title: 'Post New Job | Mana Naukari Admin',
+      title: 'Post New Job | Mana Career Admin',
     };
   }
 
@@ -124,7 +124,7 @@ export function matchRoute(path: string, onNavigate: (targetPath: string) => voi
           <ImportJobPage onNavigate={onNavigate} />
         </ProtectedRoute>
       ),
-      title: 'AI Job Import Assistant | Mana Naukari Admin',
+      title: 'AI Job Import Assistant | Mana Career Admin',
     };
   }
 
@@ -135,7 +135,7 @@ export function matchRoute(path: string, onNavigate: (targetPath: string) => voi
           <BulkImportPage onNavigate={onNavigate} />
         </ProtectedRoute>
       ),
-      title: 'Bulk Job Import & Broadcast | Mana Naukari Admin',
+      title: 'Bulk Job Import & Broadcast | Mana Career Admin',
     };
   }
 
@@ -148,7 +148,7 @@ export function matchRoute(path: string, onNavigate: (targetPath: string) => voi
           <EditJobPage jobId={jobId} onNavigate={onNavigate} />
         </ProtectedRoute>
       ),
-      title: 'Edit Job Opening | Mana Naukari Admin',
+      title: 'Edit Job Opening | Mana Career Admin',
     };
   }
 
@@ -159,7 +159,7 @@ export function matchRoute(path: string, onNavigate: (targetPath: string) => voi
           <AdminJobsListPage onNavigate={onNavigate} />
         </ProtectedRoute>
       ),
-      title: 'Manage Job Listings | Mana Naukari Admin',
+      title: 'Manage Job Listings | Mana Career Admin',
     };
   }
 
@@ -170,7 +170,7 @@ export function matchRoute(path: string, onNavigate: (targetPath: string) => voi
           <RecruiterJobsAdminPage onNavigate={onNavigate} />
         </ProtectedRoute>
       ),
-      title: 'Recruiter Approvals | Mana Naukari Admin',
+      title: 'Recruiter Approvals | Mana Career Admin',
     };
   }
 
@@ -181,7 +181,7 @@ export function matchRoute(path: string, onNavigate: (targetPath: string) => voi
           <AdminWebsiteLeadsPage onNavigate={onNavigate} />
         </ProtectedRoute>
       ),
-      title: 'Website Development Leads | Mana Naukari Admin',
+      title: 'Website Development Leads | Mana Career Admin',
     };
   }
 
@@ -192,7 +192,7 @@ export function matchRoute(path: string, onNavigate: (targetPath: string) => voi
           <AdminAnalyticsPage onNavigate={onNavigate} />
         </ProtectedRoute>
       ),
-      title: 'Platform Analytics | Mana Naukari Admin',
+      title: 'Platform Analytics | Mana Career Admin',
     };
   }
 
@@ -203,7 +203,7 @@ export function matchRoute(path: string, onNavigate: (targetPath: string) => voi
           <AdminResumeOrdersPage onNavigate={onNavigate} />
         </ProtectedRoute>
       ),
-      title: 'Resume Review Orders | Mana Naukari Admin',
+      title: 'Resume Review Orders | Mana Career Admin',
     };
   }
 
@@ -214,7 +214,7 @@ export function matchRoute(path: string, onNavigate: (targetPath: string) => voi
           <AdminApplicantsPage onNavigate={onNavigate} />
         </ProtectedRoute>
       ),
-      title: 'Applicants Management | Mana Naukari Admin',
+      title: 'Applicants Management | Mana Career Admin',
     };
   }
 
@@ -225,7 +225,7 @@ export function matchRoute(path: string, onNavigate: (targetPath: string) => voi
           <AdminKnowledgeBasePage onNavigate={onNavigate} />
         </ProtectedRoute>
       ),
-      title: 'Knowledge Base & AI RAG | Mana Naukari Admin',
+      title: 'Knowledge Base & AI RAG | Mana Career Admin',
     };
   }
 
@@ -236,7 +236,7 @@ export function matchRoute(path: string, onNavigate: (targetPath: string) => voi
           <AdminMaterialsPage onNavigate={onNavigate} />
         </ProtectedRoute>
       ),
-      title: 'Study Materials Management | Mana Naukari Admin',
+      title: 'Study Materials Management | Mana Career Admin',
     };
   }
 
@@ -247,7 +247,7 @@ export function matchRoute(path: string, onNavigate: (targetPath: string) => voi
           <AdminMockInterviewsPage onNavigate={onNavigate} />
         </ProtectedRoute>
       ),
-      title: 'Mock Interview Bookings | Mana Naukari Admin',
+      title: 'Mock Interview Bookings | Mana Career Admin',
     };
   }
 
@@ -258,7 +258,7 @@ export function matchRoute(path: string, onNavigate: (targetPath: string) => voi
           <AdminCareerRoadmapsPage onNavigate={onNavigate} />
         </ProtectedRoute>
       ),
-      title: 'Career Roadmap Analytics | Mana Naukari Admin',
+      title: 'Career Roadmap Analytics | Mana Career Admin',
     };
   }
 
@@ -276,14 +276,14 @@ export function matchRoute(path: string, onNavigate: (targetPath: string) => voi
   if (cleanPath === '/post-job' || cleanPath === '/recruiter/post-job') {
     return {
       component: wrapUserProtected(<RecruiterPostJobPage onNavigate={onNavigate} />),
-      title: 'Post a Job (Verified Recruiter) | Mana Naukari',
+      title: 'Post a Job (Verified Recruiter) | Mana Career',
     };
   }
 
   if (cleanPath === '/recruiter/dashboard' || cleanPath === '/recruiter') {
     return {
       component: wrapUserProtected(<RecruiterDashboardPage onNavigate={onNavigate} />),
-      title: 'Recruiter Dashboard | Mana Naukari',
+      title: 'Recruiter Dashboard | Mana Career',
     };
   }
 
@@ -292,7 +292,7 @@ export function matchRoute(path: string, onNavigate: (targetPath: string) => voi
     const readableTitle = fromSlug(categorySlug);
     return {
       component: wrapUserProtected(<CategoryDetailsPage categorySlug={categorySlug} onNavigate={onNavigate} />),
-      title: `${readableTitle} Jobs | Mana Naukari`,
+      title: `${readableTitle} Jobs | Mana Career`,
     };
   }
 
@@ -301,7 +301,7 @@ export function matchRoute(path: string, onNavigate: (targetPath: string) => voi
     const jobId = extractJobIdFromSlug(rawParam);
     return {
       component: wrapUserProtected(<JobDetailsPage jobId={jobId} onNavigate={onNavigate} />),
-      title: 'Job Details | Mana Naukari',
+      title: 'Job Details | Mana Career',
     };
   }
 
@@ -310,72 +310,72 @@ export function matchRoute(path: string, onNavigate: (targetPath: string) => voi
     case '/ai-website-development':
       return {
         component: wrapUserProtected(<AiWebsiteDevelopmentPage onNavigate={onNavigate} />),
-        title: 'AI Website Development Service (From ₹499) | Mana Naukari',
+        title: 'AI Website Development Service (From ₹499) | Mana Career',
       };
     case '/portfolio-service':
       return {
         component: wrapUserProtected(<PortfolioServicePage onNavigate={onNavigate} />),
-        title: 'Portfolio Website Service | Mana Naukari',
+        title: 'Portfolio Website Service | Mana Career',
       };
     case '/internships':
       return {
         component: wrapUserProtected(<JobsPage onNavigate={onNavigate} />),
-        title: 'Internships in India | Mana Naukari',
+        title: 'Internships in India | Mana Career',
       };
     case '/work-from-home':
     case '/wfh':
       return {
         component: wrapUserProtected(<JobsPage onNavigate={onNavigate} />),
-        title: 'Work From Home (Remote) Jobs | Mana Naukari',
+        title: 'Work From Home (Remote) Jobs | Mana Career',
       };
     case '/resume-review':
       return {
         component: wrapUserProtected(<ResumeReviewPage onNavigate={onNavigate} />),
-        title: 'ATS Resume Review & Optimization | Mana Naukari',
+        title: 'ATS Resume Review & Optimization | Mana Career',
       };
     case '/materials':
       return {
         component: wrapUserProtected(<MaterialsPage onNavigate={onNavigate} />),
-        title: 'Study Notes & Materials | Mana Naukari',
+        title: 'Study Notes & Materials | Mana Career',
       };
     case '/career-roadmap':
     case '/career-plan':
     case '/roadmap':
       return {
         component: wrapUserProtected(<CareerRoadmapPage onNavigate={onNavigate} />),
-        title: 'Personal Career Roadmap & AI Learning Plan | Mana Naukari',
+        title: 'Personal Career Roadmap & AI Learning Plan | Mana Career',
       };
     case '/mock-interview':
     case '/mock-interviews':
       return {
         component: wrapUserProtected(<MockInterviewPage onNavigate={onNavigate} />),
-        title: 'Tech Mock Interview Practice (₹99) | Mana Naukari',
+        title: 'Tech Mock Interview Practice (₹99) | Mana Career',
       };
     case '/jobs':
       return {
         component: wrapUserProtected(<JobsPage onNavigate={onNavigate} />),
-        title: 'Explore All Job Openings | Mana Naukari',
+        title: 'Explore All Job Openings | Mana Career',
       };
     case '/categories':
       return {
         component: wrapUserProtected(<CategoriesPage onNavigate={onNavigate} />),
-        title: 'Job Categories | Mana Naukari',
+        title: 'Job Categories | Mana Career',
       };
     case '/about':
       return {
         component: wrapUserProtected(<AboutPage onNavigate={onNavigate} />),
-        title: 'About Us | Mana Naukari',
+        title: 'About Us | Mana Career',
       };
     case '/contact':
       return {
         component: wrapUserProtected(<ContactPage onNavigate={onNavigate} />),
-        title: 'Contact & Support | Mana Naukari',
+        title: 'Contact & Support | Mana Career',
       };
     case '/':
     default:
       return {
         component: wrapUserProtected(<HomePage onNavigate={onNavigate} />),
-        title: 'Mana Naukari | Premier Tech & Fresher Job Portal',
+        title: 'Mana Career | Premier Tech & Fresher Job Portal',
       };
   }
 }

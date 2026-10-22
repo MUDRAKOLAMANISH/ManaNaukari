@@ -154,7 +154,7 @@ app.post('/api/ai/extract-job', async (req, res) => {
 
   const ai = new GoogleGenAI({ apiKey });
 
-  const systemInstruction = `You are an expert technical recruitment data extraction assistant for an Indian job portal (Career Vault Jobs).
+  const systemInstruction = `You are an expert technical recruitment data extraction assistant for an Indian job portal (Mana Career).
 Extract structured job posting fields accurately from the provided job requisition webpage or URL.
 
 Rules:
@@ -843,36 +843,36 @@ app.post('/api/auth/send-welcome-email', async (req, res) => {
 
   const plainTextContent = `Hi ${greetingName},
 
-Welcome to Mana Naukari!
+Welcome to Mana Career!
 
 We're excited to help you take the next step in your career.
 
-With Mana Naukari, you can explore:
+With Mana Career, you can explore:
 • Job opportunities for freshers and experienced candidates.
 • Internships and work-from-home opportunities.
 • Career development resources.
 • Resume and portfolio services.
 • AI-powered career planning and interview preparation, where available.
 
-Visit Mana Naukari to explore the opportunities and services available to you.
+Visit Mana Career to explore the opportunities and services available to you.
 
 Website: https://mana-naukari.netlify.app/
 
 Wishing you success in your career journey!
 
 Best regards,
-Team Mana Naukari`;
+Team Mana Career`;
 
   const htmlContent = `<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <title>Welcome to Mana Naukari</title>
+  <title>Welcome to Mana Career</title>
 </head>
 <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #f8fafc; color: #1e293b; padding: 24px; margin: 0; line-height: 1.6;">
   <div style="max-width: 580px; margin: 0 auto; background: #ffffff; border: 1px solid #e2e8f0; border-radius: 20px; padding: 32px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);">
     <div style="margin-bottom: 24px; border-bottom: 1px solid #f1f5f9; padding-bottom: 16px;">
-      <h2 style="color: #2563eb; margin: 0 0 6px 0; font-size: 24px; font-weight: 800;">Mana Naukari</h2>
+      <h2 style="color: #2563eb; margin: 0 0 6px 0; font-size: 24px; font-weight: 800;">Mana Career</h2>
       <span style="display: inline-block; background-color: #eff6ff; color: #1d4ed8; font-size: 11px; font-weight: 700; padding: 4px 10px; border-radius: 9999px;">
         Career Account Activated 🚀
       </span>
@@ -883,11 +883,11 @@ Team Mana Naukari`;
     </p>
 
     <p style="font-size: 15px; margin-bottom: 20px; color: #334155;">
-      Welcome to <strong>Mana Naukari</strong>! We're excited to help you take the next step in your career.
+      Welcome to <strong>Mana Career</strong>! We're excited to help you take the next step in your career.
     </p>
 
     <p style="font-size: 15px; margin-bottom: 12px; font-weight: 700; color: #0f172a;">
-      With Mana Naukari, you can explore:
+      With Mana Career, you can explore:
     </p>
 
     <ul style="padding-left: 0; list-style: none; margin: 0 0 24px 0;">
@@ -900,16 +900,16 @@ Team Mana Naukari`;
 
     <div style="background-color: #f8fafc; border: 1px solid #cbd5e1; border-radius: 14px; padding: 20px; margin-bottom: 24px; text-align: center;">
       <p style="font-size: 14px; color: #334155; margin: 0 0 14px 0;">
-        Visit Mana Naukari to explore the opportunities and services available to you.
+        Visit Mana Career to explore the opportunities and services available to you.
       </p>
       <a href="https://mana-naukari.netlify.app/" target="_blank" style="display: inline-block; background-color: #2563eb; color: #ffffff; text-decoration: none; font-weight: 700; font-size: 14px; padding: 12px 28px; border-radius: 12px; box-shadow: 0 2px 4px rgba(37, 99, 235, 0.2);">
-        Explore Mana Naukari ↗
+        Explore Mana Career ↗
       </a>
     </div>
 
     <div style="border-top: 1px solid #e2e8f0; padding-top: 20px; font-size: 14px;">
       <p style="margin: 0 0 4px 0; color: #64748b;">Wishing you success in your career journey!</p>
-      <p style="margin: 0; font-weight: 700; color: #0f172a;">Best regards,<br>Team Mana Naukari</p>
+      <p style="margin: 0; font-weight: 700; color: #0f172a;">Best regards,<br>Team Mana Career</p>
     </div>
   </div>
 </body>
@@ -925,7 +925,7 @@ Team Mana Naukari`;
       body: JSON.stringify({
         from: fromEmail,
         to: cleanEmail,
-        subject: 'Welcome to Mana Naukari – Your Career Journey Starts Here!',
+        subject: 'Welcome to Mana Career – Your Career Journey Starts Here!',
         text: plainTextContent,
         html: htmlContent,
       }),
@@ -983,7 +983,7 @@ app.post('/api/alerts/send-welcome-email', async (req, res) => {
 
   const plainTextContent = `Hello,
 
-Thank you for subscribing to Mana Naukari Job Alerts.
+Thank you for subscribing to Mana Career Job Alerts.
 
 You will now receive:
 
@@ -999,18 +999,18 @@ We only share genuine opportunities from official company sources.
 
 Best wishes for your career journey.
 
-Team Mana Naukari`;
+Team Mana Career`;
 
   const htmlContent = `<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <title>Welcome to Mana Naukari Job Alerts</title>
+  <title>Welcome to Mana Career Job Alerts</title>
 </head>
 <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #f8fafc; color: #1e293b; padding: 24px; margin: 0; line-height: 1.6;">
   <div style="max-width: 560px; margin: 0 auto; background: #ffffff; border: 1px solid #e2e8f0; border-radius: 16px; padding: 32px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);">
     <div style="margin-bottom: 24px;">
-      <h2 style="color: #2563eb; margin: 0 0 8px 0; font-size: 22px; font-weight: 800;">Mana Naukari</h2>
+      <h2 style="color: #2563eb; margin: 0 0 8px 0; font-size: 22px; font-weight: 800;">Mana Career</h2>
       <div style="display: inline-block; background-color: #eff6ff; color: #1d4ed8; font-size: 12px; font-weight: 700; padding: 4px 10px; border-radius: 9999px;">
         Career Alerts Activated 🚀
       </div>
@@ -1019,7 +1019,7 @@ Team Mana Naukari`;
     <p style="font-size: 15px; margin-top: 0; margin-bottom: 16px;">Hello,</p>
     
     <p style="font-size: 15px; margin-bottom: 20px;">
-      Thank you for subscribing to <strong>Mana Naukari Job Alerts</strong>.
+      Thank you for subscribing to <strong>Mana Career Job Alerts</strong>.
     </p>
     
     <p style="font-size: 15px; margin-bottom: 12px; font-weight: 600;">You will now receive:</p>
@@ -1042,7 +1042,7 @@ Team Mana Naukari`;
 
     <div style="border-top: 1px solid #e2e8f0; padding-top: 20px; font-size: 14px;">
       <p style="margin: 0 0 4px 0; color: #64748b;">Best wishes for your career journey,</p>
-      <p style="margin: 0; font-weight: 700; color: #0f172a;">Team Mana Naukari</p>
+      <p style="margin: 0; font-weight: 700; color: #0f172a;">Team Mana Career</p>
     </div>
   </div>
 </body>

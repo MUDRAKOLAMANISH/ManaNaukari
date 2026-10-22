@@ -54,7 +54,7 @@ export const ContactPage: React.FC<ContactPageProps> = () => {
       {/* Header */}
       <div className="text-center space-y-3 pt-4">
         <h1 className="text-3xl sm:text-4xl font-extrabold font-display text-slate-900 tracking-tight">
-          Contact Mana Naukari
+          Contact Mana Career
         </h1>
         <p className="text-sm text-slate-600 max-w-xl mx-auto leading-relaxed">
           Have an inquiry, want to report a broken link, or represent a corporate hiring team? Send us a direct message.
@@ -92,7 +92,7 @@ export const ContactPage: React.FC<ContactPageProps> = () => {
           </div>
 
           <div className="pt-6 border-t border-slate-800 text-[11px] text-slate-500">
-            Mana Naukari Jobs Compliance & Verification Cell.
+            Mana Career Jobs Compliance & Verification Cell.
           </div>
         </div>
 

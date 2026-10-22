@@ -3,8 +3,9 @@ import { motion } from 'framer-motion';
 import {
   Search, MapPin, Briefcase, Sparkles, ShieldCheck,
   CheckCircle2, ArrowRight, Building2, Laptop, GraduationCap,
-  TrendingUp, Users, Award, Star, Compass, Check
+  Video
 } from 'lucide-react';
+import { FeatureCarousel } from './FeatureCarousel';
 
 interface HeroSectionProps {
   onSearch: (keyword: string, location: string) => void;
@@ -62,7 +63,7 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-12 items-center">
           
-          {/* Left Column: Headline, Search & Filters (7 Cols) */}
+          {/* Left Column: Headline, Action Buttons, Search & Filters (7 Cols) */}
           <div className="lg:col-span-7 space-y-6 text-left">
             
             {/* Top Trust Island Badge */}
@@ -73,7 +74,7 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
               className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-white/90 border border-slate-200/90 shadow-2xs backdrop-blur-md text-xs font-semibold text-slate-800"
             >
               <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-              <span className="text-blue-600 font-bold uppercase tracking-wider text-[11px]">2026 Edition</span>
+              <span className="text-blue-600 font-bold uppercase tracking-wider text-[11px]">Mana Career</span>
               <span className="text-slate-300">·</span>
               <ShieldCheck className="w-3.5 h-3.5 text-blue-600" />
               <span>India&apos;s Verified Freshers &amp; Career Discovery Portal</span>
@@ -96,6 +97,33 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
               <p className="text-sm sm:text-base lg:text-lg text-slate-600 leading-relaxed font-normal max-w-xl">
                 Discover genuine openings for freshers, college graduates, and remote engineers directly from verified employers. Zero spam, zero middleman fees.
               </p>
+            </motion.div>
+
+            {/* Primary & Secondary Hero Action Buttons */}
+            <motion.div
+              initial={{ opacity: 0, y: 15 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.6, delay: 0.15 }}
+              className="flex flex-wrap items-center gap-3 pt-1"
+            >
+              <button
+                type="button"
+                onClick={() => onNavigate('/jobs')}
+                className="px-6 py-3 rounded-xl sm:rounded-2xl bg-blue-600 hover:bg-blue-700 text-white font-extrabold text-xs sm:text-sm shadow-md shadow-blue-500/20 transition-all cursor-pointer flex items-center justify-center gap-2 btn-glow"
+              >
+                <Briefcase className="w-4 h-4" />
+                <span>Explore Jobs</span>
+                <ArrowRight className="w-4 h-4" />
+              </button>
+
+              <button
+                type="button"
+                onClick={() => onNavigate('/mock-interview')}
+                className="px-6 py-3 rounded-xl sm:rounded-2xl bg-white hover:bg-slate-50 text-slate-800 hover:text-blue-600 border border-slate-200/90 font-bold text-xs sm:text-sm shadow-2xs transition-all cursor-pointer flex items-center justify-center gap-2"
+              >
+                <Video className="w-4 h-4 text-emerald-600" />
+                <span>Prepare for Interviews</span>
+              </button>
             </motion.div>
 
             {/* Glowing Search Bar */}
@@ -194,170 +222,14 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
 
           </div>
 
-          {/* Right Column: High-End Professional Image & Floating Badges (5 Cols) */}
+          {/* Right Column: Interactive Feature Carousel (5 Cols) */}
           <div className="lg:col-span-5 relative flex items-center justify-center">
             
-            {/* Ambient Backlight Behind Image */}
+            {/* Ambient Backlight Behind Carousel */}
             <div className="absolute -inset-4 bg-gradient-to-r from-blue-600/20 via-indigo-600/20 to-teal-500/20 rounded-3xl blur-2xl -z-10 pointer-events-none" />
 
-            {/* Professional Image Container with 4 Floating Cards */}
-            <div className="relative w-full max-w-lg mx-auto py-6 sm:py-8">
-              
-              {/* Main Image Frame (border-radius: 32px, subtle shadow, object-cover, object-position: center) */}
-              <motion.div
-                initial={{ opacity: 0, scale: 0.96 }}
-                animate={{ opacity: 1, scale: 1 }}
-                transition={{ duration: 0.7, delay: 0.15 }}
-                className="relative w-full rounded-[32px] overflow-hidden shadow-xl border-4 border-white/95 bg-white ring-1 ring-slate-900/5 group"
-              >
-                <div className="aspect-[4/3] w-full overflow-hidden bg-slate-50 relative rounded-[28px]">
-                  <img
-                    src="/assets/images/hero-female-engineer.jpg"
-                    alt="Young Indian female software engineer working on a laptop applying for jobs in a bright modern office"
-                    className="w-full h-full object-cover object-center transition-transform duration-700 group-hover:scale-103"
-                    loading="eager"
-                    referrerPolicy="no-referrer"
-                  />
-
-                  {/* Clean Bottom Glassmorphism Brand Bar */}
-                  <div className="absolute bottom-3 left-3 right-3 sm:bottom-4 sm:left-4 sm:right-4 p-3 sm:p-3.5 rounded-2xl bg-white/95 backdrop-blur-md border border-white/80 shadow-md flex items-center justify-between text-left">
-                    <div className="space-y-0.5">
-                      <div className="flex items-center gap-1.5 text-[10px] font-extrabold uppercase tracking-wider text-blue-600 font-display">
-                        <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                        <span>Find Jobs. Apply Online. Start Career.</span>
-                      </div>
-                      <div className="text-xs sm:text-sm font-black text-slate-900 font-display">
-                        Connect Directly With Hiring Teams
-                      </div>
-                    </div>
-                    <div className="hidden sm:flex items-center gap-1 text-[11px] font-bold text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-xl border border-emerald-200/80 shrink-0">
-                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
-                      <span>100% Free</span>
-                    </div>
-                  </div>
-                </div>
-              </motion.div>
-
-              {/* Floating Card 1: Verified Jobs (Top-Left) */}
-              <motion.div
-                initial={{ opacity: 0, y: -15, x: -15 }}
-                animate={{ opacity: 1, y: 0, x: 0 }}
-                transition={{ duration: 0.7, delay: 0.25 }}
-                whileHover={{ scale: 1.05, y: -3 }}
-                className="absolute -top-3 -left-3 sm:-top-5 sm:-left-6 hidden sm:flex items-center gap-3 p-3 sm:p-3.5 rounded-2xl bg-white/95 backdrop-blur-md border border-slate-200/80 shadow-lg animate-float z-20 text-left cursor-default transition-all"
-              >
-                <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-blue-50 text-blue-600 font-bold flex items-center justify-center text-xs border border-blue-100 shadow-2xs shrink-0">
-                  <ShieldCheck className="w-5 h-5 text-blue-600" />
-                </div>
-                <div>
-                  <div className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
-                    <span>Verified Jobs</span>
-                    <span className="text-[9px] font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded-md uppercase border border-emerald-200/70">
-                      100%
-                    </span>
-                  </div>
-                  <div className="text-[11px] text-slate-500 font-medium">Official HR Links · Zero Spam</div>
-                </div>
-              </motion.div>
-
-              {/* Floating Card 2: Internship Opportunities (Top-Right) */}
-              <motion.div
-                initial={{ opacity: 0, y: -15, x: 15 }}
-                animate={{ opacity: 1, y: 0, x: 0 }}
-                transition={{ duration: 0.7, delay: 0.35 }}
-                whileHover={{ scale: 1.05, y: -3 }}
-                className="absolute -top-3 -right-3 sm:-top-5 sm:-right-6 hidden sm:flex items-center gap-3 p-3 sm:p-3.5 rounded-2xl bg-white/95 backdrop-blur-md border border-slate-200/80 shadow-lg animate-float-reverse z-20 text-left cursor-default transition-all"
-              >
-                <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-purple-50 text-purple-600 font-bold flex items-center justify-center text-xs border border-purple-100 shadow-2xs shrink-0">
-                  <GraduationCap className="w-5 h-5 text-purple-600" />
-                </div>
-                <div>
-                  <div className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
-                    <span>Internship Opportunities</span>
-                    <span className="text-[9px] font-bold text-purple-700 bg-purple-50 px-1.5 py-0.5 rounded-md uppercase border border-purple-200/70">
-                      Stipend
-                    </span>
-                  </div>
-                  <div className="text-[11px] text-slate-500 font-medium">Students &amp; Freshers</div>
-                </div>
-              </motion.div>
-
-              {/* Floating Card 3: Work From Home (Bottom-Left) */}
-              <motion.div
-                initial={{ opacity: 0, y: 15, x: -15 }}
-                animate={{ opacity: 1, y: 0, x: 0 }}
-                transition={{ duration: 0.7, delay: 0.45 }}
-                whileHover={{ scale: 1.05, y: -3 }}
-                className="absolute -bottom-3 -left-3 sm:-bottom-5 sm:-left-6 hidden sm:flex items-center gap-3 p-3 sm:p-3.5 rounded-2xl bg-white/95 backdrop-blur-md border border-slate-200/80 shadow-lg animate-float z-20 text-left cursor-default transition-all"
-              >
-                <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-teal-50 text-teal-600 font-bold flex items-center justify-center text-xs border border-teal-100 shadow-2xs shrink-0">
-                  <Laptop className="w-5 h-5 text-teal-600" />
-                </div>
-                <div>
-                  <div className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
-                    <span>Work From Home</span>
-                    <span className="text-[9px] font-bold text-teal-700 bg-teal-50 px-1.5 py-0.5 rounded-md uppercase border border-teal-200/70">
-                      Remote
-                    </span>
-                  </div>
-                  <div className="text-[11px] text-slate-500 font-medium">Pan-India Flexibility</div>
-                </div>
-              </motion.div>
-
-              {/* Floating Card 4: Direct Company Hiring (Bottom-Right) */}
-              <motion.div
-                initial={{ opacity: 0, y: 15, x: 15 }}
-                animate={{ opacity: 1, y: 0, x: 0 }}
-                transition={{ duration: 0.7, delay: 0.55 }}
-                whileHover={{ scale: 1.05, y: -3 }}
-                className="absolute -bottom-3 -right-3 sm:-bottom-5 sm:-right-6 hidden sm:flex items-center gap-3 p-3 sm:p-3.5 rounded-2xl bg-white/95 backdrop-blur-md border border-slate-200/80 shadow-lg animate-float-reverse z-20 text-left cursor-default transition-all"
-              >
-                <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-indigo-50 text-indigo-600 font-bold flex items-center justify-center text-xs border border-indigo-100 shadow-2xs shrink-0">
-                  <Building2 className="w-5 h-5 text-indigo-600" />
-                </div>
-                <div>
-                  <div className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
-                    <span>Direct Company Hiring</span>
-                    <span className="text-[9px] font-bold text-indigo-700 bg-indigo-50 px-1.5 py-0.5 rounded-md uppercase border border-indigo-200/70">
-                      Zero Fees
-                    </span>
-                  </div>
-                  <div className="text-[11px] text-slate-500 font-medium">Verified HR &amp; Career Portals</div>
-                </div>
-              </motion.div>
-
-            </div>
-
-            {/* Mobile-Only Badges Grid (4 Cards neatly placed on small screens) */}
-            <div className="grid grid-cols-2 gap-2 mt-4 sm:hidden w-full">
-              <div className="flex items-center gap-2 p-2.5 rounded-xl bg-white border border-slate-200/80 shadow-2xs text-left">
-                <ShieldCheck className="w-4 h-4 text-blue-600 shrink-0" />
-                <div className="min-w-0">
-                  <div className="text-[11px] font-bold text-slate-900 truncate">Verified Jobs</div>
-                  <div className="text-[9px] text-slate-500 truncate">Official HR Links</div>
-                </div>
-              </div>
-              <div className="flex items-center gap-2 p-2.5 rounded-xl bg-white border border-slate-200/80 shadow-2xs text-left">
-                <GraduationCap className="w-4 h-4 text-purple-600 shrink-0" />
-                <div className="min-w-0">
-                  <div className="text-[11px] font-bold text-slate-900 truncate">Internship Openings</div>
-                  <div className="text-[9px] text-slate-500 truncate">Paid Opportunities</div>
-                </div>
-              </div>
-              <div className="flex items-center gap-2 p-2.5 rounded-xl bg-white border border-slate-200/80 shadow-2xs text-left">
-                <Laptop className="w-4 h-4 text-teal-600 shrink-0" />
-                <div className="min-w-0">
-                  <div className="text-[11px] font-bold text-slate-900 truncate">Work From Home</div>
-                  <div className="text-[9px] text-slate-500 truncate">Remote Across India</div>
-                </div>
-              </div>
-              <div className="flex items-center gap-2 p-2.5 rounded-xl bg-white border border-slate-200/80 shadow-2xs text-left">
-                <Building2 className="w-4 h-4 text-indigo-600 shrink-0" />
-                <div className="min-w-0">
-                  <div className="text-[11px] font-bold text-slate-900 truncate">Direct Company Hiring</div>
-                  <div className="text-[9px] text-slate-500 truncate">Zero Agency Fees</div>
-                </div>
-              </div>
+            <div className="w-full max-w-lg mx-auto">
+              <FeatureCarousel onNavigate={onNavigate} />
             </div>
 
           </div>
@@ -374,7 +246,7 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
           >
             <div className="mb-4">
               <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
-                Companies Actively Hiring on Mana Naukari
+                Companies Actively Hiring on Mana Career
               </span>
             </div>
 

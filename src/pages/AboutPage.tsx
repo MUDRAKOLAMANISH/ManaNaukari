@@ -20,10 +20,10 @@ export const AboutPage: React.FC<AboutPageProps> = ({ onNavigate }) => {
           <span>Our Ethical Recruiting Pledge</span>
         </div>
         <h1 className="text-3xl sm:text-5xl font-extrabold font-display text-slate-900 tracking-tight">
-          About Mana Naukari
+          About Mana Career
         </h1>
         <p className="text-base text-slate-600 max-w-2xl mx-auto leading-relaxed">
-          Mana Naukari is a trusted platform for Freshers Jobs, Internships, Work From Home Jobs, Off Campus Drives, and Entry-Level Opportunities across India.
+          Mana Career is a trusted platform for Freshers Jobs, Internships, Work From Home Jobs, Off Campus Drives, and Entry-Level Opportunities across India.
         </p>
       </div>
 
@@ -49,7 +49,7 @@ export const AboutPage: React.FC<AboutPageProps> = ({ onNavigate }) => {
             Zero-Fee Guarantee
           </h2>
           <p className="text-xs sm:text-sm text-slate-600 leading-relaxed">
-            Every candidate deserves fair, meritocratic access. Mana Naukari will always be 100% free for job seekers, graduates, and interns with zero hidden fees.
+            Every candidate deserves fair, meritocratic access. Mana Career will always be 100% free for job seekers, graduates, and interns with zero hidden fees.
           </p>
         </div>
       </div>
@@ -57,7 +57,7 @@ export const AboutPage: React.FC<AboutPageProps> = ({ onNavigate }) => {
       {/* Trust Standards List */}
       <div className="bg-slate-900 text-white rounded-3xl p-8 sm:p-10 space-y-6">
         <h2 className="text-xl font-bold font-display text-white">
-          The Mana Naukari Standard
+          The Mana Career Standard
         </h2>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs sm:text-sm text-slate-300">
           <div className="flex items-start gap-2.5">
@@ -99,7 +99,7 @@ export const AboutPage: React.FC<AboutPageProps> = ({ onNavigate }) => {
             <span>Terms &amp; Conditions</span>
           </div>
           <p className="text-xs text-slate-600 leading-relaxed">
-            By using <strong>Mana Naukari</strong>, candidates and recruiters agree to transparent, fair employment standards. Job seekers apply directly to employers at zero cost. We prohibit any fees or misleading advertisements.
+            By using <strong>Mana Career</strong>, candidates and recruiters agree to transparent, fair employment standards. Job seekers apply directly to employers at zero cost. We prohibit any fees or misleading advertisements.
           </p>
           <ul className="text-xs text-slate-500 space-y-1.5 list-disc pl-4">
             <li>100% free candidate job application portal.</li>
@@ -116,7 +116,7 @@ export const AboutPage: React.FC<AboutPageProps> = ({ onNavigate }) => {
             <span>Privacy Policy</span>
           </div>
           <p className="text-xs text-slate-600 leading-relaxed">
-            <strong>Mana Naukari</strong> respects your privacy. We never sell, rent, or trade your personal data. Subscription emails and job alert preferences are securely handled and can be unsubscribed with a single click. For data access or deletion requests, email us at <a href="mailto:mananaukari2026@gmail.com" className="text-blue-600 underline">mananaukari2026@gmail.com</a>.
+            <strong>Mana Career</strong> respects your privacy. We never sell, rent, or trade your personal data. Subscription emails and job alert preferences are securely handled and can be unsubscribed with a single click. For data access or deletion requests, email us at <a href="mailto:mananaukari2026@gmail.com" className="text-blue-600 underline">mananaukari2026@gmail.com</a>.
           </p>
           <ul className="text-xs text-slate-500 space-y-1.5 list-disc pl-4">
             <li>Zero tracking of intrusive third-party advertising cookies.</li>

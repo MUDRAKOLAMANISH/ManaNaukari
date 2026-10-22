@@ -47,7 +47,7 @@ export const AdminLoginPage: React.FC<AdminLoginPageProps> = ({ onNavigate }) =>
               <span>Admin Authentication</span>
             </div>
             <h1 className="text-2xl font-bold font-display text-slate-900 tracking-tight">
-              Sign In to Mana Naukari
+              Sign In to Mana Career
             </h1>
             <p className="text-xs text-slate-500 mt-1">
               Authorized recruitment officers & platform administrators only

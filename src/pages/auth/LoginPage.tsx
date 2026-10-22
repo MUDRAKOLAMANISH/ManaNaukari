@@ -73,7 +73,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onNavigate, redirectPath }
 
         <div className="space-y-1">
           <h2 className="text-2xl sm:text-3xl font-extrabold text-slate-900 font-display tracking-tight">
-            Welcome to Mana Naukari
+            Welcome to Mana Career
           </h2>
           <p className="text-xs sm:text-sm text-slate-600 font-medium">
             Your career journey starts here.
@@ -183,7 +183,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onNavigate, redirectPath }
                 {isSubmitting ? (
                   <>
                     <Loader2 className="w-4 h-4 animate-spin" />
-                    <span>Signing in to Mana Naukari...</span>
+                    <span>Signing in to Mana Career...</span>
                   </>
                 ) : (
                   <>
@@ -199,7 +199,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onNavigate, redirectPath }
           {/* Divider */}
           <div className="relative border-t border-slate-200/80 my-4 text-center">
             <span className="bg-white px-3 text-[11px] font-bold text-slate-400 uppercase tracking-wider relative -top-2.5">
-              New to Mana Naukari?
+              New to Mana Career?
             </span>
           </div>
 

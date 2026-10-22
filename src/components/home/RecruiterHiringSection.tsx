@@ -72,7 +72,7 @@ export const RecruiterHiringSection: React.FC<RecruiterHiringSectionProps> = ({
             </h2>
 
             <p className="text-sm sm:text-base text-blue-100/90 leading-relaxed font-normal">
-              Connect directly with thousands of active tech job seekers, campus graduates, and internship seekers across India. Post your open requisition for <strong className="text-white font-semibold underline decoration-emerald-400 decoration-2 underline-offset-4">FREE</strong> on Mana Naukari.
+              Connect directly with thousands of active tech job seekers, campus graduates, and internship seekers across India. Post your open requisition for <strong className="text-white font-semibold underline decoration-emerald-400 decoration-2 underline-offset-4">FREE</strong> on Mana Career.
             </p>
 
             {/* Core Benefits */}

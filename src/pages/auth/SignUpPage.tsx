@@ -120,7 +120,7 @@ export const SignUpPage: React.FC<SignUpPageProps> = ({ onNavigate }) => {
               </div>
               <div className="space-y-2">
                 <h3 className="font-extrabold text-xl text-slate-900 font-display">
-                  Welcome to Mana Naukari!
+                  Welcome to Mana Career!
                 </h3>
                 <p className="text-xs sm:text-sm font-semibold text-emerald-700 bg-emerald-50/80 border border-emerald-200/80 py-2 px-3 rounded-xl max-w-xs mx-auto">
                   Your account has been created successfully.

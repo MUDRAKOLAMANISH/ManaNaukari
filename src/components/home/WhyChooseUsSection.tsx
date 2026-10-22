@@ -14,7 +14,7 @@ export const WhyChooseUsSection: React.FC<WhyChooseUsSectionProps> = ({ onNaviga
       badgeColor: 'bg-emerald-50 text-emerald-700 border-emerald-200/80',
       icon: <ShieldCheck className="w-6 h-6 text-blue-600" />,
       description:
-        'Every single opening on Mana Naukari is manually verified to link directly to official employer career portals (Workday, Greenhouse, Lever, Taleo). No third-party agents or fees.',
+        'Every single opening on Mana Career is manually verified to link directly to official employer career portals (Workday, Greenhouse, Lever, Taleo). No third-party agents or fees.',
       points: [
         'Direct corporate careers URLs',
         'Official HR recruiter emails only',
@@ -61,7 +61,7 @@ export const WhyChooseUsSection: React.FC<WhyChooseUsSectionProps> = ({ onNaviga
       <div className="text-center max-w-3xl mx-auto space-y-3">
         <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-50 text-blue-700 text-xs font-bold font-display border border-blue-100">
           <Sparkles className="w-3.5 h-3.5 text-blue-600" />
-          <span>Why Job Seekers Choose Mana Naukari</span>
+          <span>Why Job Seekers Choose Mana Career</span>
         </div>
         <h2 className="text-2xl sm:text-4xl font-extrabold font-display text-slate-900 tracking-tight">
           A Fresh Approach to Starting Your Tech Career

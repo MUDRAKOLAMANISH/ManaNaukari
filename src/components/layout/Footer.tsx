@@ -33,7 +33,7 @@ export const Footer: React.FC<FooterProps> = ({ onNavigate }) => {
             </button>
 
             <p className="text-xs sm:text-sm text-slate-400 leading-relaxed max-w-md font-normal">
-              Mana Naukari is India’s dedicated job portal connecting freshers, campus graduates, internship seekers, and early-career professionals directly with verified hiring companies and official career portal opportunities.
+              Mana Career is India’s dedicated job portal connecting freshers, campus graduates, internship seekers, and early-career professionals directly with verified hiring companies and official career portal opportunities.
             </p>
 
             {/* Founder Contact & Location Card (Requirement 9) */}
@@ -160,7 +160,7 @@ export const Footer: React.FC<FooterProps> = ({ onNavigate }) => {
                   onClick={() => onNavigate('/about')} 
                   className="hover:text-white hover:translate-x-0.5 transition-all cursor-pointer text-left"
                 >
-                  About Mana Naukari
+                  About Mana Career
                 </button>
               </li>
               <li>
@@ -239,7 +239,7 @@ export const Footer: React.FC<FooterProps> = ({ onNavigate }) => {
         {/* Bottom Strip */}
         <div className="pt-8 flex flex-col sm:flex-row items-center justify-between text-xs text-slate-500 gap-4">
           <div className="flex flex-col sm:flex-row items-center sm:items-start text-center sm:text-left gap-1 sm:gap-2">
-            <span className="font-semibold text-slate-400">Mana Naukari © 2026</span>
+            <span className="font-semibold text-slate-400">Mana Career © 2026</span>
             <span className="hidden sm:inline text-slate-700">·</span>
             <span>Founded by Manish Mudrakola · Hyderabad, India</span>
           </div>
