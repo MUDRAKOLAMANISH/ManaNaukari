@@ -6,6 +6,7 @@ import { AnalyticsMetricCard } from '../../components/admin/analytics/AnalyticsM
 import { AnalyticsDailyBarChart } from '../../components/admin/analytics/AnalyticsDailyBarChart';
 import { TopViewedJobsTable } from '../../components/admin/analytics/TopViewedJobsTable';
 import { SupabaseConnectionTest } from '../../components/common/SupabaseConnectionTest';
+import { AdminDailyReminderManager } from '../../components/admin/AdminDailyReminderManager';
 import { OFFICIAL_LINKS } from '../../constants/links';
 import { 
   Users, UserCheck, Calendar, Clock, FileText, 
@@ -509,6 +510,9 @@ CREATE POLICY "Allow admin full access to recruiter_jobs" ON public.recruiter_jo
             totalSumLabel="7-Day Applications"
           />
         </div>
+
+        {/* Automated Daily Job Reminder Manager (n8n replacement) */}
+        <AdminDailyReminderManager />
 
         {/* Top Viewed Jobs Ranking Table */}
         <TopViewedJobsTable

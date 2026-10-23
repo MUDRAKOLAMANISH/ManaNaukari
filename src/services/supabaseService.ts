@@ -129,9 +129,13 @@ export const jobsService = {
 
         if (!featErr && featData) {
           featuredJob = featData as Job;
+        } else if (featErr && (featErr.message?.includes('Failed to fetch') || featErr.name === 'TypeError')) {
+          return { job: null, isFeatured: false, error: featErr as any };
         }
-      } catch {
-        // column is_featured may not exist in schema cache
+      } catch (e: any) {
+        if (e?.message?.includes('Failed to fetch') || e?.name === 'TypeError') {
+          return { job: null, isFeatured: false, error: e };
+        }
       }
 
       // Priority A2: If is_featured returned nothing, check legacy featured column
@@ -148,9 +152,13 @@ export const jobsService = {
 
           if (!legFeatErr && legFeatData) {
             featuredJob = legFeatData as Job;
+          } else if (legFeatErr && (legFeatErr.message?.includes('Failed to fetch') || legFeatErr.name === 'TypeError')) {
+            return { job: null, isFeatured: false, error: legFeatErr as any };
           }
-        } catch {
-          // ignore
+        } catch (e: any) {
+          if (e?.message?.includes('Failed to fetch') || e?.name === 'TypeError') {
+            return { job: null, isFeatured: false, error: e };
+          }
         }
       }
 
@@ -167,7 +175,10 @@ export const jobsService = {
         .limit(1)
         .maybeSingle();
 
-      if (latestErr) throw latestErr;
+      if (latestErr) {
+        console.warn('[jobsService.getTopAnnouncementJob] Notice:', latestErr.message || latestErr);
+        return { job: null, isFeatured: false, error: latestErr as any };
+      }
 
       return {
         job: (latestData as Job) || null,
@@ -175,7 +186,7 @@ export const jobsService = {
         error: null,
       };
     } catch (err: any) {
-      console.error('[jobsService.getTopAnnouncementJob] Error:', err);
+      console.warn('[jobsService.getTopAnnouncementJob] Exception:', err?.message || err);
       return { job: null, isFeatured: false, error: err };
     }
   },

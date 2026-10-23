@@ -35,6 +35,7 @@ import { ForgotPasswordPage } from '../pages/auth/ForgotPasswordPage';
 import { UpdatePasswordPage } from '../pages/auth/UpdatePasswordPage';
 import { ProtectedRoute } from '../components/auth/ProtectedRoute';
 import { UserProtectedRoute } from '../components/auth/UserProtectedRoute';
+import { UnsubscribePage } from '../pages/UnsubscribePage';
 import { fromSlug } from '../utils/slugUtils';
 import { extractJobIdFromSlug } from '../utils/jobUrlUtils';
 
@@ -92,6 +93,13 @@ export function matchRoute(path: string, onNavigate: (targetPath: string) => voi
       component: <UpdatePasswordPage onNavigate={onNavigate} />,
       title: 'Set New Password | Mana Career',
       isBareLayout: true,
+    };
+  }
+
+  if (cleanPath === '/unsubscribe') {
+    return {
+      component: <UnsubscribePage onNavigate={onNavigate} />,
+      title: 'Unsubscribe from Job Alerts | Mana Career',
     };
   }
 

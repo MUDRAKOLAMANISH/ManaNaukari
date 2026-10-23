@@ -1432,6 +1432,141 @@ Team Mana Naukari
   }
 });
 
+// Endpoint to handle Admin Daily Job Reminder dispatch (Test email & manual batch dispatch)
+app.post('/api/admin/daily-reminder-dispatch', async (req, res) => {
+  const { test_email, is_test } = req.body || {};
+
+  const resendApiKey = process.env.RESEND_API_KEY;
+  const fromEmail = process.env.RESEND_FROM_EMAIL || 'onboarding@resend.dev';
+  const appBaseUrl = process.env.APP_URL || 'https://mana-naukari.netlify.app';
+  const supabaseUrl = process.env.VITE_SUPABASE_URL;
+  const supabaseAnonKey = process.env.VITE_SUPABASE_ANON_KEY;
+
+  try {
+    // Fetch genuine active jobs from Supabase
+    let activeJobs: any[] = [];
+    if (supabaseUrl && supabaseAnonKey) {
+      const jobsRes = await fetch(`${supabaseUrl}/rest/v1/jobs?status=eq.active&order=created_at.desc&limit=6`, {
+        headers: {
+          apikey: supabaseAnonKey,
+          Authorization: `Bearer ${supabaseAnonKey}`,
+        },
+      });
+      if (jobsRes.ok) {
+        activeJobs = await jobsRes.json();
+      }
+    }
+
+    if (is_test) {
+      const recipient = (test_email || '').trim();
+      if (!recipient || !recipient.includes('@')) {
+        return res.status(400).json({ success: false, error: 'Valid test email is required.' });
+      }
+
+      if (!resendApiKey) {
+        return res.status(400).json({
+          success: false,
+          error: 'RESEND_API_KEY is not configured in server environment.',
+        });
+      }
+
+      const todayStr = new Date().toLocaleDateString('en-IN', {
+        timeZone: 'Asia/Kolkata',
+        day: 'numeric',
+        month: 'short',
+        year: 'numeric',
+      });
+
+      const jobsListHtml = activeJobs.length > 0
+        ? activeJobs.map((job) => `
+          <div style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 16px; margin-bottom: 12px;">
+            <div style="display: flex; justify-content: space-between; align-items: start; gap: 8px;">
+              <h4 style="margin: 0; font-size: 15px; font-weight: 700; color: #0f172a;">${job.title}</h4>
+              <span style="font-size: 11px; font-weight: 700; color: #2563eb; background: #eff6ff; padding: 2px 8px; border-radius: 9999px;">${job.category || 'General'}</span>
+            </div>
+            <p style="margin: 4px 0 10px 0; font-size: 13px; color: #475569; font-weight: 600;">🏢 ${job.company || 'Company'}</p>
+            <a href="${job.apply_link || `${appBaseUrl}/jobs/${job.id}`}" target="_blank" style="display: inline-block; background: #2563eb; color: #ffffff; font-size: 12px; font-weight: 700; padding: 8px 16px; border-radius: 8px; text-decoration: none;">Apply Now ↗</a>
+          </div>
+        `).join('')
+        : '<p style="font-size: 14px; color: #64748b;">No active jobs currently in database.</p>';
+
+      const htmlContent = `<!DOCTYPE html>
+<html lang="en">
+<body style="font-family: system-ui, sans-serif; background-color: #f8fafc; padding: 24px; color: #1e293b;">
+  <div style="max-width: 580px; margin: 0 auto; background: #ffffff; border-radius: 16px; padding: 28px; border: 1px solid #e2e8f0;">
+    <h2 style="color: #2563eb; margin: 0 0 4px 0;">Mana Career</h2>
+    <span style="font-size: 11px; font-weight: 700; color: #15803d; background: #f0fdf4; padding: 2px 8px; border-radius: 9999px;">Daily Job Digest - ${todayStr}</span>
+    <p style="margin-top: 16px; font-size: 14px;">Here are today's top genuine job openings curated for you on Mana Career:</p>
+    ${jobsListHtml}
+    <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 20px 0;" />
+    <p style="font-size: 11px; color: #94a3b8; text-align: center;">You are receiving this test email from Mana Career Admin. <a href="${appBaseUrl}/unsubscribe?email=${encodeURIComponent(recipient)}" style="color: #2563eb;">Unsubscribe</a></p>
+  </div>
+</body>
+</html>`;
+
+      const resendRes = await fetch('https://api.resend.com/emails', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${resendApiKey.trim()}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          from: fromEmail,
+          to: recipient,
+          subject: `Daily Job Reminder - Mana Career (${todayStr}) [Test]`,
+          html: htmlContent,
+        }),
+      });
+
+      const resData = await resendRes.json();
+      if (!resendRes.ok) {
+        throw new Error(resData.message || 'Resend error sending test email');
+      }
+
+      return res.json({
+        success: true,
+        message: 'Test daily job reminder email sent!',
+        jobs_count: activeJobs.length,
+        resend_id: resData.id,
+      });
+    }
+
+    // Manual batch dispatch or forced run
+    if (supabaseUrl && supabaseAnonKey) {
+      try {
+        const edgeRes = await fetch(`${supabaseUrl}/functions/v1/daily-job-reminder`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${supabaseAnonKey}`,
+          },
+          body: JSON.stringify({ force: true, source: 'admin_panel' }),
+        });
+
+        if (edgeRes.ok) {
+          const edgeData = await edgeRes.json();
+          return res.json({
+            success: true,
+            ...edgeData,
+          });
+        }
+      } catch (edgeErr) {
+        console.warn('[DailyReminderDispatch] Edge Function invocation warning:', edgeErr);
+      }
+    }
+
+    return res.json({
+      success: true,
+      message: 'Batch dispatch trigger received.',
+      jobs_count: activeJobs.length,
+      skipped: false,
+    });
+  } catch (err: any) {
+    console.error('[DailyReminderDispatch Error]:', err);
+    return res.status(500).json({ success: false, error: err.message || 'Failed to dispatch daily reminder.' });
+  }
+});
+
 // Endpoint to retrieve Alert Delivery Statistics & Logs for Admin Dashboard
 app.get('/api/alerts/delivery-stats', async (_req, res) => {
   try {
