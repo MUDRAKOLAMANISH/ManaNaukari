@@ -173,7 +173,7 @@ export const Footer: React.FC<FooterProps> = ({ onNavigate }) => {
               </li>
               <li>
                 <button 
-                  onClick={() => onNavigate('/about')} 
+                  onClick={() => onNavigate('/privacy-policy')} 
                   className="hover:text-white hover:translate-x-0.5 transition-all cursor-pointer text-left"
                 >
                   Privacy Policy
@@ -248,7 +248,7 @@ export const Footer: React.FC<FooterProps> = ({ onNavigate }) => {
             <button onClick={() => onNavigate('/about')} className="hover:text-slate-300 transition-colors cursor-pointer">
               Terms &amp; Conditions
             </button>
-            <button onClick={() => onNavigate('/about')} className="hover:text-slate-300 transition-colors cursor-pointer">
+            <button onClick={() => onNavigate('/privacy-policy')} className="hover:text-slate-300 transition-colors cursor-pointer">
               Privacy Policy
             </button>
             <button onClick={() => onNavigate('/contact')} className="hover:text-slate-300 transition-colors cursor-pointer">

@@ -126,6 +126,57 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  // 1b. Sign In with Google OAuth (Escapes iframe 403 restrictions via top-level popup)
+  const signInWithGoogle = async (): Promise<{ error: Error | null }> => {
+    try {
+      const redirectUrl = typeof window !== 'undefined' ? `${window.location.origin}/` : undefined;
+
+      // 1. Request OAuth URL with skipBrowserRedirect: true to avoid iframe 403 block
+      const { data, error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: redirectUrl,
+          skipBrowserRedirect: true,
+          queryParams: {
+            access_type: 'offline',
+            prompt: 'select_account',
+          },
+        },
+      });
+
+      if (error) {
+        return { error };
+      }
+
+      // 2. Open Google Accounts in a top-level popup window
+      if (data?.url) {
+        const width = 600;
+        const height = 700;
+        const left = typeof window !== 'undefined' && window.screen ? window.screen.width / 2 - width / 2 : 100;
+        const top = typeof window !== 'undefined' && window.screen ? window.screen.height / 2 - height / 2 : 100;
+
+        const authPopup = window.open(
+          data.url,
+          'Google_OAuth_Popup',
+          `width=${width},height=${height},top=${top},left=${left},status=no,resizable=yes,scrollbars=yes`
+        );
+
+        if (!authPopup || authPopup.closed || typeof authPopup.closed === 'undefined') {
+          // If popup is blocked by browser popup blocker, open in top-level window or tab
+          if (window.top && window.top !== window) {
+            window.top.location.href = data.url;
+          } else {
+            window.open(data.url, '_blank');
+          }
+        }
+      }
+
+      return { error: null };
+    } catch (err: any) {
+      return { error: err };
+    }
+  };
+
   // 2. Sign Up
   const signUp = async (email: string, password: string, name?: string): Promise<{ error: Error | null; data?: any }> => {
     try {
@@ -208,6 +259,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       isAdmin,
       loading,
       signIn,
+      signInWithGoogle,
       signUp,
       resetPassword,
       updatePassword,

@@ -78,7 +78,7 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ children, currentPath, o
       </div>
 
       {/* Global Overlays & Floating Widgets */}
-      <WhatsAppCommunityPopup currentPath={currentPath} />
+      <WhatsAppCommunityPopup currentPath={currentPath} onNavigate={onNavigate} />
       <FloatingChatbot onNavigate={onNavigate} />
       <FloatingOfferWidget onNavigate={onNavigate} />
     </div>

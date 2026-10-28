@@ -120,13 +120,36 @@ export const ApplyModal: React.FC<ApplyModalProps> = ({
 
     const detectCandidate = async () => {
       setIsCheckingDeduplication(true);
-      const localProfile = candidateProfileService.getLocalProfile();
+      let localProfile = candidateProfileService.getLocalProfile();
+
+      // If local profile is missing, check if candidate exists in Supabase by email or phone
+      if (!localProfile && (applicantEmail || applicantPhone)) {
+        try {
+          const { data: found } = await candidateProfileService.findProfileByEmailOrMobile(
+            applicantEmail,
+            applicantPhone
+          );
+          if (found) {
+            localProfile = candidateProfileService.saveLocalProfile({
+              id: found.id,
+              name: found.name,
+              email: found.email,
+              mobile: found.mobile,
+              resume_url: found.resume_url || undefined,
+              resume_file_name: found.resume_file_name || undefined,
+            });
+          }
+        } catch (e) {
+          console.warn('[ApplyModal] Auto-lookup notice:', e);
+        }
+      }
 
       if (localProfile) {
         setCandidateProfile(localProfile);
         setIsRecognized(true);
+        setIsEditingDetails(false);
 
-        if (!applicantName) setApplicantName(localProfile.name);
+        if (!applicantName || applicantName === 'Candidate') setApplicantName(localProfile.name);
         if (!applicantEmail) setApplicantEmail(localProfile.email);
         if (!applicantPhone) setApplicantPhone(localProfile.mobile);
         if (localProfile.resume_file_name) setResumeFileName(localProfile.resume_file_name);
@@ -200,9 +223,9 @@ export const ApplyModal: React.FC<ApplyModalProps> = ({
         );
 
         if (foundProfile) {
-          if (!applicantName && foundProfile.name) setApplicantName(foundProfile.name);
-          if (!applicantEmail && foundProfile.email) setApplicantEmail(foundProfile.email);
-          if (!applicantPhone && foundProfile.mobile) setApplicantPhone(foundProfile.mobile);
+          if (foundProfile.name) setApplicantName(foundProfile.name);
+          if (foundProfile.email) setApplicantEmail(foundProfile.email);
+          if (foundProfile.mobile) setApplicantPhone(foundProfile.mobile);
           if (foundProfile.resume_file_name) setResumeFileName(foundProfile.resume_file_name);
 
           const localSaved = candidateProfileService.saveLocalProfile({

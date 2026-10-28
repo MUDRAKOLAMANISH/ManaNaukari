@@ -36,6 +36,7 @@ import { UpdatePasswordPage } from '../pages/auth/UpdatePasswordPage';
 import { ProtectedRoute } from '../components/auth/ProtectedRoute';
 import { UserProtectedRoute } from '../components/auth/UserProtectedRoute';
 import { UnsubscribePage } from '../pages/UnsubscribePage';
+import { PrivacyPolicyPage } from '../pages/PrivacyPolicyPage';
 import { fromSlug } from '../utils/slugUtils';
 import { extractJobIdFromSlug } from '../utils/jobUrlUtils';
 
@@ -368,6 +369,12 @@ export function matchRoute(path: string, onNavigate: (targetPath: string) => voi
       return {
         component: wrapUserProtected(<CategoriesPage onNavigate={onNavigate} />),
         title: 'Job Categories | Mana Career',
+      };
+    case '/privacy-policy':
+    case '/privacy':
+      return {
+        component: wrapUserProtected(<PrivacyPolicyPage onNavigate={onNavigate} />),
+        title: 'Privacy Policy | Mana Career',
       };
     case '/about':
       return {

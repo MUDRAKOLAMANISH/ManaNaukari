@@ -7,8 +7,10 @@ interface SignUpPageProps {
   onNavigate: (path: string) => void;
 }
 
+import { GoogleLogoIcon } from './LoginPage';
+
 export const SignUpPage: React.FC<SignUpPageProps> = ({ onNavigate }) => {
-  const { signUp } = useAuth();
+  const { signUp, signInWithGoogle } = useAuth();
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -16,8 +18,29 @@ export const SignUpPage: React.FC<SignUpPageProps> = ({ onNavigate }) => {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isGoogleSubmitting, setIsGoogleSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isSuccess, setIsSuccess] = useState(false);
+
+  const handleGoogleSignIn = async () => {
+    setErrorMessage(null);
+    setIsGoogleSubmitting(true);
+    try {
+      const { error } = await signInWithGoogle();
+      if (error) {
+        let msg = error.message || 'Unable to connect to Google Auth.';
+        const lower = msg.toLowerCase();
+        if (lower.includes('unsupported provider') || lower.includes('provider is not enabled') || lower.includes('validation_failed')) {
+          msg = 'Google Sign-In is not enabled in your Supabase project settings yet. Please sign up with your email and password below, or enable Google Provider in your Supabase Dashboard (Authentication → Providers → Google).';
+        }
+        setErrorMessage(msg);
+        setIsGoogleSubmitting(false);
+      }
+    } catch {
+      setErrorMessage('Google Sign-In is not configured in your Supabase Auth dashboard yet. Please use email and password to sign up.');
+      setIsGoogleSubmitting(false);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -158,6 +181,35 @@ export const SignUpPage: React.FC<SignUpPageProps> = ({ onNavigate }) => {
                   <span className="leading-relaxed font-medium">{errorMessage}</span>
                 </div>
               )}
+
+              {/* Continue with Google Button */}
+              <div>
+                <button
+                  type="button"
+                  onClick={handleGoogleSignIn}
+                  disabled={isGoogleSubmitting || isSubmitting}
+                  className="w-full py-3 px-4 text-xs sm:text-sm font-bold text-slate-700 bg-white hover:bg-slate-50 active:bg-slate-100 rounded-xl border border-slate-300 shadow-2xs hover:shadow-xs transition-all cursor-pointer flex items-center justify-center gap-3 disabled:opacity-60"
+                >
+                  {isGoogleSubmitting ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin text-blue-600" />
+                      <span>Connecting to Google...</span>
+                    </>
+                  ) : (
+                    <>
+                      <GoogleLogoIcon className="w-5 h-5 shrink-0" />
+                      <span>Continue with Google</span>
+                    </>
+                  )}
+                </button>
+              </div>
+
+              {/* Divider */}
+              <div className="relative border-t border-slate-200 my-4 text-center">
+                <span className="bg-white px-3 text-[11px] font-bold text-slate-400 uppercase tracking-wider relative -top-2.5">
+                  or sign up with email
+                </span>
+              </div>
 
               <form onSubmit={handleSubmit} className="space-y-4 text-xs sm:text-sm">
                 

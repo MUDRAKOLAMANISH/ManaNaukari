@@ -155,18 +155,23 @@ app.post('/api/ai/extract-job', async (req, res) => {
   const ai = new GoogleGenAI({ apiKey });
 
   const systemInstruction = `You are an expert technical recruitment data extraction assistant for an Indian job portal (Mana Career).
-Extract structured job posting fields accurately from the provided job requisition webpage or URL.
+Extract structured job posting fields accurately and comprehensively from the provided job requisition webpage or URL.
 
 Rules:
-1. title: The job title (e.g., "Associate Software Engineer", "Data Analyst Intern", "Graduate Engineer Trainee").
+1. title: The exact job title (e.g., "Associate Software Engineer", "Data Analyst Intern", "Graduate Engineer Trainee").
 2. company: The official hiring company name (e.g., "Tata Consultancy Services", "Infosys", "Amazon", "Cognizant").
 3. location: The workplace location (e.g., "Bengaluru", "Hyderabad", "Pune", "Remote", "Pan India").
-4. experience: Experience required (e.g., "Fresher", "0-1 Years", "1-3 Years", "Fresher / Final Year").
+4. experience: Required experience (e.g., "Fresher", "0-1 Years", "1-3 Years", "Fresher / 2024-2026 Batch").
 5. job_type: Choose best from: "Fresher", "Internship", "Full Time", "Part Time", "Contract".
 6. category: Choose best from: "Software Engineering", "Data & Analytics", "QA & Testing", "Cloud & DevOps", "Operations & Support", "Product & Business", "Internship".
 7. skills_required: An array of key required technical and soft skills (e.g., ["Java", "SQL", "Spring Boot", "Git"]).
-8. salary: Explicit salary or stipend if mentioned (e.g., "₹3.5 - 4.5 LPA", "₹25,000 / month"), or null if undisclosed.
-9. description: Comprehensive, structured job description in markdown formatting including About Opportunity, Responsibilities, and Eligibility Criteria.
+8. salary: Explicit salary or stipend if mentioned (e.g., "₹3.5 - 4.5 LPA", "₹25,000 / month"), or "Best in Industry" if undisclosed.
+9. description: Exceptionally detailed, well-structured job description formatted in clear Markdown containing:
+   - ### About the Role & Opportunity: Comprehensive overview of the position at the company.
+   - ### Key Responsibilities: Bullet points detailing day-to-day duties and deliverables.
+   - ### Eligibility & Qualifications: Degree requirements (B.E / B.Tech / MCA / M.Tech / Degree), eligible batch years (e.g., 2023, 2024, 2025, 2026), and CGPA/Percentage criteria.
+   - ### Technical & Skill Expectations: Core languages, frameworks, problem-solving, and communication skills required.
+   - ### Application & Selection Process: Assessment rounds, technical interviews, and how to apply.
 10. apply_link: Keep the official URL provided as the apply_link.
 11. source: The platform or company portal (e.g., "Workday", "Greenhouse", "TCS iON", "Careers Portal").`;
 

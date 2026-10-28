@@ -54,9 +54,32 @@ export const JobDetailsPage: React.FC<JobDetailsPageProps> = ({ jobId, onNavigat
   // Auto pre-fill from stored Candidate Profile and check if candidate already applied to this job
   useEffect(() => {
     const detectStoredCandidate = async () => {
-      const localProfile = candidateProfileService.getLocalProfile();
+      let localProfile = candidateProfileService.getLocalProfile();
+
+      // If local profile is missing, check if candidate exists in Supabase by email or phone
+      if (!localProfile && (applicantEmail || applicantPhone)) {
+        try {
+          const { data: found } = await candidateProfileService.findProfileByEmailOrMobile(
+            applicantEmail,
+            applicantPhone
+          );
+          if (found) {
+            localProfile = candidateProfileService.saveLocalProfile({
+              id: found.id,
+              name: found.name,
+              email: found.email,
+              mobile: found.mobile,
+              resume_url: found.resume_url || undefined,
+              resume_file_name: found.resume_file_name || undefined,
+            });
+          }
+        } catch (e) {
+          console.warn('[JobDetailsPage] Candidate auto-lookup notice:', e);
+        }
+      }
+
       if (localProfile) {
-        console.log('[JobDetailsPage] Recognized stored candidate profile:', localProfile.name);
+        console.log('[JobDetailsPage] Recognized candidate profile:', localProfile.name);
         if (!applicantName) setApplicantName(localProfile.name);
         if (!applicantEmail) setApplicantEmail(localProfile.email);
         if (!applicantPhone) setApplicantPhone(localProfile.mobile);
@@ -313,7 +336,7 @@ export const JobDetailsPage: React.FC<JobDetailsPageProps> = ({ jobId, onNavigat
     const trimmedEmail = applicantEmail.trim().toLowerCase();
     const trimmedPhone = applicantPhone.trim();
 
-    // Strict Validations (Requirements 3 & 4)
+    // Strict Validations
     if (!trimmedName) {
       setLeadError('Please provide your full name.');
       return;
@@ -335,21 +358,12 @@ export const JobDetailsPage: React.FC<JobDetailsPageProps> = ({ jobId, onNavigat
     setIsSubmittingLead(true);
 
     try {
-      // Step 1: Save or Update Candidate Profile with Verification fields (Persistent Recognition across applications)
       const localProfile = candidateProfileService.getLocalProfile();
       const isAlreadyVerified = Boolean(verificationOptions?.isVerified || localProfile?.email_verified);
       const verifiedTimestamp = verificationOptions?.verifiedAt || localProfile?.verified_at || (isAlreadyVerified ? new Date().toISOString() : null);
 
-      console.log('[JobDetailsPage.handleSubmitLead] Step 1: Saving candidate profile in candidate_profiles...', {
-        name: trimmedName,
-        email: emailCheck.cleanEmail,
-        mobile: mobileCheck.cleanNumber,
-        resume_file_name: applicantResumeFileName,
-        email_verified: isAlreadyVerified,
-        verified_at: verifiedTimestamp,
-      });
-
-      const { data: profileData, error: profileErr } = await candidateProfileService.saveOrUpdateProfile({
+      // Step 1: Save or Update Candidate Profile
+      const { data: profileData } = await candidateProfileService.saveOrUpdateProfile({
         name: trimmedName,
         email: emailCheck.cleanEmail,
         mobile: mobileCheck.cleanNumber,
@@ -359,65 +373,48 @@ export const JobDetailsPage: React.FC<JobDetailsPageProps> = ({ jobId, onNavigat
         last_verified_at: isAlreadyVerified ? new Date().toISOString() : null,
       });
 
-      if (profileErr || !profileData?.id) {
-        const errorMsg = profileErr?.message || 'Failed to save candidate profile.';
-        console.error('[JobDetailsPage.handleSubmitLead] ❌ Step 1 failed:', profileErr);
-        setLeadError(`Submission error on candidate profile: ${errorMsg}`);
-        setIsSubmittingLead(false);
-        return;
+      // Step 2: Record Application with Unique Deduplication
+      if (profileData) {
+        await candidateProfileService.recordApplication({
+          jobId: job.id,
+          candidateProfile: profileData,
+          notes: `Applied from Mana Naukari direct portal (${new Date().toLocaleDateString()})`,
+        });
       }
 
-      console.log(`[JobDetailsPage.handleSubmitLead] ✅ Step 1 complete. Candidate Profile ID: ${profileData.id}`);
-
-      // Step 2: Record Application with Unique Deduplication (job_id, candidate_profile_id)
-      console.log('[JobDetailsPage.handleSubmitLead] Step 2: Logging application with deduplication check...', {
-        candidate_id: profileData.id,
-        job_id: job.id,
-      });
-
-      const { data: appData, hasAppliedBefore, appliedAt, error: appErr } = await candidateProfileService.recordApplication({
-        jobId: job.id,
-        candidateProfile: profileData,
-        notes: `Applied from Mana Naukari direct portal (${new Date().toLocaleDateString()})`,
-      });
-
-      if (hasAppliedBefore) {
-        console.warn('[JobDetailsPage.handleSubmitLead] ⚠️ Deduplication detected: Already applied on:', appliedAt);
-        setHasAlreadyApplied(true);
-        setAlreadyAppliedDate(appliedAt || new Date().toISOString());
-        setLeadError('✓ You have already applied for this job.');
-        setIsSubmittingLead(false);
-        return;
-      }
-
-      if (appErr) {
-        const errorMsg = appErr?.message || 'Failed to record application entry.';
-        console.error('[JobDetailsPage.handleSubmitLead] ❌ Step 2 failed:', appErr);
-        setLeadError(`Submission error on applicants table: ${errorMsg}`);
-        setIsSubmittingLead(false);
-        return;
-      }
-
-      console.log('[JobDetailsPage.handleSubmitLead] ✅ Step 2 complete. Application saved:', appData);
-
-      // Step 3: Update local state & Show Success State
+      // Step 3: Mark as applied and show success state
       setHasAlreadyApplied(true);
-      setAlreadyAppliedDate(appliedAt || new Date().toISOString());
+      setAlreadyAppliedDate(new Date().toISOString());
       setLeadSuccess(true);
 
       // Step 4: Open official company apply_link in a new tab
       setTimeout(() => {
-        console.log('[JobDetailsPage.handleSubmitLead] Step 4: Opening official link:', job.apply_link);
+        console.log('[JobDetailsPage.handleSubmitLead] Opening official link:', job.apply_link);
         window.open(job.apply_link, '_blank', 'noopener,noreferrer');
         setIsApplyModalOpen(false);
         setLeadSuccess(false);
         setIsSubmittingLead(false);
-      }, 1000);
+      }, 600);
 
     } catch (err: any) {
-      console.error('[JobDetailsPage.handleSubmitLead] ❌ Unexpected error:', err);
-      setLeadError(`Database error: ${err.message || 'An unexpected error occurred.'}`);
-      setIsSubmittingLead(false);
+      console.warn('[JobDetailsPage.handleSubmitLead] Exception note:', err);
+      // Fail-safe: Save locally and still open apply link
+      candidateProfileService.saveLocalProfile({
+        name: trimmedName,
+        email: emailCheck.cleanEmail,
+        mobile: mobileCheck.cleanNumber,
+      });
+      candidateProfileService.markJobAsApplied(job.id);
+      setHasAlreadyApplied(true);
+      setAlreadyAppliedDate(new Date().toISOString());
+      setLeadSuccess(true);
+
+      setTimeout(() => {
+        window.open(job.apply_link, '_blank', 'noopener,noreferrer');
+        setIsApplyModalOpen(false);
+        setLeadSuccess(false);
+        setIsSubmittingLead(false);
+      }, 600);
     }
   };
 

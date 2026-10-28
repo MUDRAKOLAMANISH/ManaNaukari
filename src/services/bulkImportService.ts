@@ -419,7 +419,7 @@ export const bulkImportService = {
     if (!jobs || jobs.length === 0) return '';
 
     const lines: string[] = [];
-    lines.push('🔥 *LATEST HIRING ALERTS | MANA NAUKARI* 🔥');
+    lines.push('🔥 *LATEST HIRING ALERTS | MANA CAREER* 🔥');
     lines.push('━━━━━━━━━━━━━━━━━━━━━━');
     lines.push('Verified Corporate Requisitions posted today. Direct applications open:');
     lines.push('');
@@ -433,28 +433,41 @@ export const bulkImportService = {
       lines.push(`💼 *Job Type:* ${job.jobType || 'Full Time'}`);
       lines.push(`💰 *Salary:* ${job.salary || 'Best in Industry'}`);
       
-      const skillsStr = job.skills.length > 0 ? job.skills.slice(0, 4).join(', ') : 'Technical Skills, Problem Solving';
+      const skillsStr = job.skills.length > 0 ? job.skills.slice(0, 5).join(', ') : 'Problem Solving, Technical Fundamentals';
       lines.push(`🛠️ *Key Skills:* ${skillsStr}`);
-      lines.push(`🔗 *Apply Here:* ${job.manaNaukariUrl}`);
+
+      // Add detailed description snippet if available
+      if (job.description) {
+        const cleanDesc = job.description
+          .replace(/[#*`_~]/g, ' ')
+          .replace(/\s+/g, ' ')
+          .trim();
+        const shortSnippet = cleanDesc.slice(0, 160) + (cleanDesc.length > 160 ? '...' : '');
+        if (shortSnippet) {
+          lines.push(`📋 *Role Overview:* ${shortSnippet}`);
+        }
+      }
+
+      lines.push(`🔗 *Apply Link:* ${job.manaNaukariUrl}`);
       lines.push('');
     });
 
     lines.push('━━━━━━━━━━━━━━━━━━━━━━');
-    lines.push('📌 *Important:* All positions are 100% verified. Zero placement fees.');
-    lines.push('🚀 *Free ATS Resume Check & More Jobs:* https://mananaukari.com');
+    lines.push('📌 *Important:* All positions are 100% verified. Zero application fees.');
+    lines.push('🚀 *Free ATS Resume Check & More Jobs:* https://manacarrier.netlify.app');
 
     return lines.join('\n');
   },
 
   /**
    * Generate professional LinkedIn Post
-   * Uses ONLY Mana Naukari URLs (Never original company career URLs).
+   * Uses ONLY Mana Carrier URLs (Never original company career URLs).
    */
   generateLinkedInPost(jobs: BulkImportSuccessItem[]): string {
     if (!jobs || jobs.length === 0) return '';
 
     const lines: string[] = [];
-    lines.push('🚀 Exciting Career Opportunities Alert! [Mana Naukari Verified Openings]');
+    lines.push('🚀 Exciting Career Opportunities Alert! [Mana Career Verified Openings]');
     lines.push('');
     lines.push('We have aggregated the latest verified hiring requisitions from top tech employers. Explore roles below and apply directly through our official verified links:');
     lines.push('');
@@ -465,30 +478,37 @@ export const bulkImportService = {
       lines.push(`⏳ Experience: ${job.experience || 'Fresher'}`);
       lines.push(`💼 Job Type: ${job.jobType || 'Full Time'}`);
       lines.push(`💰 Salary: ${job.salary || 'Best in Industry'}`);
-      const skillsStr = job.skills.length > 0 ? job.skills.slice(0, 4).join(', ') : 'Core Engineering, Problem Solving';
+      const skillsStr = job.skills.length > 0 ? job.skills.slice(0, 5).join(', ') : 'Core Engineering, Problem Solving';
       lines.push(`🛠️ Key Skills: ${skillsStr}`);
-      lines.push(`👉 Apply on Mana Naukari: ${job.manaNaukariUrl}`);
+      if (job.description) {
+        const cleanDesc = job.description.replace(/[#*`_~]/g, ' ').replace(/\s+/g, ' ').trim();
+        const shortSnippet = cleanDesc.slice(0, 140) + (cleanDesc.length > 140 ? '...' : '');
+        if (shortSnippet) {
+          lines.push(`📋 Role Summary: ${shortSnippet}`);
+        }
+      }
+      lines.push(`👉 Apply on Mana Career: ${job.manaNaukariUrl}`);
       lines.push('');
     });
 
-    lines.push('💡 Pro Tip: Optimize your resume before applying using our free AI ATS Resume Matcher on Mana Naukari!');
+    lines.push('💡 Pro Tip: Optimize your resume before applying using our free AI ATS Resume Matcher on Mana Career!');
     lines.push('');
-    lines.push('Follow Mana Naukari for daily verified engineering, IT, and fresher opportunities.');
+    lines.push('Follow Mana Career for daily verified engineering, IT, and fresher opportunities.');
     lines.push('');
-    lines.push('#Hiring #JobAlert #TechJobs #SoftwareEngineering #CareerOpportunities #ManaNaukari #FresherJobs #Recruitment #Careers');
+    lines.push('#Hiring #JobAlert #TechJobs #SoftwareEngineering #CareerOpportunities #ManaCareer #FresherJobs #Recruitment #Careers');
 
     return lines.join('\n');
   },
 
   /**
    * Generate professional Telegram Post
-   * Uses ONLY Mana Naukari URLs (Never original company career URLs).
+   * Uses ONLY Mana Carrier URLs (Never original company career URLs).
    */
   generateTelegramPost(jobs: BulkImportSuccessItem[]): string {
     if (!jobs || jobs.length === 0) return '';
 
     const lines: string[] = [];
-    lines.push('📢 **NEW JOB REQUISITIONS | MANA NAUKARI**');
+    lines.push('📢 **NEW JOB REQUISITIONS | MANA CAREER**');
     lines.push('━━━━━━━━━━━━━━━━━━━━━━');
     lines.push('⚡ Verified corporate openings are now active and accepting applicants:');
     lines.push('');
@@ -499,15 +519,22 @@ export const bulkImportService = {
       lines.push(`⏳ Experience: ${job.experience || 'Fresher'}`);
       lines.push(`💼 Job Type: ${job.jobType || 'Full Time'}`);
       lines.push(`💰 Salary: ${job.salary || 'Best in Industry'}`);
-      const skillsStr = job.skills.length > 0 ? job.skills.slice(0, 4).join(', ') : 'Technical Skills, Problem Solving';
+      const skillsStr = job.skills.length > 0 ? job.skills.slice(0, 5).join(', ') : 'Technical Skills, Problem Solving';
       lines.push(`🛠️ Skills: ${skillsStr}`);
+      if (job.description) {
+        const cleanDesc = job.description.replace(/[#*`_~]/g, ' ').replace(/\s+/g, ' ').trim();
+        const shortSnippet = cleanDesc.slice(0, 140) + (cleanDesc.length > 140 ? '...' : '');
+        if (shortSnippet) {
+          lines.push(`📋 Overview: ${shortSnippet}`);
+        }
+      }
       lines.push(`🔗 Apply: ${job.manaNaukariUrl}`);
       lines.push('');
     });
 
     lines.push('━━━━━━━━━━━━━━━━━━━━━━');
     lines.push('✅ 100% Verified Requisitions | No Middlemen | Free ATS Resume Check');
-    lines.push('🌐 Browse all jobs: https://mananaukari.com');
+    lines.push('🌐 Browse all jobs: https://manacarrier.netlify.app');
 
     return lines.join('\n');
   },

@@ -898,6 +898,7 @@ https://jobs.lever.co/company/example-role`}
                         <th className="py-3.5 px-4">Job Type</th>
                         <th className="py-3.5 px-4">Skills</th>
                         <th className="py-3.5 px-4">Status</th>
+                        <th className="py-3.5 px-4 text-center">View</th>
                         <th className="py-3.5 px-4 text-center">Edit</th>
                         <th className="py-3.5 px-4 text-center">Delete</th>
                       </tr>
@@ -992,6 +993,18 @@ https://jobs.lever.co/company/example-role`}
                                   <span>Active (Live)</span>
                                 </span>
                               )}
+                            </td>
+
+                            {/* View / Description Action Column */}
+                            <td className="py-3.5 px-4 text-center whitespace-nowrap">
+                              <button
+                                type="button"
+                                onClick={() => setPreviewJob(job)}
+                                className="inline-flex items-center justify-center p-2 text-blue-700 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded-lg transition-colors cursor-pointer"
+                                title="View full description & details"
+                              >
+                                <Eye className="w-3.5 h-3.5" />
+                              </button>
                             </td>
 
                             {/* Edit Action Button Column */}

@@ -80,17 +80,6 @@ export function extractJobIdFromSlug(slugOrId: string): string {
 export function getAbsoluteJobUrl(jobUrlPath: string): string {
   if (!jobUrlPath) return WEBSITE_URL;
 
-  // Normalize path segment
-  const parts = jobUrlPath.split('/');
-  const slugOrId = parts[parts.length - 1] || '';
-  
-  // Extract real job ID
-  const id = extractJobIdFromSlug(slugOrId);
-
-  if (id) {
-    return `${WEBSITE_URL}/jobs/${id}`;
-  }
-
   const cleanPath = jobUrlPath.startsWith('/') ? jobUrlPath : `/${jobUrlPath}`;
   return `${WEBSITE_URL}${cleanPath}`;
 }

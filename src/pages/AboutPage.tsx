@@ -116,7 +116,7 @@ export const AboutPage: React.FC<AboutPageProps> = ({ onNavigate }) => {
             <span>Privacy Policy</span>
           </div>
           <p className="text-xs text-slate-600 leading-relaxed">
-            <strong>Mana Career</strong> respects your privacy. We never sell, rent, or trade your personal data. Subscription emails and job alert preferences are securely handled and can be unsubscribed with a single click. For data access or deletion requests, email us at <a href="mailto:mananaukari2026@gmail.com" className="text-blue-600 underline">mananaukari2026@gmail.com</a>.
+            <strong>Mana Career</strong> respects your privacy. We never sell, rent, or trade your personal data. Subscription emails and job alert preferences are securely handled and can be unsubscribed with a single click. Read our full <button onClick={() => onNavigate('/privacy-policy')} className="text-blue-600 font-semibold underline cursor-pointer">Privacy Policy</button> or email us for data requests at <a href="mailto:manishmudrakola8@gmail.com" className="text-blue-600 underline">manishmudrakola8@gmail.com</a>.
           </p>
           <ul className="text-xs text-slate-500 space-y-1.5 list-disc pl-4">
             <li>Zero tracking of intrusive third-party advertising cookies.</li>
