@@ -67,7 +67,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     // 2. Auth State Change Listener
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, currentSession) => {
       if (!isMounted) return;
-      console.log(`[Mana Naukari Auth] Event: ${event} | User: ${currentSession?.user?.email || 'None'}`);
+      console.log(`[ManaCarrier Auth] Event: ${event} | User: ${currentSession?.user?.email || 'None'}`);
 
       setSession(currentSession);
       setUser(currentSession?.user ?? null);

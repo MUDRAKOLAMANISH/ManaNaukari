@@ -36,7 +36,7 @@ export const PortfolioServicePage: React.FC<PortfolioServicePageProps> = ({ onNa
 
       // Open WhatsApp directly with prefilled message
       const text = encodeURIComponent(
-        `Hi Manish / Mana Naukari Team!\nI would like to order the *${selectedPlan?.name || 'Developer Portfolio'}* package (${selectedPlan?.price || ''}).\n\nName: ${candidateName}\nRole: ${candidateRole}\nEmail: ${candidateEmail}\nGitHub: ${candidateGithub || 'None'}\n\nPlease share the next steps!`
+        `Hi Manish / ManaCarrier Team!\nI would like to order the *${selectedPlan?.name || 'Developer Portfolio'}* package (${selectedPlan?.price || ''}).\n\nName: ${candidateName}\nRole: ${candidateRole}\nEmail: ${candidateEmail}\nGitHub: ${candidateGithub || 'None'}\n\nPlease share the next steps!`
       );
       window.open(`https://wa.me/91${candidatePhone.replace(/[^0-9]/g, '')}?text=${text}`, '_blank');
     }, 700);
@@ -49,7 +49,7 @@ export const PortfolioServicePage: React.FC<PortfolioServicePageProps> = ({ onNa
       <section className="text-center max-w-4xl mx-auto space-y-6 pt-6 sm:pt-10">
         <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-indigo-50 border border-indigo-200 text-indigo-700 text-xs font-semibold shadow-2xs">
           <Sparkles className="w-3.5 h-3.5 text-indigo-600" />
-          <span>Launch Your Tech Brand with Mana Naukari</span>
+          <span>Launch Your Tech Brand with ManaCarrier</span>
         </div>
 
         <div className="space-y-3.5">

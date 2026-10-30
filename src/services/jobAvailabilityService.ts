@@ -2,6 +2,18 @@ import { supabase } from '../lib/supabase';
 import { Job } from '../types/database.types';
 import { verifyJobAvailability, VerificationResult } from './jobVerificationEngine';
 
+export interface FlaggedJobDetail {
+  id: string;
+  title: string;
+  company: string;
+  apply_link: string;
+  status: string; // 'closed' | 'needs_review' | 'expired' | 'OPEN' | etc
+  reason: string;
+  confidence: string;
+  evidenceSummary?: string;
+  finalUrl?: string;
+}
+
 export interface BatchCheckSummary {
   success: boolean;
   totalChecked: number;
@@ -10,6 +22,7 @@ export interface BatchCheckSummary {
   needsReviewCount: number;
   unverifiedCount: number;
   errorsCount: number;
+  flaggedJobs?: FlaggedJobDetail[];
 }
 
 export const jobAvailabilityService = {
@@ -45,15 +58,17 @@ export const jobAvailabilityService = {
 
       const result = await this.checkSingleJob(job as Job);
 
+      const nowIso = new Date().toISOString();
+
       // Persist update in Supabase with schema fallbacks
       const updatePayload: any = {
         status: result.dbStatus,
         review_reason: result.reason,
-        review_date: result.lastChecked,
+        review_date: nowIso,
         verification_confidence: result.confidence,
         verification_evidence: result.evidence.evidenceSummary,
         final_url: result.evidence.finalUrl,
-        updated_at: new Date().toISOString(),
+        updated_at: nowIso,
       };
 
       let { error: updateErr } = await supabase
@@ -61,36 +76,42 @@ export const jobAvailabilityService = {
         .update(updatePayload)
         .eq('id', jobId);
 
-      // Fallback 1: If new columns missing, retry with basic review columns
-      if (updateErr && (
-        updateErr.message?.includes('verification_confidence') ||
-        updateErr.message?.includes('verification_evidence') ||
-        updateErr.message?.includes('final_url') ||
-        updateErr.message?.includes('schema cache')
-      )) {
-        console.warn(`[Job Checker] Optional verification columns missing in DB. Retrying with standard review columns for ID ${jobId}`);
-        const fallbackRes = await supabase
+      // Fallback 1: If extended verification columns missing
+      if (updateErr) {
+        console.warn(`[Job Checker] Primary column update failed for ID ${jobId}. Trying standard review columns... (${updateErr.message})`);
+        const fallbackRes1 = await supabase
           .from('jobs')
           .update({
             status: result.dbStatus,
             review_reason: result.reason,
-            review_date: result.lastChecked,
-            updated_at: new Date().toISOString(),
+            review_date: nowIso,
+            updated_at: nowIso,
           })
           .eq('id', jobId);
-        updateErr = fallbackRes.error;
+        updateErr = fallbackRes1.error;
       }
 
-      // Fallback 2: If 'needs_review' restricted by constraint
+      // Fallback 2: If review_date / review_reason missing
+      if (updateErr) {
+        console.warn(`[Job Checker] Review columns missing for ID ${jobId}. Fallback to basic status & updated_at... (${updateErr.message})`);
+        const fallbackRes2 = await supabase
+          .from('jobs')
+          .update({
+            status: result.dbStatus,
+            updated_at: nowIso,
+          })
+          .eq('id', jobId);
+        updateErr = fallbackRes2.error;
+      }
+
+      // Fallback 3: If 'needs_review' or 'closed' restricted by check constraint
       if (updateErr && (updateErr.message?.includes('check constraint') || updateErr.message?.includes('jobs_status_check'))) {
         console.warn(`[Job Checker] Status constraint triggered. Retrying update with status 'expired' for ID ${jobId}`);
         const constraintFallback = await supabase
           .from('jobs')
           .update({
             status: 'expired',
-            review_reason: result.reason,
-            review_date: result.lastChecked,
-            updated_at: new Date().toISOString(),
+            updated_at: nowIso,
           })
           .eq('id', jobId);
         updateErr = constraintFallback.error;
@@ -141,7 +162,9 @@ export const jobAvailabilityService = {
       let unverifiedCount = 0;
       let errorsCount = 0;
 
-      const results: { success: boolean; result: VerificationResult }[] = [];
+      const flaggedJobs: FlaggedJobDetail[] = [];
+
+      const results: { success: boolean; result: VerificationResult; job: Job }[] = [];
       const batchSize = 5;
 
       for (let i = 0; i < activeJobs.length; i += batchSize) {
@@ -151,17 +174,19 @@ export const jobAvailabilityService = {
             try {
               const res = await this.checkAndUpdateJobById(job.id);
               if (res.success && res.result) {
-                return { success: true, result: res.result };
+                return { success: true, result: res.result, job };
               } else {
                 return {
                   success: false,
                   result: await this.checkSingleJob(job),
+                  job,
                 };
               }
             } catch (err) {
               return {
                 success: false,
                 result: await this.checkSingleJob(job),
+                job,
               };
             }
           })
@@ -169,16 +194,31 @@ export const jobAvailabilityService = {
         results.push(...batchResults);
       }
 
-      results.forEach(({ success, result }) => {
+      results.forEach(({ success, result, job }) => {
         if (!success) errorsCount++;
-        if (result.status === 'OPEN') openCount++;
-        else if (result.status === 'CLOSED' || result.status === 'EXPIRED') closedCount++;
-        else if (result.status === 'NEEDS_REVIEW') needsReviewCount++;
-        else if (result.status === 'UNVERIFIED') unverifiedCount++;
+        if (result.status === 'OPEN') {
+          openCount++;
+        } else {
+          if (result.status === 'CLOSED' || result.status === 'EXPIRED') closedCount++;
+          else if (result.status === 'NEEDS_REVIEW') needsReviewCount++;
+          else if (result.status === 'UNVERIFIED') unverifiedCount++;
+
+          flaggedJobs.push({
+            id: job.id,
+            title: job.title,
+            company: job.company,
+            apply_link: job.apply_link,
+            status: result.dbStatus || (result.status === 'CLOSED' ? 'closed' : result.status === 'EXPIRED' ? 'expired' : 'needs_review'),
+            reason: result.reason,
+            confidence: result.confidence,
+            evidenceSummary: result.evidence.evidenceSummary,
+            finalUrl: result.evidence.finalUrl,
+          });
+        }
       });
 
       console.log(
-        `[Job Checker Engine] Audit complete. Total: ${activeJobs.length}, Open: ${openCount}, Closed: ${closedCount}, Needs Review: ${needsReviewCount}, Unverified: ${unverifiedCount}, Issues: ${errorsCount}`
+        `[Job Checker Engine] Audit complete. Total: ${activeJobs.length}, Open: ${openCount}, Closed: ${closedCount}, Needs Review: ${needsReviewCount}, Unverified: ${unverifiedCount}, Issues: ${errorsCount}, Flagged: ${flaggedJobs.length}`
       );
 
       return {
@@ -189,6 +229,7 @@ export const jobAvailabilityService = {
         needsReviewCount,
         unverifiedCount,
         errorsCount,
+        flaggedJobs,
       };
     } catch (err: any) {
       console.error('[Job Checker Engine] Batch check exception:', err.message || err);

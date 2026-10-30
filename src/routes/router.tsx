@@ -29,12 +29,7 @@ import { AiWebsiteDevelopmentPage } from '../pages/AiWebsiteDevelopmentPage';
 import { AdminMockInterviewsPage } from '../pages/admin/AdminMockInterviewsPage';
 import { CareerRoadmapPage } from '../pages/CareerRoadmapPage';
 import { AdminCareerRoadmapsPage } from '../pages/admin/AdminCareerRoadmapsPage';
-import { LoginPage } from '../pages/auth/LoginPage';
-import { SignUpPage } from '../pages/auth/SignUpPage';
-import { ForgotPasswordPage } from '../pages/auth/ForgotPasswordPage';
-import { UpdatePasswordPage } from '../pages/auth/UpdatePasswordPage';
 import { ProtectedRoute } from '../components/auth/ProtectedRoute';
-import { UserProtectedRoute } from '../components/auth/UserProtectedRoute';
 import { UnsubscribePage } from '../pages/UnsubscribePage';
 import { PrivacyPolicyPage } from '../pages/PrivacyPolicyPage';
 import { fromSlug } from '../utils/slugUtils';
@@ -63,37 +58,20 @@ export function matchRoute(path: string, onNavigate: (targetPath: string) => voi
   const redirectParam = getRedirectQueryParam(path);
 
   // ========================================================
-  // 1. PUBLIC AUTHENTICATION ROUTES (BARE LAYOUT)
+  // 1. PUBLIC AUTHENTICATION ROUTES REDIRECTS
   // ========================================================
-  if (cleanPath === '/login') {
+  if (cleanPath === '/login' || cleanPath === '/signup' || cleanPath === '/register' || cleanPath === '/forgot-password' || cleanPath === '/update-password') {
+    // If visitor meant admin login, redirect to /admin/login. Otherwise redirect to Home.
+    if (path.includes('redirect=%2Fadmin') || path.includes('redirect=/admin')) {
+      return {
+        component: <AdminLoginPage onNavigate={onNavigate} />,
+        title: 'Admin Sign In | Mana Career',
+        isBareLayout: true,
+      };
+    }
     return {
-      component: <LoginPage onNavigate={onNavigate} redirectPath={redirectParam} />,
-      title: 'Sign In | Mana Career',
-      isBareLayout: true,
-    };
-  }
-
-  if (cleanPath === '/signup' || cleanPath === '/register') {
-    return {
-      component: <SignUpPage onNavigate={onNavigate} />,
-      title: 'Create Account | Mana Career',
-      isBareLayout: true,
-    };
-  }
-
-  if (cleanPath === '/forgot-password' || cleanPath === '/reset-password-request') {
-    return {
-      component: <ForgotPasswordPage onNavigate={onNavigate} />,
-      title: 'Reset Password | Mana Career',
-      isBareLayout: true,
-    };
-  }
-
-  if (cleanPath === '/update-password' || cleanPath === '/set-new-password') {
-    return {
-      component: <UpdatePasswordPage onNavigate={onNavigate} />,
-      title: 'Set New Password | Mana Career',
-      isBareLayout: true,
+      component: <HomePage onNavigate={onNavigate} />,
+      title: 'Mana Career | Premier Open Tech & Fresher Job Portal',
     };
   }
 
@@ -272,26 +250,19 @@ export function matchRoute(path: string, onNavigate: (targetPath: string) => voi
   }
 
   // ========================================================
-  // 3. CANDIDATE PORTAL ROUTES (USER AUTHENTICATION GUARD)
+  // 3. CANDIDATE PORTAL ROUTES (100% OPEN & ANONYMOUS ACCESS)
   // ========================================================
-
-  // Helper wrapper for user protected routes
-  const wrapUserProtected = (element: React.ReactNode): React.ReactNode => (
-    <UserProtectedRoute currentPath={path} onNavigate={onNavigate}>
-      {element}
-    </UserProtectedRoute>
-  );
 
   if (cleanPath === '/post-job' || cleanPath === '/recruiter/post-job') {
     return {
-      component: wrapUserProtected(<RecruiterPostJobPage onNavigate={onNavigate} />),
+      component: <RecruiterPostJobPage onNavigate={onNavigate} />,
       title: 'Post a Job (Verified Recruiter) | Mana Career',
     };
   }
 
   if (cleanPath === '/recruiter/dashboard' || cleanPath === '/recruiter') {
     return {
-      component: wrapUserProtected(<RecruiterDashboardPage onNavigate={onNavigate} />),
+      component: <RecruiterDashboardPage onNavigate={onNavigate} />,
       title: 'Recruiter Dashboard | Mana Career',
     };
   }
@@ -300,7 +271,7 @@ export function matchRoute(path: string, onNavigate: (targetPath: string) => voi
     const categorySlug = cleanPath.replace('/categories/', '');
     const readableTitle = fromSlug(categorySlug);
     return {
-      component: wrapUserProtected(<CategoryDetailsPage categorySlug={categorySlug} onNavigate={onNavigate} />),
+      component: <CategoryDetailsPage categorySlug={categorySlug} onNavigate={onNavigate} />,
       title: `${readableTitle} Jobs | Mana Career`,
     };
   }
@@ -309,7 +280,7 @@ export function matchRoute(path: string, onNavigate: (targetPath: string) => voi
     const rawParam = cleanPath.replace('/jobs/', '');
     const jobId = extractJobIdFromSlug(rawParam);
     return {
-      component: wrapUserProtected(<JobDetailsPage jobId={jobId} onNavigate={onNavigate} />),
+      component: <JobDetailsPage jobId={jobId} onNavigate={onNavigate} />,
       title: 'Job Details | Mana Career',
     };
   }
@@ -318,78 +289,78 @@ export function matchRoute(path: string, onNavigate: (targetPath: string) => voi
     case '/website-development':
     case '/ai-website-development':
       return {
-        component: wrapUserProtected(<AiWebsiteDevelopmentPage onNavigate={onNavigate} />),
+        component: <AiWebsiteDevelopmentPage onNavigate={onNavigate} />,
         title: 'AI Website Development Service (From ₹499) | Mana Career',
       };
     case '/portfolio-service':
       return {
-        component: wrapUserProtected(<PortfolioServicePage onNavigate={onNavigate} />),
+        component: <PortfolioServicePage onNavigate={onNavigate} />,
         title: 'Portfolio Website Service | Mana Career',
       };
     case '/internships':
       return {
-        component: wrapUserProtected(<JobsPage onNavigate={onNavigate} />),
+        component: <JobsPage onNavigate={onNavigate} />,
         title: 'Internships in India | Mana Career',
       };
     case '/work-from-home':
     case '/wfh':
       return {
-        component: wrapUserProtected(<JobsPage onNavigate={onNavigate} />),
+        component: <JobsPage onNavigate={onNavigate} />,
         title: 'Work From Home (Remote) Jobs | Mana Career',
       };
     case '/resume-review':
       return {
-        component: wrapUserProtected(<ResumeReviewPage onNavigate={onNavigate} />),
+        component: <ResumeReviewPage onNavigate={onNavigate} />,
         title: 'ATS Resume Review & Optimization | Mana Career',
       };
     case '/materials':
       return {
-        component: wrapUserProtected(<MaterialsPage onNavigate={onNavigate} />),
+        component: <MaterialsPage onNavigate={onNavigate} />,
         title: 'Study Notes & Materials | Mana Career',
       };
     case '/career-roadmap':
     case '/career-plan':
     case '/roadmap':
       return {
-        component: wrapUserProtected(<CareerRoadmapPage onNavigate={onNavigate} />),
+        component: <CareerRoadmapPage onNavigate={onNavigate} />,
         title: 'Personal Career Roadmap & AI Learning Plan | Mana Career',
       };
     case '/mock-interview':
     case '/mock-interviews':
       return {
-        component: wrapUserProtected(<MockInterviewPage onNavigate={onNavigate} />),
+        component: <MockInterviewPage onNavigate={onNavigate} />,
         title: 'Tech Mock Interview Practice (₹99) | Mana Career',
       };
     case '/jobs':
       return {
-        component: wrapUserProtected(<JobsPage onNavigate={onNavigate} />),
+        component: <JobsPage onNavigate={onNavigate} />,
         title: 'Explore All Job Openings | Mana Career',
       };
     case '/categories':
       return {
-        component: wrapUserProtected(<CategoriesPage onNavigate={onNavigate} />),
+        component: <CategoriesPage onNavigate={onNavigate} />,
         title: 'Job Categories | Mana Career',
       };
     case '/privacy-policy':
     case '/privacy':
       return {
-        component: wrapUserProtected(<PrivacyPolicyPage onNavigate={onNavigate} />),
+        component: <PrivacyPolicyPage onNavigate={onNavigate} />,
         title: 'Privacy Policy | Mana Career',
       };
     case '/about':
       return {
-        component: wrapUserProtected(<AboutPage onNavigate={onNavigate} />),
+        component: <AboutPage onNavigate={onNavigate} />,
         title: 'About Us | Mana Career',
       };
     case '/contact':
       return {
-        component: wrapUserProtected(<ContactPage onNavigate={onNavigate} />),
+        component: <ContactPage onNavigate={onNavigate} />,
         title: 'Contact & Support | Mana Career',
       };
     case '/':
     default:
       return {
-        component: wrapUserProtected(<HomePage onNavigate={onNavigate} />),
+        component: <HomePage onNavigate={onNavigate} />,
         title: 'Mana Career | Premier Tech & Fresher Job Portal',
       };
   }

@@ -28,7 +28,7 @@ serve(async (req) => {
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
     const cronSecret = Deno.env.get("CRON_SECRET")?.trim() || "";
     const resendApiKey = Deno.env.get("RESEND_API_KEY") || "";
-    const appUrl = Deno.env.get("APP_URL") || "https://mana-naukari.netlify.app";
+    const appUrl = Deno.env.get("APP_URL") || "https://manacarrier.netlify.app";
 
     if (!supabaseUrl || !supabaseServiceKey) {
       return new Response(

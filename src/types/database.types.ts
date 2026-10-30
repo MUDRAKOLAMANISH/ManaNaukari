@@ -1,5 +1,5 @@
 /**
- * Database Models and TypeScript Interfaces for Mana Naukari
+ * Database Models and TypeScript Interfaces for ManaCarrier
  * Corresponding to the Supabase PostgreSQL schema
  */
 

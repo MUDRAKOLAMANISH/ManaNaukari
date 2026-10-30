@@ -213,7 +213,7 @@ export const AiWebsiteDevelopmentPage: React.FC<AiWebsiteDevelopmentPageProps> =
 
         const planPrice = selectedTier ? selectedTier.price : '₹499';
         const text = encodeURIComponent(
-          `Hi Mana Naukari AI Dev Team!\nI would like to order the *${planName}* package (${planPrice}).\n\nName: ${clientName}\nEmail: ${clientEmail}\nWhatsApp: ${clientPhone}\nWebsite Category: ${websiteType}\nPages: ${numberOfPages}\nBudget: ${budgetRange}\nIdea: ${websiteIdea}\nReference: ${referenceWebsiteUrl || 'None'}\n\nPlease review my enquiry!`
+          `Hi ManaCarrier AI Dev Team!\nI would like to order the *${planName}* package (${planPrice}).\n\nName: ${clientName}\nEmail: ${clientEmail}\nWhatsApp: ${clientPhone}\nWebsite Category: ${websiteType}\nPages: ${numberOfPages}\nBudget: ${budgetRange}\nIdea: ${websiteIdea}\nReference: ${referenceWebsiteUrl || 'None'}\n\nPlease review my enquiry!`
         );
         window.open(`https://wa.me/91${clientPhone.replace(/[^0-9]/g, '')}?text=${text}`, '_blank');
       } else {
@@ -327,7 +327,7 @@ export const AiWebsiteDevelopmentPage: React.FC<AiWebsiteDevelopmentPageProps> =
               <span className="w-3 h-3 rounded-full bg-rose-500/80 inline-block" />
               <span className="w-3 h-3 rounded-full bg-amber-500/80 inline-block" />
               <span className="w-3 h-3 rounded-full bg-emerald-500/80 inline-block" />
-              <span className="ml-2 font-mono text-[11px] text-slate-500">https://yourname.mananaukari.app</span>
+              <span className="ml-2 font-mono text-[11px] text-slate-500">https://yourname.manacarrier.app</span>
             </div>
             <div className="flex items-center gap-3">
               <span className="hidden sm:inline-flex items-center gap-1 text-[11px] text-emerald-400 bg-emerald-950/60 px-2 py-0.5 rounded-full border border-emerald-800/50">

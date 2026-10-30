@@ -1,6 +1,6 @@
 -- ============================================================================
 -- SQL Migration: Candidate Profile System & Duplicate Application Prevention
--- Platform: Mana Naukari (Supabase / PostgreSQL)
+-- Platform: ManaCarrier (Supabase / PostgreSQL)
 -- Description:
 --   1. Creates candidate_profiles table for persistent user recognition.
 --   2. Adds candidate_profile_id and applied_at to applicants table.

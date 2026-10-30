@@ -536,7 +536,7 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
         </section>
       )}
 
-      {/* 7. Why Choose Mana Naukari (3-Column Modern Feature Section) */}
+      {/* 7. Why Choose ManaCarrier (3-Column Modern Feature Section) */}
       <WhyChooseUsSection onNavigate={onNavigate} />
 
       {/* 8. Featured Companies Section (Only real companies from DB) */}

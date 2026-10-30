@@ -147,6 +147,7 @@ export const handler = async (event: any) => {
     let needsReviewCount = 0;
     let unverifiedCount = 0;
     let errorsCount = 0;
+    const flaggedJobs: any[] = [];
 
     const batchSize = 5;
     for (let i = 0; i < activeJobs.length; i += batchSize) {
@@ -164,38 +165,49 @@ export const handler = async (event: any) => {
               status: job.status,
             });
 
-            if (result.status === 'OPEN') openCount++;
-            else if (result.status === 'CLOSED' || result.status === 'EXPIRED') closedCount++;
-            else if (result.status === 'NEEDS_REVIEW') needsReviewCount++;
-            else if (result.status === 'UNVERIFIED') unverifiedCount++;
+            if (result.status === 'OPEN') {
+              openCount++;
+            } else {
+              if (result.status === 'CLOSED' || result.status === 'EXPIRED') closedCount++;
+              else if (result.status === 'NEEDS_REVIEW') needsReviewCount++;
+              else if (result.status === 'UNVERIFIED') unverifiedCount++;
 
-            // Update database
+              flaggedJobs.push({
+                id: job.id,
+                title: job.title,
+                company: job.company,
+                apply_link: job.apply_link,
+                status: result.dbStatus || (result.status === 'CLOSED' ? 'closed' : result.status === 'EXPIRED' ? 'expired' : 'needs_review'),
+                reason: result.reason,
+                confidence: result.confidence,
+                evidenceSummary: result.evidence.evidenceSummary,
+                finalUrl: result.evidence.finalUrl,
+              });
+            }
+
+            // Update database with fallbacks
+            const nowIso = new Date().toISOString();
             let { error: updateErr } = await supabase
               .from('jobs')
               .update({
                 status: result.dbStatus,
                 review_reason: result.reason,
-                review_date: result.lastChecked,
+                review_date: nowIso,
                 verification_confidence: result.confidence,
                 verification_evidence: result.evidence.evidenceSummary,
                 final_url: result.evidence.finalUrl,
-                updated_at: new Date().toISOString(),
+                updated_at: nowIso,
               })
               .eq('id', job.id);
 
-            if (updateErr && (
-              updateErr.message?.includes('verification_confidence') ||
-              updateErr.message?.includes('verification_evidence') ||
-              updateErr.message?.includes('final_url') ||
-              updateErr.message?.includes('schema cache')
-            )) {
+            if (updateErr) {
               await supabase
                 .from('jobs')
                 .update({
                   status: result.dbStatus,
                   review_reason: result.reason,
-                  review_date: result.lastChecked,
-                  updated_at: new Date().toISOString(),
+                  review_date: nowIso,
+                  updated_at: nowIso,
                 })
                 .eq('id', job.id);
             }
@@ -214,10 +226,11 @@ export const handler = async (event: any) => {
         totalChecked: activeJobs.length,
         openCount,
         closedCount,
-        needsReviewCount: needsReviewCount,
-        flaggedCount: closedCount + needsReviewCount,
+        needsReviewCount,
+        flaggedCount: flaggedJobs.length,
         unverifiedCount,
         errorsCount,
+        flaggedJobs,
       }),
     };
   } catch (err: any) {

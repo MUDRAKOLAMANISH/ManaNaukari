@@ -1,6 +1,6 @@
 -- ============================================================================
 -- SQL Migration: Add Availability Monitoring columns to jobs table
--- Platform: Mana Naukari (Supabase / PostgreSQL)
+-- Platform: ManaCarrier (Supabase / PostgreSQL)
 -- Description:
 --   Adds review_reason and review_date columns to support automated job health checks,
 --   and safely updates the status check constraint to include 'needs_review'.

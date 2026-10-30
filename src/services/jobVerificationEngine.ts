@@ -1,5 +1,5 @@
 /**
- * Advanced Multi-Stage Job Verification Engine for Mana Naukari
+ * Advanced Multi-Stage Job Verification Engine for ManaCarrier
  *
  * Implements an evidence-based, 5-stage verification pipeline:
  *  - Stage A: URL validation, SSRF protection, connectivity, HTTP status analysis
@@ -126,6 +126,28 @@ const HIGH_CONFIDENCE_CLOSURE_PHRASES = [
   'this posting is closed',
   'page you are looking for does not exist or has been removed',
   'job you are looking for is no longer available',
+  '404 not found',
+  '404 page not found',
+  'page not found',
+  'page could not be found',
+  'requisition has been deleted',
+  'job has been deleted',
+  'job does not exist',
+  'job not found',
+  'position not found',
+  'requisition not found',
+  'this job was removed',
+  'posting has been removed',
+  'invalid job id',
+  'error 404',
+  'this job post has expired',
+  'the job you requested is not available',
+  'job is inactive',
+  'this job is inactive',
+  'this requisition is closed',
+  'requisition is inactive',
+  'posting is closed',
+  'posting inactive',
 ];
 
 /**
@@ -258,7 +280,7 @@ async function runAiAssistedVerification(
 
   try {
     const ai = new GoogleGenAI({ apiKey });
-    const systemInstruction = `You are a strict, factual job requisition availability auditor for Mana Naukari.
+    const systemInstruction = `You are a strict, factual job requisition availability auditor for ManaCarrier.
 Your job is to determine if a specific job requisition is OPEN, CLOSED, EXPIRED, or NEEDS_REVIEW based ONLY on provided official page evidence.
 
 Rules:
@@ -423,7 +445,7 @@ export async function verifyJobAvailability(
       method: 'GET',
       headers: {
         'User-Agent':
-          'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36 ManaNaukariBot/2.0',
+          'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36 ManaCarrierBot/2.0',
         Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
         'Accept-Language': 'en-US,en;q=0.9',
       },
@@ -562,6 +584,29 @@ export async function verifyJobAvailability(
   const titleMatch = htmlText.match(/<title\b[^>]*>([\s\S]*?)<\/title>/i);
   if (titleMatch && titleMatch[1]) {
     evidence.pageTitle = titleMatch[1].replace(/\s+/g, ' ').trim();
+    const lowerTitle = evidence.pageTitle.toLowerCase();
+
+    // Check if Page Title indicates 404, Not Found, Closed, or Removed
+    const titleClosureSignals = [
+      '404', 'not found', 'page removed', 'job closed', 'position closed',
+      'requisition closed', 'expired', 'page missing', 'error 404', 'no longer available'
+    ];
+    for (const signal of titleClosureSignals) {
+      if (lowerTitle.includes(signal)) {
+        return {
+          status: 'CLOSED',
+          confidence: 'HIGH',
+          dbStatus: 'closed',
+          reason: `Official page title indicates removed or closed requisition ("${evidence.pageTitle}")`,
+          evidence: {
+            ...evidence,
+            verificationMethod: 'deterministic_html',
+            evidenceSummary: `Official requisition page title contains closure signal ("${evidence.pageTitle}").`,
+          },
+          lastChecked,
+        };
+      }
+    }
   }
 
   // Stage C: Redirect Destination Analysis
@@ -629,10 +674,12 @@ export async function verifyJobAvailability(
   }
 
   // Stage B3: Active Application Button & Form Detection
+  let hasExplicitApplyButton = false;
   for (const phrase of ACTIVE_APPLICATION_PHRASES) {
     if (cleanText.includes(phrase)) {
       evidence.matchedOpenPhrase = phrase;
       evidence.hasApplyButton = true;
+      hasExplicitApplyButton = true;
       break;
     }
   }
@@ -641,8 +688,8 @@ export async function verifyJobAvailability(
     evidence.hasApplyButton = true;
   }
 
-  // If active apply button found and no closure phrase -> Strong OPEN
-  if (evidence.hasApplyButton || cleanText.includes(target.company.toLowerCase()) || cleanText.includes(target.title.toLowerCase())) {
+  // If active apply button or explicit apply signal found and no closure phrase -> Strong OPEN
+  if (hasExplicitApplyButton || evidence.hasApplyButton) {
     return {
       status: 'OPEN',
       confidence: 'HIGH',

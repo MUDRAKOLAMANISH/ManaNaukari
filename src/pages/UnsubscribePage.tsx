@@ -87,7 +87,7 @@ export const UnsubscribePage: React.FC<UnsubscribePageProps> = ({ onNavigate }) 
 
         if (!rpcErr && rpcData && rpcData.success) {
           setStatusState('success');
-          setDisplayMessage('You have successfully unsubscribed from Mana Naukari job alerts.');
+          setDisplayMessage('You have successfully unsubscribed from ManaCarrier job alerts.');
           return;
         }
       }
@@ -100,10 +100,10 @@ export const UnsubscribePage: React.FC<UnsubscribePageProps> = ({ onNavigate }) 
 
         if (resData.status === 'already_unsubscribed') {
           setStatusState('already_unsubscribed');
-          setDisplayMessage('You have already unsubscribed from Mana Naukari job alerts.');
+          setDisplayMessage('You have already unsubscribed from ManaCarrier job alerts.');
         } else {
           setStatusState('success');
-          setDisplayMessage('You have successfully unsubscribed from Mana Naukari job alerts.');
+          setDisplayMessage('You have successfully unsubscribed from ManaCarrier job alerts.');
         }
         return;
       }
@@ -155,7 +155,7 @@ export const UnsubscribePage: React.FC<UnsubscribePageProps> = ({ onNavigate }) 
               
               <div className="p-4 bg-emerald-50/60 border border-emerald-200/80 rounded-2xl text-xs sm:text-sm text-emerald-900 max-w-md mx-auto leading-relaxed">
                 <p className="font-bold">
-                  {displayMessage || 'You have successfully unsubscribed from Mana Naukari job alerts.'}
+                  {displayMessage || 'You have successfully unsubscribed from ManaCarrier job alerts.'}
                 </p>
                 {confirmedEmail && (
                   <p className="text-emerald-700 text-xs mt-1 font-normal">
@@ -166,7 +166,7 @@ export const UnsubscribePage: React.FC<UnsubscribePageProps> = ({ onNavigate }) 
             </div>
 
             <p className="text-xs text-slate-500 max-w-xs mx-auto leading-relaxed">
-              You will no longer receive daily job opening updates. You can subscribe again anytime on the Mana Naukari homepage.
+              You will no longer receive daily job opening updates. You can subscribe again anytime on the ManaCarrier homepage.
             </p>
 
             <div className="pt-2">
@@ -176,7 +176,7 @@ export const UnsubscribePage: React.FC<UnsubscribePageProps> = ({ onNavigate }) 
                 className="w-full py-3.5 px-4 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl text-xs sm:text-sm cursor-pointer shadow-md transition-all flex items-center justify-center gap-2"
               >
                 <ArrowLeft className="w-4 h-4" />
-                <span>Return to Mana Naukari Homepage</span>
+                <span>Return to ManaCarrier Homepage</span>
               </button>
             </div>
           </div>
@@ -191,7 +191,7 @@ export const UnsubscribePage: React.FC<UnsubscribePageProps> = ({ onNavigate }) 
                 Unsubscribe from Job Alerts
               </h1>
               <p className="text-xs text-slate-500 max-w-sm mx-auto leading-relaxed">
-                Confirm your request to stop receiving daily job digest notifications from Mana Naukari.
+                Confirm your request to stop receiving daily job digest notifications from ManaCarrier.
               </p>
             </div>
 
@@ -247,7 +247,7 @@ export const UnsubscribePage: React.FC<UnsubscribePageProps> = ({ onNavigate }) 
                 onClick={() => onNavigate('/')}
                 className="text-xs text-slate-500 hover:text-slate-800 font-medium cursor-pointer"
               >
-                Cancel and return to Mana Naukari
+                Cancel and return to ManaCarrier
               </button>
             </div>
           </>

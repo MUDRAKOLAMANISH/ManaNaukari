@@ -289,7 +289,7 @@ export const aiMockInterviewService = {
       actionableTips: [
         'Practice speaking answers out loud 2-3 times before actual interviews.',
         'Use the STAR method: explicitly state Situation, Task, Action, and Result.',
-        'Review study materials on Mana Naukari for deep-dive technical questions.',
+        'Review study materials on ManaCarrier for deep-dive technical questions.',
       ],
       recommendedStudyMaterials: [
         'Top 50 Technical Interview Questions for Freshers',
@@ -312,7 +312,7 @@ export const aiMockInterviewService = {
     evaluations: QuestionEvaluation[]
   ) {
     try {
-      const existingStr = localStorage.getItem('mana_naukari_ai_interview_history');
+      const existingStr = localStorage.getItem('mana_carrier_ai_interview_history');
       const existing = existingStr ? JSON.parse(existingStr) : [];
       const newRecord = {
         id: 'session_' + Date.now(),
@@ -322,7 +322,7 @@ export const aiMockInterviewService = {
         timestamp: new Date().toISOString(),
       };
       existing.unshift(newRecord);
-      localStorage.setItem('mana_naukari_ai_interview_history', JSON.stringify(existing.slice(0, 10)));
+      localStorage.setItem('mana_carrier_ai_interview_history', JSON.stringify(existing.slice(0, 10)));
     } catch (e) {
       console.warn('Could not save interview session history locally', e);
     }

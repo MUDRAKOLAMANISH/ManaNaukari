@@ -18,7 +18,7 @@ if (!fs.existsSync(UPLOADS_DIR)) {
 
 const STORE_FILE = path.join(DATA_DIR, 'knowledge_base.json');
 
-export type KnowledgeSourceType = 'pdf' | 'docx' | 'txt' | 'text_entry' | 'url';
+export type KnowledgeSourceType = 'pdf' | 'docx' | 'txt' | 'md' | 'text_entry' | 'url';
 
 export const KNOWLEDGE_CATEGORIES = [
   'Company Information',
@@ -45,7 +45,7 @@ export interface KnowledgeDocument {
   chunk_count: number;
   content: string;
   preview_text?: string;
-  status: 'indexed' | 'processing' | 'failed';
+  status: 'indexed' | 'processing' | 'failed' | 'Uploading' | 'Processing' | 'Ready' | 'Failed';
   created_at: string;
   updated_at: string;
 }
@@ -94,47 +94,47 @@ interface KnowledgeStore {
   lastIndexedAt: string;
 }
 
-// Initial seed FAQs for Mana Naukari to ensure immediate rich domain knowledge
+// Initial seed FAQs for ManaCarrier to ensure immediate rich domain knowledge
 const SEED_FAQS: Omit<KnowledgeFAQ, 'id' | 'created_at' | 'updated_at'>[] = [
   {
     category: 'General',
-    question: 'What is Mana Naukari?',
-    answer: 'Mana Naukari is a dedicated Indian employment and career discovery platform connecting freshers, campus graduates, internship seekers, and early-career professionals directly with verified hiring companies and official career portal opportunities.',
+    question: 'What is ManaCarrier?',
+    answer: 'ManaCarrier is a dedicated Indian employment and career discovery platform connecting freshers, campus graduates, internship seekers, and early-career professionals directly with verified hiring companies and official career portal opportunities.',
   },
   {
     category: 'Jobs',
-    question: 'Does Mana Naukari charge any fee for job applications?',
-    answer: 'No. Mana Naukari is 100% free for job seekers. All job requisitions link directly to official company career portals (Workday, Greenhouse, Lever, Google Forms, or official HR sites). Mana Naukari never charges any middleman or application fees.',
+    question: 'Does ManaCarrier charge any fee for job applications?',
+    answer: 'No. ManaCarrier is 100% free for job seekers. All job requisitions link directly to official company career portals (Workday, Greenhouse, Lever, Google Forms, or official HR sites). ManaCarrier never charges any middleman or application fees.',
   },
   {
     category: 'Resume Review',
-    question: 'What is the Mana Naukari ATS Resume Review service?',
+    question: 'What is the ManaCarrier ATS Resume Review service?',
     answer: 'The ATS Resume Review service is a professional service where career coaches and recruitment experts evaluate your resume against Applicant Tracking Systems (ATS), verify industry keywords, optimize formatting, and deliver an actionable feedback report within 24 to 48 hours.',
   },
   {
     category: 'Portfolio Service',
-    question: 'Does Mana Naukari provide portfolio review and career guidance?',
-    answer: 'Yes! Mana Naukari offers guidance on technical and design portfolios (GitHub projects, Figma showcases, live web demos) and provides resume optimization to help entry-level candidates stand out to top tech employers.',
+    question: 'Does ManaCarrier provide portfolio review and career guidance?',
+    answer: 'Yes! ManaCarrier offers guidance on technical and design portfolios (GitHub projects, Figma showcases, live web demos) and provides resume optimization to help entry-level candidates stand out to top tech employers.',
   },
   {
     category: 'Recruiter Services',
-    question: 'How can recruiters and companies post jobs on Mana Naukari?',
-    answer: 'Recruiters can visit the Recruiter Portal (/post-job or /recruiter/dashboard) to register with their official corporate email and company website. Once verified by the Mana Naukari administration team, recruiters can post job openings and manage incoming candidates directly from their dashboard.',
+    question: 'How can recruiters and companies post jobs on ManaCarrier?',
+    answer: 'Recruiters can visit the Recruiter Portal (/post-job or /recruiter/dashboard) to register with their official corporate email and company website. Once verified by the ManaCarrier administration team, recruiters can post job openings and manage incoming candidates directly from their dashboard.',
   },
   {
     category: 'Jobs',
-    question: 'What types of job openings are available on Mana Naukari?',
-    answer: 'Mana Naukari specializes in Entry-Level, Fresher, Internship, and Work From Home (WFH) positions across domains including Software Engineering, Data Science & AI, QA & Automation, DevOps & Cloud, Product & UI/UX Design, and Sales/Operations.',
+    question: 'What types of job openings are available on ManaCarrier?',
+    answer: 'ManaCarrier specializes in Entry-Level, Fresher, Internship, and Work From Home (WFH) positions across domains including Software Engineering, Data Science & AI, QA & Automation, DevOps & Cloud, Product & UI/UX Design, and Sales/Operations.',
   },
   {
     category: 'Company Information',
-    question: 'How do I contact Mana Naukari support?',
-    answer: 'You can reach out via the Contact page (/contact) or email support directly at mananaukari2026@gmail.com. We also provide an official WhatsApp community for real-time job alerts.',
+    question: 'How do I contact ManaCarrier support?',
+    answer: 'You can reach out via the Contact page (/contact) or email support directly at manishmudrakola8@gmail.com. We also provide an official WhatsApp community for real-time job alerts.',
   },
   {
     category: 'Policies',
-    question: 'What are Mana Naukari verification and safety policies?',
-    answer: 'Mana Naukari strictly forbids fraudulent job postings, fee demands, or multi-level marketing schemes. Every recruiter account is manually verified through corporate email verification and company domain validation.',
+    question: 'What are ManaCarrier verification and safety policies?',
+    answer: 'ManaCarrier strictly forbids fraudulent job postings, fee demands, or multi-level marketing schemes. Every recruiter account is manually verified through corporate email verification and company domain validation.',
   },
 ];
 
@@ -194,7 +194,7 @@ function saveStore() {
 
 loadStore();
 
-export const FALLBACK_MESSAGE = 'I could not find this information in the Mana Naukari Knowledge Base.';
+export const FALLBACK_MESSAGE = "I couldn't find a clear answer to this question in the ManaCarrier knowledge base. Please try rephrasing your question or contact the ManaCarrier team at manishmudrakola8@gmail.com.";
 
 /**
  * Generate embedding vector using Gemini API 'gemini-embedding-2-preview'
@@ -314,7 +314,7 @@ export async function extractTextFromPdf(buffer: Buffer): Promise<{ text: string
   }
 
   // If extraction failed or yielded empty text
-  throw new Error('Unable to extract text from this document. Please upload a readable PDF or add content manually.');
+  throw new Error('This PDF appears to be scanned or contains no extractable text. Please upload a text-based PDF or Markdown/TXT file.');
 }
 
 /**
@@ -332,11 +332,11 @@ export async function extractTextFromDocx(buffer: Buffer): Promise<{ text: strin
     console.error('[KnowledgeEngine] Mammoth DOCX extraction error:', err);
   }
 
-  throw new Error('Unable to extract text from this document. Please upload a readable PDF or add content manually.');
+  throw new Error('Unable to extract text from this document. Please upload a readable DOCX file or add content manually.');
 }
 
 /**
- * 3. Extract text from plain TXT buffer
+ * 3. Extract text from plain TXT or MD buffer
  */
 export function extractTextFromTxt(buffer: Buffer): { text: string; pages: number } {
   const text = buffer.toString('utf-8').trim();
@@ -344,7 +344,7 @@ export function extractTextFromTxt(buffer: Buffer): { text: string; pages: numbe
     const pages = Math.max(1, Math.ceil(text.length / 2500));
     return { text, pages };
   }
-  throw new Error('Unable to extract text from this document. Please upload a readable PDF or add content manually.');
+  throw new Error('The uploaded file is empty or contains no readable text.');
 }
 
 /**
@@ -380,12 +380,12 @@ export function chunkTextByWords(
 }
 
 /**
- * Service API: Ingest and index an uploaded document (PDF, DOCX, TXT)
+ * Service API: Ingest and index an uploaded document (PDF, DOCX, TXT, MD)
  */
 export async function ingestDocument(
   fileName: string,
   fileBuffer: Buffer,
-  fileType: 'pdf' | 'docx' | 'txt',
+  fileType: 'pdf' | 'docx' | 'txt' | 'md',
   category: string = 'General',
   customTitle?: string
 ): Promise<{ document: KnowledgeDocument; extraction: ExtractionResult }> {
@@ -399,15 +399,15 @@ export async function ingestDocument(
     extractionResult = await extractTextFromPdf(fileBuffer);
   } else if (fileType === 'docx') {
     extractionResult = await extractTextFromDocx(fileBuffer);
-  } else if (fileType === 'txt') {
+  } else if (fileType === 'txt' || fileType === 'md') {
     extractionResult = extractTextFromTxt(fileBuffer);
   } else {
-    throw new Error('Unsupported file format. Please upload PDF, DOCX, or TXT.');
+    throw new Error('Supported file formats: PDF (.pdf), Word (.docx), Plain Text (.txt), and Markdown (.md).');
   }
 
   const { text: rawText, pages: pageCount } = extractionResult;
   if (!rawText || rawText.length < 10) {
-    throw new Error('Unable to extract text from this document. Please upload a readable PDF or add content manually.');
+    throw new Error('Unable to extract text from this document. Please upload a readable document or add content manually.');
   }
 
   // Chunk text (500-1000 words per chunk)
@@ -857,9 +857,8 @@ export function listFaqs(): KnowledgeFAQ[] {
 
 /**
  * Main RAG Chatbot Query Execution
- * Strict anti-hallucination: ONLY answers from retrieved knowledge base content.
- * If no relevant content found, returns EXACT message:
- * "I could not find this information in the Mana Naukari Knowledge Base."
+ * Strict anti-hallucination: ONLY answers from retrieved knowledge base content and verified jobs.
+ * Fast response times with hybrid keyword + vector retrieval and instant fallbacks.
  */
 export async function queryRag(
   userQuestion: string,
@@ -879,15 +878,30 @@ export async function queryRag(
     };
   }
 
-  // If external retrieved context was provided from Supabase client
+  const stopWords = new Set([
+    'a', 'an', 'the', 'is', 'are', 'was', 'were', 'in', 'on', 'at', 'to', 'for',
+    'of', 'with', 'by', 'from', 'about', 'how', 'what', 'when', 'where', 'which',
+    'who', 'why', 'can', 'you', 'i', 'my', 'me', 'we', 'our', 'do', 'does', 'please',
+    'tell', 'give', 'any', 'some', 'there', 'this', 'that', 'is', 'it'
+  ]);
+
+  const queryTerms = query
+    .toLowerCase()
+    .replace(/[^\w\s]/g, ' ')
+    .split(/\s+/)
+    .filter((w) => w.length > 1 && !stopWords.has(w));
+
+  const lowerQuery = query.toLowerCase();
+
+  // Step 1: External context provided from client
   if (externalContext && externalContext.trim()) {
-    const systemInstruction = `You are the official Mana Naukari AI Career & Knowledge Assistant.
-Mana Naukari is India's trusted job and internship portal for freshers and early-career talent.
+    const systemInstruction = `You are the official ManaCarrier AI Assistant.
+ManaCarrier is India's premier job and internship portal for freshers and early-career talent.
 
 STRICT INSTRUCTIONS TO PREVENT HALLUCINATIONS:
-1. Answer strictly and EXCLUSIVELY from the Mana Naukari Knowledge Base context provided below.
+1. Answer strictly and EXCLUSIVELY from the ManaCarrier Knowledge Base context provided below.
 2. DO NOT use general AI knowledge, assumptions, or information from the internet outside the provided context.
-3. If the provided context does not contain enough specific information to answer the question, or if the question is unrelated to the provided documents, you MUST reply EXACTLY with this sentence:
+3. If the provided context does not contain enough specific information to answer the question, reply with:
 "${FALLBACK_MESSAGE}"
 4. Be concise, professional, and clear. Format key details with bullet points where appropriate.
 5. Never invent contact details, fees, requirements, or policies not explicitly written in the context.`;
@@ -900,7 +914,7 @@ ${query}
 
 Please provide a concise answer strictly based on the Knowledge Base context:`;
 
-    const candidateModels = ['gemini-3.1-flash-lite', 'gemini-3.8-flash'];
+    const candidateModels = ['gemini-3.8-flash', 'gemini-3.1-flash-lite'];
     for (const model of candidateModels) {
       try {
         const response = await ai.models.generateContent({
@@ -917,7 +931,7 @@ Please provide a concise answer strictly based on the Knowledge Base context:`;
           const isRefusal = generatedText.includes(FALLBACK_MESSAGE) || generatedText.includes('could not find this information');
           return {
             answer: isRefusal ? FALLBACK_MESSAGE : generatedText,
-            citations: isRefusal ? [] : [{ source: 'Knowledge Base', type: 'document', snippet: externalContext.slice(0, 100) }],
+            citations: isRefusal ? [] : [{ source: 'ManaCarrier Knowledge Base', type: 'document', snippet: externalContext.slice(0, 100) }],
             matched: !isRefusal,
           };
         }
@@ -927,70 +941,115 @@ Please provide a concise answer strictly based on the Knowledge Base context:`;
     }
   }
 
-  // Step 1: Generate Embedding for user query
-  const queryEmbedding = await generateEmbedding(query);
+  // Step 2: Parallel Query Embedding generation with 1.5s timeout
+  let queryEmbedding: number[] = [];
+  try {
+    const embedPromise = generateEmbedding(query);
+    const timeoutPromise = new Promise<number[]>((resolve) => setTimeout(() => resolve([]), 1500));
+    queryEmbedding = await Promise.race([embedPromise, timeoutPromise]);
+  } catch (embedErr) {
+    console.warn('[KnowledgeEngine] Query embedding skipped/timed out, continuing with keyword search.');
+  }
 
-  // Step 2: Vector search against FAQs
-  let storeNeedsSave = false;
+  // Step 3: Hybrid Search over FAQs
   const scoredFaqs: Array<{ faq: KnowledgeFAQ; score: number }> = [];
   for (const faq of store.faqs) {
-    let emb = faq.embedding;
-    if (!emb || emb.length === 0) {
-      emb = await generateEmbedding(`Question: ${faq.question}\nAnswer: ${faq.answer}`);
-      faq.embedding = emb;
-      storeNeedsSave = true;
+    let score = 0;
+    const qLower = faq.question.toLowerCase();
+    const aLower = faq.answer.toLowerCase();
+
+    // Exact phrase match
+    if (qLower.includes(lowerQuery) || lowerQuery.includes(qLower)) {
+      score += 60;
     }
-    const score = cosineSimilarity(queryEmbedding, emb);
-    scoredFaqs.push({ faq, score });
+    if (aLower.includes(lowerQuery)) {
+      score += 40;
+    }
+
+    // Keyword overlap
+    for (const term of queryTerms) {
+      if (qLower.includes(term)) score += 15;
+      if (aLower.includes(term)) score += 8;
+    }
+
+    // Vector similarity boost
+    if (queryEmbedding.length > 0 && faq.embedding && faq.embedding.length > 0) {
+      const vecScore = cosineSimilarity(queryEmbedding, faq.embedding);
+      if (vecScore > 0.3) {
+        score += vecScore * 50;
+      }
+    }
+
+    if (score > 0) {
+      scoredFaqs.push({ faq, score });
+    }
   }
 
-  // Step 3: Vector search against Document and Text Knowledge Chunks
+  // Step 4: Hybrid Search over Document Chunks
   const scoredChunks: Array<{ chunk: KnowledgeChunk; score: number }> = [];
   for (const chunk of store.chunks) {
-    let emb = chunk.embedding;
-    if (!emb || emb.length === 0) {
-      emb = await generateEmbedding(chunk.content);
-      chunk.embedding = emb;
-      storeNeedsSave = true;
+    let score = 0;
+    const cLower = chunk.content.toLowerCase();
+    const docLower = chunk.document_name.toLowerCase();
+
+    if (cLower.includes(lowerQuery)) score += 50;
+    if (docLower.includes(lowerQuery)) score += 40;
+
+    for (const term of queryTerms) {
+      if (cLower.includes(term)) {
+        const count = (cLower.match(new RegExp(`\\b${term}\\b`, 'g')) || []).length;
+        score += count > 0 ? 10 + count * 2 : 5;
+      }
+      if (docLower.includes(term)) score += 12;
+      if (chunk.category.toLowerCase().includes(term)) score += 8;
     }
-    const score = cosineSimilarity(queryEmbedding, emb);
-    scoredChunks.push({ chunk, score });
+
+    if (queryEmbedding.length > 0 && chunk.embedding && chunk.embedding.length > 0) {
+      const vecScore = cosineSimilarity(queryEmbedding, chunk.embedding);
+      if (vecScore > 0.3) {
+        score += vecScore * 50;
+      }
+    }
+
+    if (score > 0) {
+      scoredChunks.push({ chunk, score });
+    }
   }
 
-  if (storeNeedsSave) {
-    saveStore();
+  // Step 5: Check active jobs from Supabase if query mentions jobs/roles/companies
+  let activeJobsContext = '';
+  const jobKeywords = ['job', 'jobs', 'vacancy', 'opening', 'internship', 'fresher', 'hiring', 'role', 'developer', 'engineer', 'salary', 'wfh', 'work from home', 'tcs', 'infosys', 'wipro', 'accenture', 'cognizant', 'amazon'];
+  const mentionsJobs = queryTerms.some((t) => jobKeywords.includes(t)) || jobKeywords.some((k) => lowerQuery.includes(k));
+
+  if (mentionsJobs && supabase) {
+    try {
+      const { data: jobs } = await supabase
+        .from('jobs')
+        .select('title, company, location, experience, salary, category, apply_link')
+        .eq('status', 'active')
+        .order('created_at', { ascending: false })
+        .limit(5);
+
+      if (jobs && jobs.length > 0) {
+        const jobListStr = jobs
+          .map((j) => `• **${j.title}** at **${j.company}** (${j.location} | ${j.experience} | ${j.salary || 'Best in Industry'}) - [Apply Link](${j.apply_link})`)
+          .join('\n');
+        activeJobsContext = `\n\n--- ACTIVE VERIFIED JOBS ON MANACARRIER ---\n${jobListStr}`;
+      }
+    } catch (jobErr) {
+      console.warn('[KnowledgeEngine] Error fetching active jobs for RAG:', jobErr);
+    }
   }
 
-  // Sort by highest similarity
+  // Sort search results
   scoredFaqs.sort((a, b) => b.score - a.score);
   scoredChunks.sort((a, b) => b.score - a.score);
 
-  const topFaq = scoredFaqs[0];
-  const topChunk = scoredChunks[0];
-  const maxScore = Math.max(topFaq?.score || 0, topChunk?.score || 0);
+  const topFaqs = scoredFaqs.slice(0, 3).map((f) => f.faq);
+  const topChunks = scoredChunks.slice(0, 4).map((c) => c.chunk);
 
-  console.log(
-    `[KnowledgeEngine] RAG Query: "${query}" | Max Similarity Score: ${maxScore.toFixed(3)} (Top FAQ: ${
-      topFaq?.score?.toFixed(3) || 0
-    }, Top Chunk: ${topChunk?.score?.toFixed(3) || 0})`
-  );
-
-  // Step 4: Strict similarity threshold check
-  const STRICT_THRESHOLD = 0.38;
-  if (maxScore < STRICT_THRESHOLD) {
-    console.log('[KnowledgeEngine] Query below similarity threshold. Returning strict fallback.');
-    return {
-      answer: FALLBACK_MESSAGE,
-      citations: [],
-      matched: false,
-    };
-  }
-
-  // Retrieve top relevant chunks (threshold 0.38)
-  const relevantFaqs = scoredFaqs.filter((f) => f.score >= STRICT_THRESHOLD).slice(0, 3).map((f) => f.faq);
-  const relevantChunks = scoredChunks.filter((c) => c.score >= STRICT_THRESHOLD).slice(0, 4).map((c) => c.chunk);
-
-  if (relevantFaqs.length === 0 && relevantChunks.length === 0) {
+  if (topFaqs.length === 0 && topChunks.length === 0 && !activeJobsContext) {
+    console.log(`[KnowledgeEngine] No matching content found for query: "${query}". Returning fallback.`);
     return {
       answer: FALLBACK_MESSAGE,
       citations: [],
@@ -1001,9 +1060,9 @@ Please provide a concise answer strictly based on the Knowledge Base context:`;
   const citations: Citation[] = [];
   const contextSegments: string[] = [];
 
-  if (relevantFaqs.length > 0) {
-    contextSegments.push('--- RELEVANT FAQS FROM MANA NAUKARI KNOWLEDGE BASE ---');
-    for (const faq of relevantFaqs) {
+  if (topFaqs.length > 0) {
+    contextSegments.push('--- RELEVANT FAQS FROM MANACARRIER KNOWLEDGE BASE ---');
+    for (const faq of topFaqs) {
       contextSegments.push(`[Category: ${faq.category}]\nQ: ${faq.question}\nA: ${faq.answer}`);
       citations.push({
         source: `FAQ: ${faq.question}`,
@@ -1013,9 +1072,9 @@ Please provide a concise answer strictly based on the Knowledge Base context:`;
     }
   }
 
-  if (relevantChunks.length > 0) {
-    contextSegments.push('--- RELEVANT EXCERPTS FROM KNOWLEDGE BASE DOCUMENTS & TEXT ENTRIES ---');
-    for (const chunk of relevantChunks) {
+  if (topChunks.length > 0) {
+    contextSegments.push('--- RELEVANT EXCERPTS FROM KNOWLEDGE DOCUMENTS ---');
+    for (const chunk of topChunks) {
       contextSegments.push(`[Source: ${chunk.document_name} | Category: ${chunk.category}]:\n${chunk.content}`);
       citations.push({
         source: chunk.document_name,
@@ -1025,88 +1084,85 @@ Please provide a concise answer strictly based on the Knowledge Base context:`;
     }
   }
 
+  if (activeJobsContext) {
+    contextSegments.push(activeJobsContext);
+    citations.push({
+      source: 'Verified Job Requisitions',
+      type: 'document',
+      snippet: 'Active job openings currently listed on ManaCarrier',
+    });
+  }
+
   const knowledgeContext = contextSegments.join('\n\n');
 
-  // Step 5: Synthesize concise response with Gemini 3.8 Flash using strict anti-hallucination prompt
-  const systemInstruction = `You are the official Mana Naukari AI Career & Knowledge Assistant.
-Mana Naukari is India's trusted job and internship portal for freshers and early-career talent.
+  // Step 6: Gemini response generation with strict anti-hallucination prompt
+  const systemInstruction = `You are the official ManaCarrier AI Assistant.
+ManaCarrier is India's premier job and internship portal for freshers, students, and early-career professionals.
 
-STRICT INSTRUCTIONS TO PREVENT HALLUCINATIONS:
-1. Answer strictly and EXCLUSIVELY from the Mana Naukari Knowledge Base context provided below.
-2. DO NOT use general AI knowledge, assumptions, or information from the internet outside the provided context.
-3. If the provided context does not contain enough specific information to answer the question, or if the question is unrelated to the provided documents, you MUST reply EXACTLY with this sentence:
+STRICT KNOWLEDGE-BASE GROUNDING & ACCURACY INSTRUCTIONS:
+1. Answer strictly and EXCLUSIVELY using the ManaCarrier Knowledge Base context provided below.
+2. DO NOT use general AI model knowledge, external web assumptions, or unverified claims.
+3. DO NOT invent or hallucinate job details, application links, eligibility criteria, salary information, policies, or other facts.
+4. If the retrieved knowledge base context does NOT contain a clear answer to the user's question, reply EXACTLY with:
 "${FALLBACK_MESSAGE}"
-4. Be concise, professional, and clear. Format key details with bullet points where appropriate.
-5. Never invent contact details, fees, requirements, or policies not explicitly written in the context.`;
+5. If the knowledge base contains only PARTIAL information, clearly explain which details are available and explicitly state what information is missing.
+6. Provide complete, detailed, highly useful answers instead of vague summaries. Use clear Markdown headings, subheadings, bullet points, numbered steps, and clean links where supported by the retrieved context.
+7. For job-related questions, include the role, company, eligibility, location, deadline, and official application link ONLY when these details are explicitly present in the retrieved context.
+8. Maintain a warm, encouraging, professional tone.`;
 
-  try {
-    const prompt = `KNOWLEDGE BASE CONTEXT:
+  const prompt = `KNOWLEDGE BASE CONTEXT:
 ${knowledgeContext}
 
 USER QUESTION:
 ${query}
 
-Please provide a concise answer strictly based on the Knowledge Base context:`;
+Please provide a clear, concise, well-structured answer strictly based on the Knowledge Base context:`;
 
-    const candidateModels = ['gemini-3.1-flash-lite', 'gemini-3.8-flash'];
-    for (const model of candidateModels) {
-      try {
-        const response = await ai.models.generateContent({
-          model,
-          contents: prompt,
-          config: {
-            systemInstruction,
-            temperature: 0.1, // Near-zero temperature for maximum factual fidelity
-          },
-        });
+  const candidateModels = ['gemini-3.8-flash', 'gemini-3.1-flash-lite'];
+  for (const model of candidateModels) {
+    try {
+      const response = await ai.models.generateContent({
+        model,
+        contents: prompt,
+        config: {
+          systemInstruction,
+          temperature: 0.1,
+        },
+      });
 
-        const generatedText = response.text?.trim();
-        if (generatedText) {
-          const isRefusal = generatedText.includes(FALLBACK_MESSAGE) || generatedText.includes('could not find this information');
-          return {
-            answer: isRefusal ? FALLBACK_MESSAGE : generatedText,
-            citations: isRefusal ? [] : citations,
-            matched: !isRefusal,
-          };
-        }
-      } catch (modelErr: any) {
-        console.warn(`[KnowledgeEngine] Model ${model} generation failed (${modelErr?.status || modelErr?.message}), trying next model...`);
+      const generatedText = response.text?.trim();
+      if (generatedText) {
+        const isRefusal = generatedText.includes(FALLBACK_MESSAGE) || generatedText.includes('could not find this information');
+        return {
+          answer: isRefusal ? FALLBACK_MESSAGE : generatedText,
+          citations: isRefusal ? [] : citations,
+          matched: !isRefusal,
+        };
       }
+    } catch (modelErr: any) {
+      console.warn(`[KnowledgeEngine] Model ${model} generation failed (${modelErr?.status || modelErr?.message}), trying next fallback...`);
     }
+  }
 
-    // Direct synthesized fallback from retrieved FAQ or Document snippet if AI generation fails
-    if (relevantFaqs.length > 0) {
-      return {
-        answer: relevantFaqs[0].answer,
-        citations,
-        matched: true,
-      };
-    } else if (relevantChunks.length > 0) {
-      return {
-        answer: relevantChunks[0].content,
-        citations,
-        matched: true,
-      };
-    }
-
+  // Fast direct synthesized fallback from top retrieved FAQ or chunk if AI model generation is unavailable
+  if (topFaqs.length > 0) {
     return {
-      answer: FALLBACK_MESSAGE,
-      citations: [],
-      matched: false,
+      answer: `${topFaqs[0].answer}\n\n*Source: ManaCarrier FAQ - ${topFaqs[0].question}*`,
+      citations,
+      matched: true,
     };
-  } catch (err: any) {
-    console.error('[KnowledgeEngine] Gemini generation error:', err);
-    if (relevantFaqs.length > 0) {
-      return {
-        answer: relevantFaqs[0].answer,
-        citations,
-        matched: true,
-      };
-    }
+  } else if (topChunks.length > 0) {
     return {
-      answer: FALLBACK_MESSAGE,
-      citations: [],
-      matched: false,
+      answer: `${topChunks[0].content}\n\n*Source: ManaCarrier Knowledge Base - ${topChunks[0].document_name}*`,
+      citations,
+      matched: true,
     };
   }
+
+  return {
+    answer: FALLBACK_MESSAGE,
+    citations: [],
+    matched: false,
+  };
 }
+

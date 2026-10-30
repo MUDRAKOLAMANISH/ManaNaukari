@@ -39,7 +39,7 @@ export const AdminHeader: React.FC<AdminHeaderProps> = ({
           >
             <BrandLogo size="sm" iconOnly={true} />
             <span className="font-bold text-base tracking-tight">
-              Mana Naukari Admin
+              ManaCarrier Admin
             </span>
           </button>
 

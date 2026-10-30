@@ -147,7 +147,7 @@ We are looking for motivated and driven fresh graduates to join our high-growth 
                 <span>Verified Recruiter & Employer Network</span>
               </div>
               <h1 className="text-2xl sm:text-3xl font-extrabold font-display text-slate-900 tracking-tight">
-                Post a Job Opening on Mana Naukari
+                Post a Job Opening on ManaCarrier
               </h1>
               <p className="text-xs sm:text-sm text-slate-500 mt-1.5 max-w-xl leading-relaxed">
                 Connect with thousands of active freshers, engineering graduates, and entry-level professionals. Every listing undergoes mandatory verification and admin review.
@@ -340,7 +340,7 @@ We are looking for motivated and driven fresh graduates to join our high-growth 
                   <span>2. Job Requisition Information</span>
                 </h2>
                 <p className="text-xs text-slate-500 mt-0.5">
-                  Provide detailed job criteria. Once approved by Mana Naukari administrators, this will be published to the public portal.
+                  Provide detailed job criteria. Once approved by ManaCarrier administrators, this will be published to the public portal.
                 </p>
               </div>
 

@@ -1,6 +1,7 @@
 import 'dotenv/config';
 import express from 'express';
 import path from 'path';
+import crypto from 'crypto';
 import { createServer as createViteServer } from 'vite';
 import { GoogleGenAI, Type } from '@google/genai';
 import multer from 'multer';
@@ -1067,7 +1068,7 @@ Team Mana Career`;
       body: JSON.stringify({
         from: fromEmail,
         to: cleanEmail,
-        subject: 'Welcome to Mana Naukari Job Alerts 🚀',
+        subject: 'Welcome to ManaCarrier Job Alerts 🚀',
         text: plainTextContent,
         html: htmlContent,
       }),
@@ -1253,7 +1254,7 @@ app.post('/api/alerts/send-job-alert', async (req, res) => {
 
 Hello,
 
-A new verified job opportunity matching your preferred category (${jobCategory}) is now active on Mana Naukari!
+A new verified job opportunity matching your preferred category (${jobCategory}) is now active on ManaCarrier!
 
 Job Details:
 - Title: ${jobTitle}
@@ -1268,7 +1269,7 @@ Official Direct Application: ${applyLink}
 We only share genuine opportunities directly from official career portals.
 
 Best wishes,
-Team Mana Naukari
+Team ManaCarrier
       `;
 
       const htmlContent = `<!DOCTYPE html>
@@ -1283,7 +1284,7 @@ Team Mana Naukari
     <!-- Header -->
     <div style="display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid #f1f5f9; padding-bottom: 16px; margin-bottom: 24px;">
       <div>
-        <h2 style="color: #2563eb; margin: 0; font-size: 22px; font-weight: 800;">Mana Naukari</h2>
+        <h2 style="color: #2563eb; margin: 0; font-size: 22px; font-weight: 800;">ManaCarrier</h2>
         <span style="font-size: 12px; color: #64748b;">Verified Career Alerts</span>
       </div>
       <div style="background-color: #eff6ff; color: #1d4ed8; font-size: 11px; font-weight: 700; padding: 4px 10px; border-radius: 9999px;">
@@ -1334,7 +1335,7 @@ Team Mana Naukari
     <!-- Footer -->
     <div style="border-top: 1px solid #e2e8f0; padding-top: 20px; font-size: 13px; color: #94a3b8;">
       <p style="margin: 0 0 4px 0;">Best wishes for your job hunt,</p>
-      <strong style="color: #475569;">Team Mana Naukari</strong>
+      <strong style="color: #475569;">Team ManaCarrier</strong>
     </div>
   </div>
 </body>
@@ -1437,8 +1438,299 @@ Team Mana Naukari
   }
 });
 
-// Endpoint to handle Admin Daily Job Reminder dispatch (Test email & manual batch dispatch)
+// Helper: Server-side Admin Authorization Verification
+async function verifyAdminServerRequest(req: express.Request): Promise<boolean> {
+  const authHeader = req.headers.authorization || '';
+  const cronSecretHeader = req.headers['x-cron-secret'] || '';
+  const expectedCronSecret = process.env.CRON_SECRET || '';
+
+  // 1. Cron secret check for automated background jobs
+  if (expectedCronSecret && cronSecretHeader === expectedCronSecret) {
+    return true;
+  }
+
+  // 2. Bearer Token check against Supabase Auth & admin_users table
+  if (!authHeader.startsWith('Bearer ')) {
+    return false;
+  }
+
+  const token = authHeader.substring(7).trim();
+  const supabaseUrl = process.env.VITE_SUPABASE_URL;
+  const supabaseAnonKey = process.env.VITE_SUPABASE_ANON_KEY;
+
+  if (!token || !supabaseUrl || !supabaseAnonKey) {
+    return false;
+  }
+
+  try {
+    const userRes = await fetch(`${supabaseUrl}/auth/v1/user`, {
+      headers: {
+        apikey: supabaseAnonKey,
+        Authorization: `Bearer ${token}`,
+      },
+    });
+
+    if (!userRes.ok) return false;
+    const userData = await userRes.json();
+    const email = userData?.email?.toLowerCase();
+    if (!email) return false;
+
+    // Verify email exists in admin_users
+    const adminRes = await fetch(`${supabaseUrl}/rest/v1/admin_users?email=eq.${encodeURIComponent(email)}&select=id`, {
+      headers: {
+        apikey: supabaseAnonKey,
+        Authorization: `Bearer ${supabaseAnonKey}`,
+      },
+    });
+
+    if (!adminRes.ok) return false;
+    const adminData = await adminRes.json();
+    return Array.isArray(adminData) && adminData.length > 0;
+  } catch {
+    return false;
+  }
+}
+
+// ============================================================================
+// PUBLIC ALERTS ENDPOINTS (SERVER PROXY TO PROTECT SUBSCRIBERS TABLE)
+// ============================================================================
+
+// Public Subscription Endpoint (Anonymous visitors can subscribe or update preferences without table SELECT rights)
+app.post('/api/alerts/subscribe', async (req, res) => {
+  const { email, categories, frequency } = req.body || {};
+  const cleanEmail = (email || '').trim().toLowerCase();
+
+  if (!cleanEmail || !cleanEmail.includes('@')) {
+    return res.status(400).json({ success: false, message: 'Valid email address is required.' });
+  }
+
+  const supabaseUrl = process.env.VITE_SUPABASE_URL;
+  const supabaseAnonKey = process.env.VITE_SUPABASE_ANON_KEY;
+
+  if (!supabaseUrl || !supabaseAnonKey) {
+    return res.status(500).json({ success: false, message: 'Supabase configuration missing.' });
+  }
+
+  try {
+    // 1. Try PostgreSQL RPC 'subscribe_job_alerts'
+    const rpcRes = await fetch(`${supabaseUrl}/rest/v1/rpc/subscribe_job_alerts`, {
+      method: 'POST',
+      headers: {
+        apikey: supabaseAnonKey,
+        Authorization: `Bearer ${supabaseAnonKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        p_email: cleanEmail,
+        p_categories: Array.isArray(categories) ? categories : ['Freshers'],
+        p_frequency: frequency || 'daily',
+      }),
+    });
+
+    if (rpcRes.ok) {
+      const rpcData = await rpcRes.json();
+      return res.json(rpcData);
+    }
+
+    // 2. Fallback REST insert
+    const insertRes = await fetch(`${supabaseUrl}/rest/v1/job_alert_subscribers`, {
+      method: 'POST',
+      headers: {
+        apikey: supabaseAnonKey,
+        Authorization: `Bearer ${supabaseAnonKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        email: cleanEmail,
+        categories: Array.isArray(categories) ? categories : ['Freshers'],
+        frequency: frequency || 'daily',
+        is_active: true,
+      }),
+    });
+
+    if (insertRes.ok) {
+      return res.json({ success: true, message: 'Successfully subscribed to daily job alerts!' });
+    }
+
+    return res.status(400).json({ success: false, message: 'Unable to save subscription.' });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, message: err.message || 'Server error saving subscription.' });
+  }
+});
+
+// Public Unsubscribe Endpoint
+app.post('/api/alerts/unsubscribe', async (req, res) => {
+  const { email, token } = req.body || {};
+  const cleanEmail = (email || '').trim().toLowerCase();
+
+  if (!cleanEmail) {
+    return res.status(400).json({ success: false, message: 'Valid email is required.' });
+  }
+
+  const supabaseUrl = process.env.VITE_SUPABASE_URL;
+  const supabaseAnonKey = process.env.VITE_SUPABASE_ANON_KEY;
+
+  if (!supabaseUrl || !supabaseAnonKey) {
+    return res.status(500).json({ success: false, message: 'Supabase configuration missing.' });
+  }
+
+  try {
+    const rpcRes = await fetch(`${supabaseUrl}/rest/v1/rpc/unsubscribe_job_alerts`, {
+      method: 'POST',
+      headers: {
+        apikey: supabaseAnonKey,
+        Authorization: `Bearer ${supabaseAnonKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        p_email: cleanEmail,
+        p_token: token || null,
+      }),
+    });
+
+    if (rpcRes.ok) {
+      const rpcData = await rpcRes.json();
+      return res.json(rpcData);
+    }
+
+    return res.status(400).json({ success: false, message: 'Unsubscribe failed.' });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+// Helper: Verify Svix/Resend HMAC Webhook Signatures
+function verifyResendWebhookSignature(
+  payload: string | object,
+  headers: Record<string, string | string[] | undefined>,
+  secret: string
+): boolean {
+  if (!secret) return true; // If secret not set in environment, allow with warning
+
+  const svixId = (headers['svix-id'] || headers['msg-id']) as string;
+  const svixTimestamp = (headers['svix-timestamp'] || headers['msg-timestamp']) as string;
+  const svixSignature = (headers['svix-signature'] || headers['msg-signature']) as string;
+
+  if (!svixId || !svixTimestamp || !svixSignature) {
+    return false;
+  }
+
+  // Prevent replay attacks (check timestamp within 5 minutes)
+  const timestampNum = parseInt(svixTimestamp, 10);
+  const now = Math.floor(Date.now() / 1000);
+  if (isNaN(timestampNum) || Math.abs(now - timestampNum) > 300) {
+    return false;
+  }
+
+  const rawBody = typeof payload === 'string' ? payload : JSON.stringify(payload);
+  const toSign = `${svixId}.${svixTimestamp}.${rawBody}`;
+
+  try {
+    const secretKey = secret.startsWith('whsec_') ? secret.substring(6) : secret;
+    const secretBytes = Buffer.from(secretKey, 'base64');
+
+    const computedHmac = crypto
+      .createHmac('sha256', secretBytes)
+      .update(toSign)
+      .digest('base64');
+
+    const signatures = svixSignature.split(' ');
+    for (const sigPart of signatures) {
+      const parts = sigPart.split(',');
+      const signature = parts.length > 1 ? parts[1] : parts[0];
+      if (signature === computedHmac) {
+        return true;
+      }
+    }
+    return false;
+  } catch {
+    return false;
+  }
+}
+
+// Resend Webhook Endpoint: Tracking Delivery, Bounces, and Failures with HMAC Verification
+app.post('/api/webhooks/resend', async (req, res) => {
+  const webhookSecret = process.env.RESEND_WEBHOOK_SECRET || process.env.SVIX_WEBHOOK_SECRET || '';
+
+  // Enforce signature verification if webhook secret is configured
+  if (webhookSecret && !verifyResendWebhookSignature(req.body, req.headers, webhookSecret)) {
+    console.warn('[Resend Webhook] Signature verification failed! Request rejected.');
+    return res.status(401).json({ error: 'Invalid webhook signature.' });
+  }
+
+  const event = req.body || {};
+  const eventType = event.type || '';
+  const emailId = event.data?.email_id || event.data?.id || '';
+
+  console.log(`[Resend Webhook Received] Event: "${eventType}" | Message ID: "${emailId}"`);
+
+  if (!emailId) {
+    return res.status(200).json({ received: true, note: 'No email_id in payload' });
+  }
+
+  const supabaseUrl = process.env.VITE_SUPABASE_URL;
+  const supabaseAnonKey = process.env.VITE_SUPABASE_ANON_KEY;
+
+  if (supabaseUrl && supabaseAnonKey) {
+    try {
+      let mappedStatus = 'sent';
+      if (eventType === 'email.delivered') mappedStatus = 'delivered';
+      else if (eventType === 'email.bounced') mappedStatus = 'bounced';
+      else if (eventType === 'email.complained') mappedStatus = 'complained';
+      else if (eventType === 'email.failed') mappedStatus = 'failed';
+
+      // Update delivery log
+      await fetch(`${supabaseUrl}/rest/v1/daily_job_reminder_logs?resend_id=eq.${encodeURIComponent(emailId)}`, {
+        method: 'PATCH',
+        headers: {
+          apikey: supabaseAnonKey,
+          Authorization: `Bearer ${supabaseAnonKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          status: mappedStatus,
+          updated_at: new Date().toISOString(),
+        }),
+      });
+
+      // Automatically deactivate bounced subscribers
+      if (mappedStatus === 'bounced' || mappedStatus === 'complained') {
+        const recipients = event.data?.to;
+        const targetEmail = Array.isArray(recipients) ? recipients[0] : recipients;
+        if (targetEmail) {
+          await fetch(`${supabaseUrl}/rest/v1/job_alert_subscribers?email=ilike.${encodeURIComponent(targetEmail)}`, {
+            method: 'PATCH',
+            headers: {
+              apikey: supabaseAnonKey,
+              Authorization: `Bearer ${supabaseAnonKey}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              is_active: false,
+              updated_at: new Date().toISOString(),
+            }),
+          });
+        }
+      }
+    } catch (err) {
+      console.warn('[Resend Webhook Warning] Exception processing event:', err);
+    }
+  }
+
+  return res.status(200).json({ received: true, event: eventType });
+});
+
+// Endpoint to handle Admin Daily Job Reminder dispatch (Strict Server-Side Admin Authorization)
 app.post('/api/admin/daily-reminder-dispatch', async (req, res) => {
+  // Server-side Admin Protection
+  const isAdmin = await verifyAdminServerRequest(req);
+  if (!isAdmin) {
+    return res.status(403).json({
+      success: false,
+      error: 'Forbidden: Access restricted strictly to verified ManaCarrier administrators.',
+    });
+  }
+
   const { test_email, is_test } = req.body || {};
 
   const resendApiKey = process.env.RESEND_API_KEY;
@@ -1481,6 +1773,7 @@ app.post('/api/admin/daily-reminder-dispatch', async (req, res) => {
         month: 'short',
         year: 'numeric',
       });
+      const todayYmd = new Date().toISOString().split('T')[0];
 
       const jobsListHtml = activeJobs.length > 0
         ? activeJobs.map((job) => `
@@ -1528,6 +1821,57 @@ app.post('/api/admin/daily-reminder-dispatch', async (req, res) => {
         throw new Error(resData.message || 'Resend error sending test email');
       }
 
+      // Record test run & delivery log in Supabase
+      if (supabaseUrl && supabaseAnonKey) {
+        try {
+          const runRes = await fetch(`${supabaseUrl}/rest/v1/daily_job_reminder_runs`, {
+            method: 'POST',
+            headers: {
+              apikey: supabaseAnonKey,
+              Authorization: `Bearer ${supabaseAnonKey}`,
+              'Content-Type': 'application/json',
+              Prefer: 'return=representation',
+            },
+            body: JSON.stringify({
+              run_date: todayYmd,
+              status: 'completed',
+              total_subscribers: 1,
+              emails_sent: 1,
+              emails_failed: 0,
+              jobs_included_count: activeJobs.length,
+              is_test: true,
+              started_at: new Date().toISOString(),
+              completed_at: new Date().toISOString(),
+            }),
+          });
+
+          let runId = null;
+          if (runRes.ok) {
+            const runArr = await runRes.json();
+            if (runArr && runArr[0]) runId = runArr[0].id;
+          }
+
+          await fetch(`${supabaseUrl}/rest/v1/daily_job_reminder_logs`, {
+            method: 'POST',
+            headers: {
+              apikey: supabaseAnonKey,
+              Authorization: `Bearer ${supabaseAnonKey}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              run_id: runId,
+              run_date: todayYmd,
+              recipient_email: recipient,
+              status: 'sent',
+              resend_id: resData.id,
+              created_at: new Date().toISOString(),
+            }),
+          });
+        } catch (dbLogErr) {
+          console.warn('[DailyReminderDispatch] Notice: DB logging exception:', dbLogErr);
+        }
+      }
+
       return res.json({
         success: true,
         message: 'Test daily job reminder email sent!',
@@ -1536,33 +1880,140 @@ app.post('/api/admin/daily-reminder-dispatch', async (req, res) => {
       });
     }
 
-    // Manual batch dispatch or forced run
+    // Manual batch dispatch
+    let subscribers: any[] = [];
     if (supabaseUrl && supabaseAnonKey) {
-      try {
-        const edgeRes = await fetch(`${supabaseUrl}/functions/v1/daily-job-reminder`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${supabaseAnonKey}`,
-          },
-          body: JSON.stringify({ force: true, source: 'admin_panel' }),
-        });
-
-        if (edgeRes.ok) {
-          const edgeData = await edgeRes.json();
-          return res.json({
-            success: true,
-            ...edgeData,
-          });
-        }
-      } catch (edgeErr) {
-        console.warn('[DailyReminderDispatch] Edge Function invocation warning:', edgeErr);
+      const subRes = await fetch(`${supabaseUrl}/rest/v1/job_alert_subscribers?is_active=neq.false`, {
+        headers: {
+          apikey: supabaseAnonKey,
+          Authorization: `Bearer ${supabaseAnonKey}`,
+        },
+      });
+      if (subRes.ok) {
+        subscribers = await subRes.json();
       }
+    }
+
+    const todayStr = new Date().toLocaleDateString('en-IN', {
+      timeZone: 'Asia/Kolkata',
+      day: 'numeric',
+      month: 'short',
+      year: 'numeric',
+    });
+    const todayYmd = new Date().toISOString().split('T')[0];
+
+    let sentCount = 0;
+    let failedCount = 0;
+
+    if (resendApiKey && subscribers.length > 0) {
+      for (const sub of subscribers) {
+        const recipient = (sub.email || '').trim().toLowerCase();
+        if (!recipient) continue;
+
+        const userCategories = Array.isArray(sub.categories) ? sub.categories : [];
+        const matchedJobs = activeJobs.filter((j) =>
+          userCategories.length === 0 ||
+          userCategories.includes('All') ||
+          userCategories.some((c: string) => c.toLowerCase() === (j.category || '').toLowerCase())
+        );
+
+        const jobsListHtml = (matchedJobs.length > 0 ? matchedJobs : activeJobs).map((job) => `
+          <div style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 16px; margin-bottom: 12px;">
+            <div style="display: flex; justify-content: space-between; align-items: start; gap: 8px;">
+              <h4 style="margin: 0; font-size: 15px; font-weight: 700; color: #0f172a;">${job.title}</h4>
+              <span style="font-size: 11px; font-weight: 700; color: #2563eb; background: #eff6ff; padding: 2px 8px; border-radius: 9999px;">${job.category || 'General'}</span>
+            </div>
+            <p style="margin: 4px 0 10px 0; font-size: 13px; color: #475569; font-weight: 600;">🏢 ${job.company || 'Company'}</p>
+            <a href="${job.apply_link || `${appBaseUrl}/jobs/${job.id}`}" target="_blank" style="display: inline-block; background: #2563eb; color: #ffffff; font-size: 12px; font-weight: 700; padding: 8px 16px; border-radius: 8px; text-decoration: none;">Apply Now ↗</a>
+          </div>
+        `).join('');
+
+        const htmlContent = `<!DOCTYPE html>
+<html lang="en">
+<body style="font-family: system-ui, sans-serif; background-color: #f8fafc; padding: 24px; color: #1e293b;">
+  <div style="max-width: 580px; margin: 0 auto; background: #ffffff; border-radius: 16px; padding: 28px; border: 1px solid #e2e8f0;">
+    <h2 style="color: #2563eb; margin: 0 0 4px 0;">Mana Career</h2>
+    <span style="font-size: 11px; font-weight: 700; color: #15803d; background: #f0fdf4; padding: 2px 8px; border-radius: 9999px;">Daily Job Digest - ${todayStr}</span>
+    <p style="margin-top: 16px; font-size: 14px;">Here are today's top genuine job openings curated for you on Mana Career:</p>
+    ${jobsListHtml}
+    <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 20px 0;" />
+    <p style="font-size: 11px; color: #94a3b8; text-align: center;">You are receiving this daily job digest from Mana Career. <a href="${appBaseUrl}/unsubscribe?email=${encodeURIComponent(recipient)}" style="color: #2563eb;">Unsubscribe</a></p>
+  </div>
+</body>
+</html>`;
+
+        try {
+          const dispatchRes = await fetch('https://api.resend.com/emails', {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${resendApiKey.trim()}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              from: fromEmail,
+              to: recipient,
+              subject: `Daily Job Digest - Mana Career (${todayStr})`,
+              html: htmlContent,
+            }),
+          });
+
+          const dispatchData = await dispatchRes.json();
+          if (dispatchRes.ok) {
+            sentCount++;
+            if (supabaseUrl && supabaseAnonKey) {
+              await fetch(`${supabaseUrl}/rest/v1/daily_job_reminder_logs`, {
+                method: 'POST',
+                headers: {
+                  apikey: supabaseAnonKey,
+                  Authorization: `Bearer ${supabaseAnonKey}`,
+                  'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                  run_date: todayYmd,
+                  recipient_email: recipient,
+                  status: 'sent',
+                  resend_id: dispatchData.id,
+                  created_at: new Date().toISOString(),
+                }),
+              });
+            }
+          } else {
+            failedCount++;
+          }
+        } catch {
+          failedCount++;
+        }
+      }
+    }
+
+    if (supabaseUrl && supabaseAnonKey) {
+      await fetch(`${supabaseUrl}/rest/v1/daily_job_reminder_runs`, {
+        method: 'POST',
+        headers: {
+          apikey: supabaseAnonKey,
+          Authorization: `Bearer ${supabaseAnonKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          run_date: todayYmd,
+          status: 'completed',
+          total_subscribers: subscribers.length,
+          emails_sent: sentCount,
+          emails_failed: failedCount,
+          jobs_included_count: activeJobs.length,
+          is_test: false,
+          started_at: new Date().toISOString(),
+          completed_at: new Date().toISOString(),
+        }),
+      });
     }
 
     return res.json({
       success: true,
-      message: 'Batch dispatch trigger received.',
+      message: `Batch dispatch finished: ${sentCount} sent, ${failedCount} failed.`,
+      total_subscribers: subscribers.length,
+      emails_sent: sentCount,
+      emails_failed: failedCount,
       jobs_count: activeJobs.length,
       skipped: false,
     });
@@ -1572,33 +2023,56 @@ app.post('/api/admin/daily-reminder-dispatch', async (req, res) => {
   }
 });
 
-// Endpoint to retrieve Alert Delivery Statistics & Logs for Admin Dashboard
-app.get('/api/alerts/delivery-stats', async (_req, res) => {
+// Endpoint to retrieve Alert Delivery Statistics & Logs for Admin Dashboard (Protected Admin Access)
+app.get('/api/alerts/delivery-stats', async (req, res) => {
+  const isAdmin = await verifyAdminServerRequest(req);
+  if (!isAdmin) {
+    return res.status(403).json({
+      success: false,
+      error: 'Forbidden: Access restricted strictly to verified ManaCarrier administrators.',
+    });
+  }
+
   try {
     const supabaseUrl = process.env.VITE_SUPABASE_URL;
     const supabaseAnonKey = process.env.VITE_SUPABASE_ANON_KEY;
 
     let totalSubscribers = 0;
     let activeSubscribers = 0;
+    let logs: any[] = [];
 
     if (supabaseUrl && supabaseAnonKey) {
-      const subRes = await fetch(`${supabaseUrl}/rest/v1/job_alert_subscribers?select=id,is_active`, {
-        headers: {
-          apikey: supabaseAnonKey,
-          Authorization: `Bearer ${supabaseAnonKey}`,
-        },
-      });
+      const [subRes, logRes] = await Promise.all([
+        fetch(`${supabaseUrl}/rest/v1/job_alert_subscribers?select=id,is_active`, {
+          headers: {
+            apikey: supabaseAnonKey,
+            Authorization: `Bearer ${supabaseAnonKey}`,
+          },
+        }),
+        fetch(`${supabaseUrl}/rest/v1/daily_job_reminder_logs?select=*&order=created_at.desc&limit=50`, {
+          headers: {
+            apikey: supabaseAnonKey,
+            Authorization: `Bearer ${supabaseAnonKey}`,
+          },
+        }),
+      ]);
 
       if (subRes.ok) {
         const subs = await subRes.json();
         totalSubscribers = subs.length;
         activeSubscribers = subs.filter((s: any) => s.is_active !== false).length;
       }
+
+      if (logRes.ok) {
+        logs = await logRes.json();
+      }
     }
 
-    const successfulDeliveries = jobAlertDeliveryLogs.filter((l) => l.status === 'sent').length;
-    const failedDeliveries = jobAlertDeliveryLogs.filter((l) => l.status === 'failed' || l.status === 'skipped').length;
-    const totalAlertsSent = jobAlertDeliveryLogs.length;
+    const successfulDeliveries = logs.filter((l) => l.status === 'sent' || l.status === 'delivered').length;
+    const actualDeliveredCount = logs.filter((l) => l.status === 'delivered').length;
+    const bouncedCount = logs.filter((l) => l.status === 'bounced').length;
+    const failedDeliveries = logs.filter((l) => l.status === 'failed' || l.status === 'bounced').length;
+    const totalAlertsSent = logs.length;
 
     return res.json({
       success: true,
@@ -1607,8 +2081,10 @@ app.get('/api/alerts/delivery-stats', async (_req, res) => {
         totalSubscribers,
         activeSubscribers,
         successfulDeliveries,
+        actualDeliveredCount,
+        bouncedCount,
         failedDeliveries,
-        recentDeliveries: jobAlertDeliveryLogs.slice(0, 30),
+        recentDeliveries: logs,
       },
     });
   } catch (err: any) {
@@ -1668,14 +2144,14 @@ app.post('/api/knowledge/upload', upload.single('file'), async (req, res) => {
     }
 
     const ext = path.extname(file.originalname).toLowerCase();
-    if (ext !== '.pdf' && ext !== '.docx' && ext !== '.txt') {
+    if (ext !== '.pdf' && ext !== '.docx' && ext !== '.txt' && ext !== '.md') {
       return res.status(400).json({
         success: false,
-        error: 'Supported file formats: PDF (.pdf), Word (.docx), and Plain Text (.txt).',
+        error: 'Supported file formats: PDF (.pdf), Word (.docx), Plain Text (.txt), and Markdown (.md).',
       });
     }
 
-    const fileType = ext === '.pdf' ? 'pdf' : ext === '.docx' ? 'docx' : 'txt';
+    const fileType = ext === '.pdf' ? 'pdf' : ext === '.docx' ? 'docx' : ext === '.md' ? 'md' : 'txt';
     const category = req.body?.category || 'General';
     const customTitle = req.body?.title ? req.body.title.trim() : undefined;
 

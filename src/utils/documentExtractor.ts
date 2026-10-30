@@ -62,7 +62,7 @@ export async function extractTextFromPdfFile(fileOrBuffer: File | ArrayBuffer | 
     const cleanedText = fullText.replace(/--\s*\d+\s+of\s+\d+\s*--/gi, '').trim();
 
     if (!cleanedText || cleanedText.length < 10) {
-      throw new Error('Unable to extract text from this document. Please upload a readable PDF or add content manually.');
+      throw new Error('This PDF appears to be scanned or contains no extractable text. Please upload a text-based PDF or Markdown/TXT file.');
     }
 
     console.log(`[DocumentExtractor] Successfully extracted ${cleanedText.length} chars from ${numPages} page(s) in PDF.`);
@@ -73,7 +73,10 @@ export async function extractTextFromPdfFile(fileOrBuffer: File | ArrayBuffer | 
     };
   } catch (err: any) {
     console.error('[DocumentExtractor] PDF extraction error:', err);
-    throw new Error('Unable to extract text from this document. Please upload a readable PDF or add content manually.');
+    if (err.message && err.message.includes('scanned')) {
+      throw err;
+    }
+    throw new Error('This PDF appears to be scanned or contains no extractable text. Please upload a text-based PDF or Markdown/TXT file.');
   }
 }
 
@@ -94,7 +97,7 @@ export async function extractTextFromDocxFile(fileOrBuffer: File | ArrayBuffer):
     const text = result?.value ? result.value.trim() : '';
 
     if (!text || text.length < 10) {
-      throw new Error('Unable to extract text from this document. Please upload a readable PDF or add content manually.');
+      throw new Error('Unable to extract text from this DOCX file. Please upload a readable file or add content manually.');
     }
 
     const pages = Math.max(1, Math.ceil(text.length / 2500));
@@ -106,15 +109,15 @@ export async function extractTextFromDocxFile(fileOrBuffer: File | ArrayBuffer):
     };
   } catch (err: any) {
     console.error('[DocumentExtractor] DOCX extraction error:', err);
-    throw new Error('Unable to extract text from this document. Please upload a readable PDF or add content manually.');
+    throw new Error(err.message || 'Unable to extract text from this document. Please upload a readable file.');
   }
 }
 
 /**
- * Extract text from TXT file
+ * Extract text from TXT or MD file
  */
 export async function extractTextFromTxtFile(fileOrText: File | string): Promise<ExtractedDocument> {
-  console.log('[DocumentExtractor] Starting TXT extraction...');
+  console.log('[DocumentExtractor] Starting TXT/MD extraction...');
   try {
     let text = '';
     if (fileOrText instanceof File) {
@@ -125,18 +128,18 @@ export async function extractTextFromTxtFile(fileOrText: File | string): Promise
 
     text = text.trim();
     if (!text || text.length < 5) {
-      throw new Error('Unable to extract text from this document. Please upload a readable PDF or add content manually.');
+      throw new Error('The uploaded file is empty or contains no readable text.');
     }
 
     const pages = Math.max(1, Math.ceil(text.length / 2500));
-    console.log(`[DocumentExtractor] Successfully extracted ${text.length} chars from TXT.`);
+    console.log(`[DocumentExtractor] Successfully extracted ${text.length} chars from text/markdown file.`);
     return {
       text,
       pages,
       characters: text.length,
     };
   } catch (err: any) {
-    console.error('[DocumentExtractor] TXT extraction error:', err);
-    throw new Error('Unable to extract text from this document. Please upload a readable PDF or add content manually.');
+    console.error('[DocumentExtractor] TXT/MD extraction error:', err);
+    throw new Error(err.message || 'Unable to extract text from this document. Please upload a readable text/markdown file.');
   }
 }

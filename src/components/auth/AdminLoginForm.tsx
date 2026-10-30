@@ -67,7 +67,7 @@ export const AdminLoginForm: React.FC<AdminLoginFormProps> = ({ onSuccess }) => 
             type="email"
             required
             autoComplete="email"
-            placeholder="admin@mananaukari.com"
+            placeholder="admin@manacarrier.com"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             disabled={isSubmitting}

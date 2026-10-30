@@ -109,7 +109,7 @@ serve(async (req) => {
           success: true,
           status: "already_unsubscribed",
           email: subscriber.email,
-          message: "You have already unsubscribed from Mana Naukari job alerts.",
+          message: "You have already unsubscribed from ManaCarrier job alerts.",
         }),
         { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
@@ -156,7 +156,7 @@ serve(async (req) => {
         success: true,
         status: "unsubscribed",
         email: subscriber.email,
-        message: "You have successfully unsubscribed from Mana Naukari job alerts.",
+        message: "You have successfully unsubscribed from ManaCarrier job alerts.",
       }),
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );

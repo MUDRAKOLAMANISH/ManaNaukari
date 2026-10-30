@@ -26,7 +26,7 @@ export const FeaturedCompanies: React.FC<FeaturedCompaniesProps> = ({
             <span>Top Employers</span>
           </div>
           <h2 className="text-2xl sm:text-3xl font-extrabold font-display text-slate-900 tracking-tight mt-0.5">
-            Companies Actively Hiring on Mana Naukari
+            Companies Actively Hiring on ManaCarrier
           </h2>
         </div>
       </div>

@@ -1,7 +1,9 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import {
-  MessageSquare, X, Send, Sparkles, Bot, User,
-  FileText, HelpCircle, ChevronDown, RotateCcw, AlertCircle, ExternalLink
+  X, Send, Sparkles, Bot, User,
+  FileText, HelpCircle, RotateCcw, ExternalLink, ShieldCheck,
+  CheckCircle2, ArrowRight
 } from 'lucide-react';
 import { queryChatbotRag } from '../../services/knowledgeService';
 
@@ -20,14 +22,163 @@ interface ChatMessage {
 }
 
 const QUICK_PROMPTS = [
-  'Is Mana Naukari free for candidates?',
+  'Is ManaCarrier free for candidates?',
   'How does the ATS Resume Review service work?',
-  'How can recruiters post jobs?',
-  'What internship domains are available?',
+  'How can recruiters post jobs on ManaCarrier?',
+  'What internship categories are available?',
 ];
+
+const EXACT_FALLBACK = "I couldn't find a clear answer to this question in the ManaCarrier knowledge base. Please try rephrasing your question or contact the ManaCarrier team at manishmudrakola8@gmail.com.";
 
 interface FloatingChatbotProps {
   onNavigate?: (path: string) => void;
+}
+
+/**
+ * Lightweight, safe Markdown renderer for assistant messages.
+ * Handles headings, bold/italic, bullet/numbered lists, and clickable links.
+ */
+
+const FormattedMarkdown: React.FC<{ content: string; onNavigate?: (path: string) => void }> = ({ content, onNavigate }) => {
+  if (!content) return null;
+
+  // Split content by line breaks
+  const lines = content.split('\n');
+
+  return (
+    <div className="space-y-2.5 text-slate-800 text-sm sm:text-base leading-relaxed font-sans">
+      {lines.map((line, lIdx) => {
+        const trimmed = line.trim();
+        if (!trimmed) return <div key={lIdx} className="h-1.5" />;
+
+        // Headings
+        if (trimmed.startsWith('### ')) {
+          return (
+            <h4 key={lIdx} className="text-base sm:text-lg font-bold text-slate-900 font-display pt-2 pb-1 border-b border-slate-100">
+              {renderFormattedInline(trimmed.slice(4), onNavigate)}
+            </h4>
+          );
+        }
+        if (trimmed.startsWith('## ')) {
+          return (
+            <h3 key={lIdx} className="text-lg sm:text-xl font-extrabold text-slate-900 font-display pt-2.5 pb-1">
+              {renderFormattedInline(trimmed.slice(3), onNavigate)}
+            </h3>
+          );
+        }
+        if (trimmed.startsWith('# ')) {
+          return (
+            <h2 key={lIdx} className="text-xl sm:text-2xl font-extrabold text-slate-950 font-display pt-3 pb-1">
+              {renderFormattedInline(trimmed.slice(2), onNavigate)}
+            </h2>
+          );
+        }
+
+        // Bullet lists (* item or - item)
+        if (trimmed.startsWith('* ') || trimmed.startsWith('- ')) {
+          return (
+            <div key={lIdx} className="flex items-start gap-2.5 pl-2 my-1">
+              <span className="w-1.5 h-1.5 rounded-full bg-blue-600 mt-2 shrink-0" />
+              <div className="flex-1 font-sans">{renderFormattedInline(trimmed.slice(2), onNavigate)}</div>
+            </div>
+          );
+        }
+
+        // Numbered lists (e.g. 1. item)
+        const numMatch = trimmed.match(/^(\d+)\.\s+(.*)$/);
+        if (numMatch) {
+          return (
+            <div key={lIdx} className="flex items-start gap-2 pl-2 my-1">
+              <span className="font-bold text-blue-700 text-xs sm:text-sm shrink-0 min-w-[20px]">{numMatch[1]}.</span>
+              <div className="flex-1 font-sans">{renderFormattedInline(numMatch[2], onNavigate)}</div>
+            </div>
+          );
+        }
+
+        // Standard paragraph
+        return (
+          <p key={lIdx} className="my-1">
+            {renderFormattedInline(trimmed, onNavigate)}
+          </p>
+        );
+      })}
+    </div>
+  );
+};
+
+/**
+ * Helper to render bold (**text**), code (`code`), and hyperlinks ([Text](url)) inline safely.
+ */
+function renderFormattedInline(text: string, onNavigate?: (path: string) => void): React.ReactNode[] {
+  // Regex to match markdown links: [label](url)
+  const linkRegex = /\[([^\]]+)\]\(([^)]+)\)/g;
+  const parts: React.ReactNode[] = [];
+  let lastIdx = 0;
+  let match: RegExpExecArray | null;
+
+  while ((match = linkRegex.exec(text)) !== null) {
+    if (match.index > lastIdx) {
+      parts.push(renderBoldAndItalic(text.slice(lastIdx, match.index), `text-${lastIdx}`));
+    }
+
+    const label = match[1];
+    const rawUrl = match[2];
+    const isInternalRoute = rawUrl.startsWith('/') && !rawUrl.startsWith('//');
+
+    parts.push(
+      isInternalRoute && onNavigate ? (
+        <button
+          key={`link-${match.index}`}
+          onClick={() => onNavigate(rawUrl)}
+          className="text-blue-600 font-bold underline hover:text-blue-800 transition-colors inline-flex items-center gap-0.5 cursor-pointer"
+        >
+          <span>{label}</span>
+        </button>
+      ) : (
+        <a
+          key={`link-${match.index}`}
+          href={rawUrl}
+          target="_blank"
+          rel="noreferrer"
+          className="text-blue-600 font-bold underline hover:text-blue-800 transition-colors inline-flex items-center gap-0.5 cursor-pointer"
+        >
+          <span>{label}</span>
+          <ExternalLink className="w-3 h-3 inline shrink-0" />
+        </a>
+      )
+    );
+
+    lastIdx = linkRegex.lastIndex;
+  }
+
+  if (lastIdx < text.length) {
+    parts.push(renderBoldAndItalic(text.slice(lastIdx), `text-${lastIdx}`));
+  }
+
+  return parts;
+}
+
+/**
+ * Helper for **bold** and `code` inline formatting
+ */
+function renderBoldAndItalic(text: string, keyPrefix: string): React.ReactNode {
+  // Split on **bold**
+  const segments = text.split(/(\*\*[^*]+\*\*)/g);
+
+  return (
+    <React.Fragment key={keyPrefix}>
+      {segments.map((seg, i) => {
+        if (seg.startsWith('**') && seg.endsWith('**')) {
+          return (
+            <strong key={i} className="font-bold text-slate-900">
+              {seg.slice(2, -2)}
+            </strong>
+          );
+        }
+        return seg;
+      })}
+    </React.Fragment>
+  );
 }
 
 export const FloatingChatbot: React.FC<FloatingChatbotProps> = ({ onNavigate }) => {
@@ -38,7 +189,7 @@ export const FloatingChatbot: React.FC<FloatingChatbotProps> = ({ onNavigate }) 
     {
       id: 'welcome-1',
       sender: 'assistant',
-      text: 'Namaste! Welcome to Mana Naukari AI Assistant. I can help answer questions regarding our verified job listings, internships, ATS resume reviews, recruiter services, and career guidance using our verified knowledge base. What can I help you with today?',
+      text: 'Namaste! Welcome to **ManaCarrier AI Assistant**.\n\nI can help answer questions regarding verified job listings, internships, ATS resume reviews, recruiter services, and career guidance using our verified knowledge base. What can I help you with today?',
       timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
     },
   ]);
@@ -46,7 +197,7 @@ export const FloatingChatbot: React.FC<FloatingChatbotProps> = ({ onNavigate }) 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  // Auto-scroll to bottom of chat
+  // Auto-scroll to bottom
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
@@ -54,7 +205,7 @@ export const FloatingChatbot: React.FC<FloatingChatbotProps> = ({ onNavigate }) 
   useEffect(() => {
     if (isOpen) {
       scrollToBottom();
-      inputRef.current?.focus();
+      setTimeout(() => inputRef.current?.focus(), 150);
     }
   }, [isOpen, messages, isLoading]);
 
@@ -74,7 +225,7 @@ export const FloatingChatbot: React.FC<FloatingChatbotProps> = ({ onNavigate }) 
     setIsLoading(true);
 
     try {
-      // Build lightweight conversation history
+      // Lightweight conversation history
       const history = messages
         .filter((m) => m.id !== 'welcome-1')
         .slice(-6)
@@ -83,28 +234,33 @@ export const FloatingChatbot: React.FC<FloatingChatbotProps> = ({ onNavigate }) 
           content: m.text,
         }));
 
-      console.log('[FloatingChatbot] Asking RAG knowledge assistant:', query);
+      console.log('[ManaCarrier AI] Querying knowledge base:', query);
       const data = await queryChatbotRag(query, history);
+
+      const responseText = data.answer || EXACT_FALLBACK;
+      const isRefusal = responseText.includes(EXACT_FALLBACK) || responseText.includes("couldn't find a clear answer");
 
       const assistantMsg: ChatMessage = {
         id: `assistant-${Date.now()}`,
         sender: 'assistant',
-        text: data.answer || 'I could not find this information in the Mana Naukari Knowledge Base.',
-        citations: (data.citations || []).map((c) => ({
-          source: c.source,
-          type: 'document' as const,
-          snippet: c.snippet,
-        })),
+        text: responseText,
+        citations: isRefusal
+          ? []
+          : (data.citations || []).map((c) => ({
+              source: c.source,
+              type: 'document' as const,
+              snippet: c.snippet,
+            })),
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       };
 
       setMessages((prev) => [...prev, assistantMsg]);
     } catch (err) {
-      console.error('[FloatingChatbot] Send message error:', err);
+      console.error('[ManaCarrier AI] Error fetching answer:', err);
       const errorMsg: ChatMessage = {
         id: `assistant-${Date.now()}`,
         sender: 'assistant',
-        text: 'I could not find this information in the Mana Naukari Knowledge Base.',
+        text: EXACT_FALLBACK,
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       };
       setMessages((prev) => [...prev, errorMsg]);
@@ -125,7 +281,7 @@ export const FloatingChatbot: React.FC<FloatingChatbotProps> = ({ onNavigate }) 
       {
         id: `welcome-${Date.now()}`,
         sender: 'assistant',
-        text: 'Chat history cleared. How can I assist you with Mana Naukari services, jobs, or resume reviews?',
+        text: 'Chat history cleared. How can I assist you with ManaCarrier services, jobs, or resume reviews?',
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       },
     ]);
@@ -134,228 +290,244 @@ export const FloatingChatbot: React.FC<FloatingChatbotProps> = ({ onNavigate }) 
   return (
     <div className="fixed bottom-5 right-5 sm:bottom-6 sm:right-6 z-50 flex flex-col items-end">
       
-      {/* 1. Chat Window */}
-      {isOpen && (
-        <div
-          role="dialog"
-          aria-label="Mana Naukari AI Assistant"
-          className="w-[calc(100vw-2.5rem)] sm:w-[420px] h-[550px] max-h-[85vh] bg-white rounded-3xl shadow-2xl border border-slate-200/90 flex flex-col overflow-hidden mb-3.5 animate-scaleUp"
-        >
-          {/* Header */}
-          <div className="bg-gradient-to-r from-blue-600 via-indigo-600 to-blue-700 p-4 text-white flex items-center justify-between shadow-xs">
-            <div className="flex items-center gap-3">
-              <div className="w-9 h-9 rounded-2xl bg-white/15 backdrop-blur-xs flex items-center justify-center border border-white/20">
-                <Bot className="w-5 h-5 text-white" />
-              </div>
-              <div>
-                <div className="flex items-center gap-2">
-                  <h3 className="font-extrabold text-sm tracking-tight font-display">
-                    Mana Naukari AI
-                  </h3>
-                  <span className="inline-flex items-center gap-1 text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-emerald-400/20 text-emerald-200 border border-emerald-400/30">
-                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                    <span>RAG Online</span>
-                  </span>
+      {/* 1. Chat Window with Framer Motion AnimatePresence */}
+      <AnimatePresence>
+        {isOpen && (
+          <motion.div
+            initial={{ opacity: 0, scale: 0.92, y: 20 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.92, y: 20 }}
+            transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
+            role="dialog"
+            aria-label="ManaCarrier AI Assistant"
+            className="w-[calc(100vw-2rem)] sm:w-[480px] md:w-[520px] h-[610px] max-h-[88vh] bg-white rounded-3xl shadow-2xl border border-slate-200/90 flex flex-col overflow-hidden mb-3.5"
+          >
+            {/* Header */}
+            <div className="bg-gradient-to-r from-blue-600 via-indigo-600 to-violet-700 p-4 sm:p-4.5 text-white flex items-center justify-between shadow-xs">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-white/15 backdrop-blur-xs flex items-center justify-center border border-white/20 shrink-0">
+                  <Bot className="w-5 h-5 text-white" />
                 </div>
-                <p className="text-[11px] text-blue-100/90 font-medium">
-                  Verified knowledge base &amp; career guidance
-                </p>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h3 className="font-extrabold text-sm sm:text-base tracking-tight font-display">
+                      ManaCarrier AI Assistant
+                    </h3>
+                    <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-400/20 text-emerald-200 border border-emerald-400/30">
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                      <span>RAG Knowledge Active</span>
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-blue-100/90 font-medium">
+                    Verified job information &amp; career guidance
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-1">
+                <button
+                  type="button"
+                  onClick={handleResetChat}
+                  className="p-2 text-white/80 hover:text-white hover:bg-white/10 rounded-xl transition-colors cursor-pointer"
+                  title="Reset Conversation"
+                  aria-label="Reset Conversation"
+                >
+                  <RotateCcw className="w-4 h-4" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIsOpen(false)}
+                  className="p-2 text-white/80 hover:text-white hover:bg-white/10 rounded-xl transition-colors cursor-pointer"
+                  title="Close Chat"
+                  aria-label="Close Chat"
+                >
+                  <X className="w-5 h-5" />
+                </button>
               </div>
             </div>
 
-            <div className="flex items-center gap-1">
-              <button
-                type="button"
-                onClick={handleResetChat}
-                className="p-1.5 text-white/80 hover:text-white hover:bg-white/10 rounded-xl transition-colors cursor-pointer"
-                title="Reset Conversation"
-                aria-label="Reset Conversation"
-              >
-                <RotateCcw className="w-4 h-4" />
-              </button>
-              <button
-                type="button"
-                onClick={() => setIsOpen(false)}
-                className="p-1.5 text-white/80 hover:text-white hover:bg-white/10 rounded-xl transition-colors cursor-pointer"
-                title="Close Chat"
-                aria-label="Close Chat"
-              >
-                <X className="w-5 h-5" />
-              </button>
+            {/* RAG Verification Policy Bar */}
+            <div className="bg-blue-50/90 border-b border-blue-100 px-4 py-2 flex items-center justify-between text-[11px] text-blue-900 font-medium">
+              <div className="flex items-center gap-1.5">
+                <ShieldCheck className="w-3.5 h-3.5 text-blue-600 shrink-0" />
+                <span className="truncate">Answers strictly verified against the ManaCarrier Knowledge Base</span>
+              </div>
             </div>
-          </div>
 
-          {/* RAG Policy Notice */}
-          <div className="bg-blue-50/80 border-b border-blue-100/80 px-4 py-1.5 flex items-center gap-1.5 text-[11px] text-blue-800">
-            <Sparkles className="w-3 h-3 text-blue-600 shrink-0" />
-            <span className="truncate">Answers strictly verified from our Knowledge Base &amp; FAQs</span>
-          </div>
-
-          {/* Messages Stream */}
-          <div className="flex-1 p-4 overflow-y-auto space-y-3.5 bg-slate-50/50 text-xs">
-            {messages.map((msg) => (
-              <div
-                key={msg.id}
-                className={`flex gap-2.5 ${msg.sender === 'user' ? 'justify-end' : 'justify-start'}`}
-              >
-                {msg.sender === 'assistant' && (
-                  <div className="w-7 h-7 rounded-xl bg-blue-100 text-blue-700 flex items-center justify-center shrink-0 mt-0.5">
-                    <Bot className="w-4 h-4" />
-                  </div>
-                )}
-
-                <div
-                  className={`max-w-[82%] rounded-2xl px-3.5 py-2.5 shadow-2xs leading-relaxed ${
-                    msg.sender === 'user'
-                      ? 'bg-blue-600 text-white font-medium rounded-br-xs'
-                      : 'bg-white text-slate-800 border border-slate-200/80 rounded-bl-xs'
-                  }`}
+            {/* Messages Stream */}
+            <div className="flex-1 p-4 sm:p-5 overflow-y-auto space-y-4 bg-slate-50/50">
+              {messages.map((msg) => (
+                <motion.div
+                  key={msg.id}
+                  initial={{ opacity: 0, y: 8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.2 }}
+                  className={`flex gap-3 ${msg.sender === 'user' ? 'justify-end' : 'justify-start'}`}
                 >
-                  <p className="whitespace-pre-line text-xs">{msg.text}</p>
-
-                  {/* Source Citations */}
-                  {msg.citations && msg.citations.length > 0 && (
-                    <div className="mt-2.5 pt-2 border-t border-slate-100 space-y-1">
-                      <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block font-display">
-                        Verified Sources:
-                      </span>
-                      <div className="flex flex-wrap gap-1">
-                        {msg.citations.map((c, idx) => (
-                          <span
-                            key={idx}
-                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-slate-100 border border-slate-200 text-[10px] text-slate-600 font-semibold truncate max-w-[200px]"
-                            title={c.snippet}
-                          >
-                            {c.type === 'document' ? (
-                              <FileText className="w-3 h-3 text-blue-600 shrink-0" />
-                            ) : (
-                              <HelpCircle className="w-3 h-3 text-indigo-600 shrink-0" />
-                            )}
-                            <span className="truncate">{c.source}</span>
-                          </span>
-                        ))}
-                      </div>
+                  {msg.sender === 'assistant' && (
+                    <div className="w-8 h-8 rounded-2xl bg-blue-100 text-blue-700 flex items-center justify-center shrink-0 mt-0.5 shadow-2xs border border-blue-200/60">
+                      <Bot className="w-4.5 h-4.5" />
                     </div>
                   )}
 
                   <div
-                    className={`text-[9px] mt-1 text-right ${
-                      msg.sender === 'user' ? 'text-blue-200' : 'text-slate-400'
+                    className={`max-w-[86%] sm:max-w-[84%] rounded-2xl px-4 py-3 shadow-2xs ${
+                      msg.sender === 'user'
+                        ? 'bg-blue-600 text-white font-medium rounded-br-xs text-sm sm:text-base'
+                        : 'bg-white text-slate-800 border border-slate-200/90 rounded-bl-xs'
                     }`}
                   >
-                    {msg.timestamp}
-                  </div>
-                </div>
+                    {msg.sender === 'user' ? (
+                      <p className="whitespace-pre-wrap text-sm sm:text-base leading-relaxed">{msg.text}</p>
+                    ) : (
+                      <FormattedMarkdown content={msg.text} onNavigate={onNavigate} />
+                    )}
 
-                {msg.sender === 'user' && (
-                  <div className="w-7 h-7 rounded-xl bg-slate-200 text-slate-700 flex items-center justify-center shrink-0 mt-0.5">
-                    <User className="w-4 h-4" />
-                  </div>
-                )}
-              </div>
-            ))}
+                    {/* Source Citations */}
+                    {msg.citations && msg.citations.length > 0 && (
+                      <div className="mt-3 pt-2.5 border-t border-slate-100 space-y-1.5">
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block font-display">
+                          Retrieved Sources &amp; Evidence:
+                        </span>
+                        <div className="flex flex-wrap gap-1.5">
+                          {msg.citations.map((c, idx) => (
+                            <span
+                              key={idx}
+                              className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-slate-100 border border-slate-200 text-[11px] text-slate-700 font-semibold truncate max-w-[240px]"
+                              title={c.snippet}
+                            >
+                              <FileText className="w-3 h-3 text-blue-600 shrink-0" />
+                              <span className="truncate">{c.source}</span>
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
 
-            {/* Loading Indicator */}
-            {isLoading && (
-              <div className="flex gap-2.5 justify-start">
-                <div className="w-7 h-7 rounded-xl bg-blue-100 text-blue-700 flex items-center justify-center shrink-0 mt-0.5">
-                  <Bot className="w-4 h-4" />
-                </div>
-                <div className="bg-white text-slate-600 border border-slate-200/80 rounded-2xl rounded-bl-xs px-4 py-2.5 shadow-2xs flex items-center gap-2">
-                  <div className="flex gap-1 items-center">
-                    <span className="w-1.5 h-1.5 rounded-full bg-blue-600 animate-bounce" />
-                    <span className="w-1.5 h-1.5 rounded-full bg-blue-600 animate-bounce [animation-delay:0.2s]" />
-                    <span className="w-1.5 h-1.5 rounded-full bg-blue-600 animate-bounce [animation-delay:0.4s]" />
+                    <div
+                      className={`text-[10px] mt-1.5 text-right font-medium ${
+                        msg.sender === 'user' ? 'text-blue-200' : 'text-slate-400'
+                      }`}
+                    >
+                      {msg.timestamp}
+                    </div>
                   </div>
-                  <span className="text-[11px] text-slate-500 font-medium">Searching RAG knowledge base...</span>
-                </div>
+
+                  {msg.sender === 'user' && (
+                    <div className="w-8 h-8 rounded-2xl bg-slate-200 text-slate-700 flex items-center justify-center shrink-0 mt-0.5 border border-slate-300/80">
+                      <User className="w-4.5 h-4.5" />
+                    </div>
+                  )}
+                </motion.div>
+              ))}
+
+              {/* Animated Typing Indicator */}
+              {isLoading && (
+                <motion.div
+                  initial={{ opacity: 0, y: 8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="flex gap-3 justify-start"
+                >
+                  <div className="w-8 h-8 rounded-2xl bg-blue-100 text-blue-700 flex items-center justify-center shrink-0 mt-0.5 border border-blue-200/60">
+                    <Bot className="w-4.5 h-4.5" />
+                  </div>
+                  <div className="bg-white text-slate-700 border border-slate-200/90 rounded-2xl rounded-bl-xs px-4 py-3 shadow-2xs flex items-center gap-2.5">
+                    <div className="flex gap-1 items-center">
+                      <span className="w-2 h-2 rounded-full bg-blue-600 animate-bounce" />
+                      <span className="w-2 h-2 rounded-full bg-blue-600 animate-bounce [animation-delay:0.2s]" />
+                      <span className="w-2 h-2 rounded-full bg-blue-600 animate-bounce [animation-delay:0.4s]" />
+                    </div>
+                    <span className="text-xs text-slate-500 font-medium">Searching ManaCarrier knowledge base...</span>
+                  </div>
+                </motion.div>
+              )}
+
+              <div ref={messagesEndRef} />
+            </div>
+
+            {/* Suggested Questions Pill bar */}
+            {messages.length <= 3 && !isLoading && (
+              <div className="px-3.5 py-2.5 bg-white border-t border-slate-100 flex items-center gap-2 overflow-x-auto no-scrollbar">
+                <span className="text-[10px] font-bold text-slate-400 shrink-0 font-display uppercase tracking-wider">
+                  Suggested:
+                </span>
+                {QUICK_PROMPTS.map((prompt, i) => (
+                  <button
+                    key={i}
+                    type="button"
+                    onClick={() => handleSendMessage(prompt)}
+                    className="px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-blue-50 hover:text-blue-700 border border-slate-200/80 text-xs text-slate-700 font-medium whitespace-nowrap transition-colors cursor-pointer shrink-0 shadow-2xs"
+                  >
+                    {prompt}
+                  </button>
+                ))}
               </div>
             )}
 
-            <div ref={messagesEndRef} />
-          </div>
-
-          {/* Quick Questions (Shown if only welcome message or user asks) */}
-          {messages.length <= 3 && !isLoading && (
-            <div className="px-3.5 py-2 bg-white border-t border-slate-100 flex items-center gap-1.5 overflow-x-auto no-scrollbar">
-              <span className="text-[10px] font-bold text-slate-400 shrink-0 font-display">
-                Suggested:
-              </span>
-              {QUICK_PROMPTS.map((prompt, i) => (
-                <button
-                  key={i}
-                  type="button"
-                  onClick={() => handleSendMessage(prompt)}
-                  className="px-2.5 py-1 rounded-xl bg-slate-100 hover:bg-blue-50 hover:text-blue-700 border border-slate-200/80 text-[10px] text-slate-600 font-medium whitespace-nowrap transition-colors cursor-pointer shrink-0"
-                >
-                  {prompt}
-                </button>
-              ))}
-            </div>
-          )}
-
-          {/* Input Footer */}
-          <div className="p-3 bg-white border-t border-slate-200/80">
-            <div className="flex items-center gap-2">
-              <input
-                ref={inputRef}
-                type="text"
-                value={inputMessage}
-                onChange={(e) => setInputMessage(e.target.value)}
-                onKeyDown={handleKeyDown}
-                placeholder="Ask about jobs, internships, ATS resume reviews..."
-                disabled={isLoading}
-                className="flex-1 px-3.5 py-2.5 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-600 focus:bg-white text-slate-900 placeholder:text-slate-400 disabled:opacity-60"
-              />
-              <button
-                type="button"
-                onClick={() => handleSendMessage()}
-                disabled={isLoading || !inputMessage.trim()}
-                className="w-9 h-9 rounded-xl bg-blue-600 hover:bg-blue-700 active:bg-blue-800 disabled:opacity-40 text-white flex items-center justify-center transition-colors shadow-xs cursor-pointer shrink-0"
-                aria-label="Send message"
-              >
-                <Send className="w-4 h-4" />
-              </button>
-            </div>
-            <div className="flex items-center justify-between text-[10px] text-slate-400 mt-2 px-1">
-              <span>Powered by Gemini &amp; Mana Naukari RAG</span>
-              {onNavigate && (
+            {/* Input Footer */}
+            <div className="p-3.5 bg-white border-t border-slate-200/80">
+              <div className="flex items-center gap-2">
+                <input
+                  ref={inputRef}
+                  type="text"
+                  value={inputMessage}
+                  onChange={(e) => setInputMessage(e.target.value)}
+                  onKeyDown={handleKeyDown}
+                  placeholder="Ask about ManaCarrier jobs, internships, ATS resume reviews..."
+                  disabled={isLoading}
+                  className="flex-1 px-4 py-3 text-xs sm:text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-600 focus:bg-white text-slate-900 placeholder:text-slate-400 disabled:opacity-60 transition-all"
+                />
                 <button
                   type="button"
-                  onClick={() => {
-                    setIsOpen(false);
-                    onNavigate('/contact');
-                  }}
-                  className="text-blue-600 hover:underline flex items-center gap-0.5"
+                  onClick={() => handleSendMessage()}
+                  disabled={isLoading || !inputMessage.trim()}
+                  className="w-10 h-10 rounded-xl bg-blue-600 hover:bg-blue-700 active:bg-blue-800 disabled:opacity-40 text-white flex items-center justify-center transition-colors shadow-xs cursor-pointer shrink-0"
+                  aria-label="Send message"
                 >
-                  <span>Need human support?</span>
-                  <ExternalLink className="w-2.5 h-2.5" />
+                  <Send className="w-4 h-4" />
                 </button>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
+              </div>
 
-      {/* 2. Small, Clean Floating Action Button */}
+              <div className="flex items-center justify-between text-[10px] text-slate-400 mt-2 px-1 font-medium">
+                <span>Powered by Gemini &amp; ManaCarrier RAG</span>
+                {onNavigate && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsOpen(false);
+                      onNavigate('/contact');
+                    }}
+                    className="text-blue-600 hover:underline flex items-center gap-0.5 font-bold"
+                  >
+                    <span>Contact Support</span>
+                    <ExternalLink className="w-2.5 h-2.5" />
+                  </button>
+                )}
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* 2. Floating Action Button */}
       <div className="flex items-center gap-2">
         <button
           type="button"
           onClick={() => setIsOpen(!isOpen)}
-          className={`relative w-10 h-10 sm:w-11 sm:h-11 rounded-full flex items-center justify-center text-white shadow-md transition-all cursor-pointer ${
+          className={`relative w-11 h-11 sm:w-12 sm:h-12 rounded-full flex items-center justify-center text-white shadow-lg transition-all cursor-pointer ${
             isOpen
               ? 'bg-slate-800 hover:bg-slate-900 rotate-90'
               : 'bg-blue-600 hover:bg-blue-500 active:scale-95'
           }`}
-          aria-label={isOpen ? 'Close AI Chat' : 'Ask AI Assistant'}
-          title={isOpen ? 'Close AI Chat' : 'Ask AI Assistant'}
+          aria-label={isOpen ? 'Close AI Chat' : 'Ask ManaCarrier AI Assistant'}
+          title={isOpen ? 'Close AI Chat' : 'Ask ManaCarrier AI Assistant'}
         >
           {isOpen ? (
             <X className="w-5 h-5 text-white" />
           ) : (
             <>
-              <Bot className="w-5 h-5 text-white" />
-              <span className="absolute top-0 right-0 w-2.5 h-2.5 rounded-full bg-cyan-400 border-2 border-white" />
+              <Bot className="w-6 h-6 text-white" />
+              <span className="absolute top-0 right-0 w-3 h-3 rounded-full bg-emerald-400 border-2 border-white animate-pulse" />
             </>
           )}
         </button>

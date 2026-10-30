@@ -93,7 +93,7 @@ export const CategoryDetailsPage: React.FC<CategoryDetailsPageProps> = ({
         });
 
         // 2. Set dynamic document title and meta description for SEO
-        document.title = `${matchedCatName} Jobs | Verified Vacancies | Mana Naukari`;
+        document.title = `${matchedCatName} Jobs | Verified Vacancies | ManaCarrier`;
         const metaDescEl = document.querySelector('meta[name="description"]');
         if (metaDescEl) {
           metaDescEl.setAttribute(

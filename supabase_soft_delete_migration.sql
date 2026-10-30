@@ -1,6 +1,6 @@
 -- ============================================================================
 -- SQL Migration: Soft Delete Architecture & Application Data Preservation
--- Platform: Mana Naukari (Supabase / PostgreSQL)
+-- Platform: ManaCarrier (Supabase / PostgreSQL)
 -- Description:
 --   1. Removes all ON DELETE CASCADE behaviors from applicants and job_views.
 --   2. Enforces ON DELETE RESTRICT so jobs cannot be hard-deleted if applications exist.

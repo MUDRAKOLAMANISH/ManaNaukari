@@ -26,7 +26,7 @@ export const ShareModal: React.FC<ShareModalProps> = ({
   if (!isOpen) return null;
 
   const fullUrl = getAbsoluteJobUrl(jobUrlPath);
-  const shareText = `Hiring Alert: ${jobTitle} at ${company} on Mana Naukari. Apply now:`;
+  const shareText = `Hiring Alert: ${jobTitle} at ${company} on ManaCarrier. Apply now:`;
 
   const handleCopy = () => {
     navigator.clipboard.writeText(fullUrl).then(() => {

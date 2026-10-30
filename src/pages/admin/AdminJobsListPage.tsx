@@ -8,6 +8,8 @@ import { JobTablePagination } from '../../components/admin/JobTablePagination';
 import { DeleteConfirmModal } from '../../components/admin/DeleteConfirmModal';
 import { SocialShareModal } from '../../components/admin/SocialShareModal';
 import { JobVerificationModal } from '../../components/admin/JobVerificationModal';
+import { ScanResultsModal } from '../../components/admin/ScanResultsModal';
+import { jobAvailabilityService, BatchCheckSummary } from '../../services/jobAvailabilityService';
 import { 
   Search, RefreshCw, AlertCircle, CheckCircle2, 
   ShieldCheck, Database, Copy, Check, ChevronDown, ChevronUp, RotateCcw, Trash2
@@ -109,17 +111,32 @@ export const AdminJobsListPage: React.FC<AdminJobsListPageProps> = ({ onNavigate
       ]);
 
       let checkedTodayCount = 0;
+      const localCheckedKey = `mana_carrier_checked_today_${todayPrefix}`;
+      const localCount = parseInt(localStorage.getItem(localCheckedKey) || '0', 10);
+
       try {
         const { count, error } = await supabase
           .from('jobs')
           .select('id', { count: 'exact', head: true })
           .gte('review_date', todayPrefix);
-        if (!error) {
-          checkedTodayCount = count || 0;
+
+        if (!error && count !== null) {
+          checkedTodayCount = count;
+        } else {
+          // Fallback: Check updated_at timestamp for today
+          const { count: updatedCount } = await supabase
+            .from('jobs')
+            .select('id', { count: 'exact', head: true })
+            .gte('updated_at', todayPrefix);
+          if (updatedCount !== null) {
+            checkedTodayCount = updatedCount;
+          }
         }
       } catch (err) {
-        console.warn('Could not query checked_today counts:', err);
+        console.warn('Could not query checked_today counts from DB:', err);
       }
+
+      checkedTodayCount = Math.max(checkedTodayCount, localCount);
 
       setStatusCounts({
         all: allRes.count || 0,
@@ -260,49 +277,63 @@ export const AdminJobsListPage: React.FC<AdminJobsListPageProps> = ({ onNavigate
   };
 
   const [scanning, setScanning] = useState(false);
+  const [scanSummary, setScanSummary] = useState<BatchCheckSummary | null>(null);
+  const [isScanResultsModalOpen, setIsScanResultsModalOpen] = useState(false);
 
   const handleRunHealthCheck = async () => {
     setScanning(true);
     setToastMessage('Initiating live job availability checks on active postings...');
     setTimeout(() => setToastMessage(null), 3000);
 
+    let summary: BatchCheckSummary | null = null;
+
     try {
+      // 1. Attempt API endpoint
       const res = await fetch('/api/admin/check-availability', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
       });
 
-      // Defensive Handling: Check response status and Content-Type before parsing JSON
       const contentType = res.headers.get('content-type') || '';
-      if (!res.ok || !contentType.includes('application/json')) {
-        console.error('[Admin] Health Check API failure details:', {
-          url: '/api/admin/check-availability',
-          status: res.status,
-          statusText: res.statusText,
-          contentType: contentType,
-          headers: Array.from(res.headers.entries()).reduce((acc: any, [k, v]) => {
-            acc[k] = v;
-            return acc;
-          }, {}),
-        });
-        alert("Production API endpoint is not responding correctly.");
-        return;
+      if (res.ok && contentType.includes('application/json')) {
+        const data = await res.json();
+        if (data && data.success) {
+          summary = data;
+        }
       }
-
-      const data = await res.json();
-      if (data.success) {
-        setToastMessage(`Job scan complete! Checked ${data.totalChecked} jobs. Flagged ${data.flaggedCount} potential closures.`);
-        setTimeout(() => setToastMessage(null), 5000);
-        loadJobs();
-      } else {
-        alert(`Error running health check: ${data.error || 'Unknown error'}`);
-      }
-    } catch (err: any) {
-      console.error('Failed to run availability checks:', err);
-      alert(`Network error running health check: ${err.message}`);
-    } finally {
-      setScanning(false);
+    } catch (apiErr) {
+      console.warn('[Admin] API endpoint unreachable, falling back to client audit engine:', apiErr);
     }
+
+    // 2. Client-Side Fallback if API did not return valid summary
+    if (!summary) {
+      try {
+        console.log('[Admin] Running client-side availability scan across active jobs...');
+        summary = await jobAvailabilityService.checkAllActiveJobs();
+      } catch (clientErr: any) {
+        console.error('Failed to run client-side availability check:', clientErr);
+        alert(`Error running health check: ${clientErr.message || 'Unknown error'}`);
+      }
+    }
+
+    if (summary && summary.success) {
+      const todayPrefix = new Date().toISOString().split('T')[0];
+      const localKey = `mana_carrier_checked_today_${todayPrefix}`;
+      const prevLocal = parseInt(localStorage.getItem(localKey) || '0', 10);
+      localStorage.setItem(localKey, String(Math.max(prevLocal, summary.totalChecked)));
+
+      setScanSummary(summary);
+      setIsScanResultsModalOpen(true);
+      const flaggedCount = summary.flaggedJobs?.length || 0;
+      setToastMessage(`Job scan complete! Checked ${summary.totalChecked} jobs. ${flaggedCount} flagged for review or closure.`);
+      setTimeout(() => setToastMessage(null), 5000);
+      loadJobs();
+      loadStatusCounts();
+    } else if (!summary) {
+      alert('Could not complete availability check. Please check your network connection.');
+    }
+
+    setScanning(false);
   };
 
   const handleUpdateStatus = async (job: Job, newStatus: string) => {
@@ -669,6 +700,17 @@ CREATE OR REPLACE VIEW public.applications AS SELECT * FROM public.applicants;`;
         onUpdateStatus={(jobToUpdate, newStatus) => {
           handleUpdateStatus(jobToUpdate, newStatus);
           setAuditModalJob(null);
+        }}
+      />
+
+      {/* Scan Results Summary Modal */}
+      <ScanResultsModal
+        summary={scanSummary}
+        isOpen={isScanResultsModalOpen}
+        onClose={() => setIsScanResultsModalOpen(false)}
+        onRefreshJobs={() => {
+          loadJobs();
+          loadStatusCounts();
         }}
       />
 

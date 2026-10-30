@@ -19,7 +19,7 @@ import {
   getTelegramConfig,
   saveTelegramConfig,
   TelegramConfig,
-  getManaNaukariJobUrl,
+  getManaCarrierJobUrl,
 } from '../../utils/socialShare';
 
 interface SocialShareModalProps {
@@ -62,7 +62,7 @@ export const SocialShareModal: React.FC<SocialShareModalProps> = ({
 
   if (!isOpen || !job) return null;
 
-  const jobUrl = getManaNaukariJobUrl(job.id);
+  const jobUrl = getManaCarrierJobUrl(job.id);
 
   const handleCopyMessage = async () => {
     const success = await copyJobMessageToClipboard(formattedMessage);
@@ -406,7 +406,7 @@ export const SocialShareModal: React.FC<SocialShareModalProps> = ({
                 </label>
                 <input
                   type="text"
-                  placeholder="@mananaukari_jobs or -100xxxxxxxxxx"
+                  placeholder="@manacarrier_jobs or -100xxxxxxxxxx"
                   value={telegramConfig.channelId}
                   onChange={(e) => setTelegramConfigState({ ...telegramConfig, channelId: e.target.value })}
                   className="w-full px-3 py-2 bg-white border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-600 focus:outline-none font-mono text-[11px]"

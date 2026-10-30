@@ -72,36 +72,36 @@ export const handler = async (event: any) => {
 
     const plainTextContent = `Hi ${greetingName},
 
-Welcome to Mana Naukari!
+Welcome to ManaCarrier!
 
 We're excited to help you take the next step in your career.
 
-With Mana Naukari, you can explore:
+With ManaCarrier, you can explore:
 • Job opportunities for freshers and experienced candidates.
 • Internships and work-from-home opportunities.
 • Career development resources.
 • Resume and portfolio services.
 • AI-powered career planning and interview preparation, where available.
 
-Visit Mana Naukari to explore the opportunities and services available to you.
+Visit ManaCarrier to explore the opportunities and services available to you.
 
-Website: https://mana-naukari.netlify.app/
+Website: https://manacarrier.netlify.app/
 
 Wishing you success in your career journey!
 
 Best regards,
-Team Mana Naukari`;
+Team ManaCarrier`;
 
     const htmlContent = `<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <title>Welcome to Mana Naukari</title>
+  <title>Welcome to ManaCarrier</title>
 </head>
 <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #f8fafc; color: #1e293b; padding: 24px; margin: 0; line-height: 1.6;">
   <div style="max-width: 580px; margin: 0 auto; background: #ffffff; border: 1px solid #e2e8f0; border-radius: 20px; padding: 32px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);">
     <div style="margin-bottom: 24px; border-bottom: 1px solid #f1f5f9; padding-bottom: 16px;">
-      <h2 style="color: #2563eb; margin: 0 0 6px 0; font-size: 24px; font-weight: 800;">Mana Naukari</h2>
+      <h2 style="color: #2563eb; margin: 0 0 6px 0; font-size: 24px; font-weight: 800;">ManaCarrier</h2>
       <span style="display: inline-block; background-color: #eff6ff; color: #1d4ed8; font-size: 11px; font-weight: 700; padding: 4px 10px; border-radius: 9999px;">
         Career Account Activated 🚀
       </span>
@@ -112,11 +112,11 @@ Team Mana Naukari`;
     </p>
 
     <p style="font-size: 15px; margin-bottom: 20px; color: #334155;">
-      Welcome to <strong>Mana Naukari</strong>! We're excited to help you take the next step in your career.
+      Welcome to <strong>ManaCarrier</strong>! We're excited to help you take the next step in your career.
     </p>
 
     <p style="font-size: 15px; margin-bottom: 12px; font-weight: 700; color: #0f172a;">
-      With Mana Naukari, you can explore:
+      With ManaCarrier, you can explore:
     </p>
 
     <ul style="padding-left: 0; list-style: none; margin: 0 0 24px 0;">
@@ -129,16 +129,16 @@ Team Mana Naukari`;
 
     <div style="background-color: #f8fafc; border: 1px solid #cbd5e1; border-radius: 14px; padding: 20px; margin-bottom: 24px; text-align: center;">
       <p style="font-size: 14px; color: #334155; margin: 0 0 14px 0;">
-        Visit Mana Naukari to explore the opportunities and services available to you.
+        Visit ManaCarrier to explore the opportunities and services available to you.
       </p>
-      <a href="https://mana-naukari.netlify.app/" target="_blank" style="display: inline-block; background-color: #2563eb; color: #ffffff; text-decoration: none; font-weight: 700; font-size: 14px; padding: 12px 28px; border-radius: 12px; box-shadow: 0 2px 4px rgba(37, 99, 235, 0.2);">
-        Explore Mana Naukari ↗
+      <a href="https://manacarrier.netlify.app/" target="_blank" style="display: inline-block; background-color: #2563eb; color: #ffffff; text-decoration: none; font-weight: 700; font-size: 14px; padding: 12px 28px; border-radius: 12px; box-shadow: 0 2px 4px rgba(37, 99, 235, 0.2);">
+        Explore ManaCarrier ↗
       </a>
     </div>
 
     <div style="border-top: 1px solid #e2e8f0; padding-top: 20px; font-size: 14px;">
       <p style="margin: 0 0 4px 0; color: #64748b;">Wishing you success in your career journey!</p>
-      <p style="margin: 0; font-weight: 700; color: #0f172a;">Best regards,<br>Team Mana Naukari</p>
+      <p style="margin: 0; font-weight: 700; color: #0f172a;">Best regards,<br>Team ManaCarrier</p>
     </div>
   </div>
 </body>
@@ -153,7 +153,7 @@ Team Mana Naukari`;
       body: JSON.stringify({
         from: fromEmail,
         to: cleanEmail,
-        subject: 'Welcome to Mana Naukari – Your Career Journey Starts Here!',
+        subject: 'Welcome to ManaCarrier – Your Career Journey Starts Here!',
         text: plainTextContent,
         html: htmlContent,
       }),

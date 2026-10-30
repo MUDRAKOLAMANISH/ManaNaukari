@@ -739,13 +739,23 @@ export const applicantsService = {
 export const contactMessagesService = {
   async create(message: ContactMessageInsert): Promise<{ data: ContactMessage | null; error: Error | null }> {
     try {
-      const { data, error } = await supabase
+      // Execute insert directly without .select() to ensure unauthenticated users with INSERT RLS permissions can submit without hitting SELECT RLS restrictions.
+      const { error } = await supabase
         .from('contact_messages')
-        .insert(message)
-        .select()
-        .single();
-      return { data: data as ContactMessage | null, error };
+        .insert({
+          name: message.name.trim(),
+          email: message.email.trim(),
+          message: message.message.trim(),
+        });
+
+      if (error) {
+        console.error('[contactMessagesService.create] Supabase insert error:', error);
+        return { data: null, error };
+      }
+
+      return { data: message as ContactMessage, error: null };
     } catch (err: any) {
+      console.error('[contactMessagesService.create] Unexpected exception:', err);
       return { data: null, error: err };
     }
   },
@@ -783,8 +793,8 @@ export interface SubscribeJobAlertsResult {
 
 export const jobAlertSubscribersService = {
   /**
-   * Subscribes an email with category and frequency preferences into `job_alert_subscribers`.
-   * Checks for duplicate emails to prevent multiple subscriptions.
+   * Subscribes an email with category and frequency preferences securely into `job_alert_subscribers`.
+   * Uses SECURITY DEFINER RPC or server proxy to protect subscriber records from public SELECT inspection.
    */
   async subscribe({
     email,
@@ -793,128 +803,111 @@ export const jobAlertSubscribersService = {
   }: SubscribeJobAlertsInput): Promise<SubscribeJobAlertsResult> {
     const cleanEmail = email.trim().toLowerCase();
 
-    // Step 1: Check if email already exists in job_alert_subscribers
+    // 1. Primary: Security-definer RPC 'subscribe_job_alerts'
     try {
-      const { data: existing, error: checkError } = await supabase
-        .from('job_alert_subscribers')
-        .select('id, email')
-        .ilike('email', cleanEmail)
-        .maybeSingle();
+      const { data: rpcRes, error: rpcErr } = await supabase.rpc('subscribe_job_alerts', {
+        p_email: cleanEmail,
+        p_categories: categories,
+        p_frequency: frequency,
+      });
 
-      if (!checkError && existing) {
-        return {
-          success: false,
-          isDuplicate: true,
-          message: 'This email is already subscribed to job alerts.',
-          error: 'Email already exists',
-        };
+      if (!rpcErr && rpcRes && typeof rpcRes === 'object') {
+        const resObj = rpcRes as any;
+        if (resObj.success) {
+          this.sendWelcomeEmailAsync(cleanEmail, categories, frequency);
+          return {
+            success: true,
+            message: resObj.message || 'Successfully subscribed to job alerts!',
+          };
+        }
       }
-    } catch (checkErr) {
-      console.warn('[jobAlertSubscribersService] Pre-check notice:', checkErr);
+    } catch (rpcCatch) {
+      console.warn('[jobAlertSubscribersService] RPC notice:', rpcCatch);
     }
 
-    // Step 2: Insert into job_alert_subscribers
-    const createdAt = new Date().toISOString();
-
+    // 2. Secondary: Backend server proxy endpoint '/api/alerts/subscribe'
     try {
-      const { error } = await supabase
+      const res = await fetch('/api/alerts/subscribe', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: cleanEmail, categories, frequency }),
+      });
+
+      if (res.ok) {
+        const resData = await res.json();
+        if (resData.success) {
+          this.sendWelcomeEmailAsync(cleanEmail, categories, frequency);
+          return {
+            success: true,
+            message: resData.message || 'Successfully subscribed to job alerts!',
+          };
+        }
+      }
+    } catch (apiErr) {
+      console.warn('[jobAlertSubscribersService] Server proxy notice:', apiErr);
+    }
+
+    // 3. Fallback: Direct insert for anonymous visitors
+    try {
+      const { error: insertErr } = await supabase
         .from('job_alert_subscribers')
         .insert({
           email: cleanEmail,
           categories,
           frequency,
           is_active: true,
-          created_at: createdAt,
         });
 
-      if (error) {
-        // Detect PostgreSQL duplicate key violation (code 23505) or unique constraint
-        if (
-          error.code === '23505' ||
-          error.message?.toLowerCase().includes('duplicate') ||
-          error.message?.toLowerCase().includes('already exists') ||
-          error.message?.toLowerCase().includes('unique')
-        ) {
-          return {
-            success: false,
-            isDuplicate: true,
-            message: 'This email is already subscribed to job alerts.',
-            error: error.message,
-          };
-        }
-
-        // If is_active column is not present (code 42703), fallback without is_active
-        if (error.code === '42703' && error.message?.includes('is_active')) {
-          const fallbackRes = await supabase
-            .from('job_alert_subscribers')
-            .insert({
-              email: cleanEmail,
-              categories,
-              frequency,
-              created_at: createdAt,
-            });
-
-          if (fallbackRes.error) {
-            if (
-              fallbackRes.error.code === '23505' ||
-              fallbackRes.error.message?.toLowerCase().includes('duplicate') ||
-              fallbackRes.error.message?.toLowerCase().includes('already exists')
-            ) {
-              return {
-                success: false,
-                isDuplicate: true,
-                message: 'This email is already subscribed to job alerts.',
-                error: fallbackRes.error.message,
-              };
-            }
-            return {
-              success: false,
-              message: fallbackRes.error.message || 'Failed to subscribe.',
-              error: fallbackRes.error.message,
-            };
-          }
-
-          // Async trigger welcome email notification (fire-and-forget: failure does not block subscription)
-          this.sendWelcomeEmailAsync(cleanEmail, categories, frequency);
-
-          return {
-            success: true,
-            message: 'Successfully subscribed to job alerts.',
-          };
-        }
-
+      if (!insertErr) {
+        this.sendWelcomeEmailAsync(cleanEmail, categories, frequency);
         return {
-          success: false,
-          message: error.message || 'Failed to subscribe.',
-          error: error.message,
+          success: true,
+          message: 'Successfully subscribed to daily job alerts!',
         };
       }
 
-      // Async trigger welcome email notification (fire-and-forget: failure does not block subscription)
-      this.sendWelcomeEmailAsync(cleanEmail, categories, frequency);
-
-      return {
-        success: true,
-        message: 'Successfully subscribed to job alerts.',
-      };
-    } catch (insertErr: any) {
-      if (
-        insertErr?.code === '23505' ||
-        insertErr?.message?.toLowerCase().includes('duplicate') ||
-        insertErr?.message?.toLowerCase().includes('already exists')
-      ) {
-        return {
-          success: false,
-          isDuplicate: true,
-          message: 'This email is already subscribed to job alerts.',
-          error: insertErr.message,
-        };
-      }
       return {
         success: false,
-        message: insertErr?.message || 'An unexpected error occurred.',
-        error: insertErr?.message,
+        message: insertErr.message || 'Failed to subscribe.',
+        error: insertErr.message,
       };
+    } catch (fallbackErr: any) {
+      return {
+        success: false,
+        message: fallbackErr?.message || 'An unexpected error occurred.',
+        error: fallbackErr?.message,
+      };
+    }
+  },
+
+  /**
+   * Unsubscribes an email using unsubscribe token or secure verification
+   */
+  async unsubscribe(email: string, token?: string): Promise<{ success: boolean; message: string }> {
+    const cleanEmail = email.trim().toLowerCase();
+    try {
+      const { data: rpcRes, error: rpcErr } = await supabase.rpc('unsubscribe_job_alerts', {
+        p_email: cleanEmail,
+        p_token: token || null,
+      });
+
+      if (!rpcErr && rpcRes && (rpcRes as any).success) {
+        return { success: true, message: (rpcRes as any).message };
+      }
+    } catch (err) {
+      console.warn('[jobAlertSubscribersService] Unsubscribe RPC notice:', err);
+    }
+
+    try {
+      const res = await fetch('/api/alerts/unsubscribe', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: cleanEmail, token }),
+      });
+      const data = await res.json();
+      return { success: Boolean(data.success), message: data.message || 'Unsubscribed' };
+    } catch (err: any) {
+      return { success: false, message: err.message || 'Failed to unsubscribe' };
     }
   },
 

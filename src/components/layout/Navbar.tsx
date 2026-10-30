@@ -18,7 +18,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   onToggleSidebarCollapse,
   isSidebarCollapsed = false,
 }) => {
-  const { user, signOut } = useAuth();
+  const { user, isAdmin, signOut } = useAuth();
   const [searchQuery, setSearchQuery] = useState('');
 
   const handleSearchSubmit = (e: React.FormEvent) => {
@@ -30,9 +30,9 @@ export const Navbar: React.FC<NavbarProps> = ({
     }
   };
 
-  const handleSignOut = async () => {
+  const handleAdminSignOut = async () => {
     await signOut();
-    onNavigate('/login');
+    onNavigate('/admin/login');
   };
 
   return (
@@ -77,52 +77,41 @@ export const Navbar: React.FC<NavbarProps> = ({
           </form>
         </div>
 
-        {/* Right Actions: User Profile Badge, Admin Portal, Post a Job */}
+        {/* Right Actions: Admin Portal & Post a Job */}
         <div className="flex items-center gap-2.5 shrink-0">
           
-          {/* User Account / Sign Out */}
-          {user ? (
+          {/* Admin Logged-In Badge / Logout or Admin Login Button */}
+          {user && isAdmin ? (
             <div className="flex items-center gap-2">
               <div
-                title={user.email || 'Authenticated Candidate'}
-                className="hidden md:flex items-center gap-2 px-3 py-1.5 bg-slate-100 border border-slate-200 rounded-xl text-xs font-semibold text-slate-800"
+                title={`Admin Authenticated (${user.email})`}
+                className="hidden md:flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 border border-blue-200 rounded-xl text-xs font-bold text-blue-900"
               >
-                <div className="w-5 h-5 rounded-full bg-blue-600 text-white flex items-center justify-center text-[10px] font-bold">
-                  {(user.email?.[0] || 'U').toUpperCase()}
-                </div>
-                <span className="max-w-[130px] truncate">{user.email?.split('@')[0]}</span>
+                <ShieldCheck className="w-4 h-4 text-blue-600" />
+                <span className="max-w-[120px] truncate">{user.email?.split('@')[0]} (Admin)</span>
               </div>
 
               <button
-                onClick={handleSignOut}
-                title="Sign out of Mana Career session"
+                onClick={handleAdminSignOut}
+                title="Sign out of Admin session"
                 className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-bold text-rose-700 hover:text-rose-800 bg-rose-50 hover:bg-rose-100 border border-rose-200 rounded-xl transition-all cursor-pointer shadow-2xs"
               >
                 <LogOut className="w-3.5 h-3.5" />
-                <span className="hidden sm:inline">Logout</span>
+                <span className="hidden sm:inline">Admin Logout</span>
               </button>
             </div>
           ) : (
-            <button
-              onClick={() => onNavigate('/login')}
-              className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-xl transition-all cursor-pointer"
-            >
-              <UserIcon className="w-3.5 h-3.5" />
-              <span>Sign In</span>
-            </button>
+            <div className="relative group">
+              <button
+                onClick={() => onNavigate('/admin/login')}
+                title="Admin Portal Access"
+                className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-slate-700 hover:text-slate-900 bg-slate-100 hover:bg-slate-200/80 border border-slate-200 rounded-xl transition-all duration-200 cursor-pointer shadow-2xs group"
+              >
+                <Lock className="w-3.5 h-3.5 text-slate-500 group-hover:text-slate-700 transition-colors" />
+                <span className="hidden sm:inline">Admin Portal</span>
+              </button>
+            </div>
           )}
-
-          {/* Admin Portal Button */}
-          <div className="relative group">
-            <button
-              onClick={() => onNavigate('/admin/login')}
-              title="Admin & Recruiter Access Only"
-              className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-slate-700 hover:text-slate-900 bg-slate-100 hover:bg-slate-200/80 border border-slate-200 rounded-xl transition-all duration-200 cursor-pointer shadow-2xs group"
-            >
-              <Lock className="w-3.5 h-3.5 text-slate-500 group-hover:text-slate-700 transition-colors" />
-              <span className="hidden sm:inline">Admin</span>
-            </button>
-          </div>
 
           {/* Post a Job Free CTA */}
           <button

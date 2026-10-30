@@ -1535,14 +1535,14 @@ export const CareerRoadmapPage: React.FC<CareerRoadmapPageProps> = ({ onNavigate
 
           </section>
 
-          {/* SECTION 6: CONNECT TO MANA NAUKARI SERVICES GRID */}
+          {/* SECTION 6: CONNECT TO MANA CARRIER SERVICES GRID */}
           <section className="bg-slate-50 rounded-3xl border border-slate-200/80 p-6 sm:p-8 space-y-5">
             <div className="text-center space-y-1">
               <span className="text-[11px] font-bold text-indigo-600 uppercase tracking-wider">
                 Integrated Career Support
               </span>
               <h2 className="text-xl font-bold text-slate-900 font-display">
-                Mana Naukari Accelerated Career Services
+                ManaCarrier Accelerated Career Services
               </h2>
             </div>
 

@@ -1,6 +1,6 @@
 -- ============================================================================
 -- SQL Migration: Mock Interview Bookings Module
--- Platform: Mana Naukari (Supabase / PostgreSQL)
+-- Platform: ManaCarrier (Supabase / PostgreSQL)
 -- Description:
 --   Creates the public.mock_interview_bookings table, enables RLS,
 --   adds performance indexes, and configures security policies for candidate bookings

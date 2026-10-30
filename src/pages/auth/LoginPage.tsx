@@ -154,6 +154,9 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onNavigate, redirectPath }
                 </>
               )}
             </button>
+            <p className="mt-2.5 text-[11px] sm:text-xs text-slate-500 text-center leading-relaxed font-medium">
+              Google Sign-In is currently in testing and is not yet available to everyone. Please continue using Email and Password to create an account or sign in.
+            </p>
           </div>
 
           {/* Divider */}

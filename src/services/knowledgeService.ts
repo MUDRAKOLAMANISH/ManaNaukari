@@ -22,8 +22,8 @@ export interface KnowledgeDocumentRecord {
   id: string | number;
   title: string;
   file_name?: string | null;
-  file_type: 'pdf' | 'docx' | 'txt' | 'text_entry' | 'url';
-  source_type?: 'pdf' | 'docx' | 'txt' | 'text_entry' | 'url';
+  file_type: 'pdf' | 'docx' | 'txt' | 'md' | 'text_entry' | 'url';
+  source_type?: 'pdf' | 'docx' | 'txt' | 'md' | 'text_entry' | 'url';
   file_size?: number;
   category: string;
   extracted_text: string;
@@ -33,7 +33,8 @@ export interface KnowledgeDocumentRecord {
   chunk_count?: number;
   page_count?: number;
   char_count?: number;
-  status?: 'indexed' | 'processing' | 'failed';
+  status?: 'indexed' | 'processing' | 'failed' | 'Uploading' | 'Processing' | 'Ready' | 'Failed';
+  error_message?: string;
 }
 
 export interface KnowledgeChunkRecord {
@@ -141,11 +142,17 @@ export async function uploadKnowledgeDocument(
   });
 
   const ext = file.name.split('.').pop()?.toLowerCase() || '';
-  if (ext !== 'pdf' && ext !== 'docx' && ext !== 'txt') {
-    throw new Error('Supported file formats: PDF (.pdf), Word (.docx), and Plain Text (.txt).');
+  if (ext !== 'pdf' && ext !== 'docx' && ext !== 'txt' && ext !== 'md') {
+    throw new Error('Supported file formats: PDF (.pdf), Word (.docx), Plain Text (.txt), and Markdown (.md).');
   }
 
-  const fileType = ext === 'pdf' ? 'pdf' : ext === 'docx' ? 'docx' : 'txt';
+  // File size validation (25 MB max)
+  const MAX_FILE_SIZE = 25 * 1024 * 1024;
+  if (file.size > MAX_FILE_SIZE) {
+    throw new Error('File size exceeds the 25 MB limit. Please upload a smaller file.');
+  }
+
+  const fileType: 'pdf' | 'docx' | 'txt' | 'md' = ext === 'pdf' ? 'pdf' : ext === 'docx' ? 'docx' : ext === 'md' ? 'md' : 'txt';
 
   // Step 1: Text Extraction
   let extracted: { text: string; pages: number; characters: number };
@@ -161,11 +168,11 @@ export async function uploadKnowledgeDocument(
     }
   } catch (err: any) {
     console.error('[KnowledgeService] Extraction error:', err);
-    throw new Error('Unable to extract text from this document. Please upload a readable PDF or add content manually.');
+    throw new Error(err.message || 'Unable to extract text from this document. Please upload a readable document or add content manually.');
   }
 
   if (!extracted.text || extracted.text.trim().length < 10) {
-    throw new Error('Unable to extract text from this document. Please upload a readable PDF or add content manually.');
+    throw new Error('Unable to extract text from this document. Please upload a readable document or add content manually.');
   }
 
   const fullText = extracted.text.trim();
@@ -187,27 +194,82 @@ export async function uploadKnowledgeDocument(
     char_count: fullText.length,
   });
 
-  const { data: docData, error: docErr } = await supabase
-    .from('knowledge_documents')
-    .insert([
-      {
-        title,
-        file_name: file.name,
-        file_type: fileType,
-        file_size: file.size,
-        category: category || 'General',
-        extracted_text: fullText,
-        content: fullText,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      },
-    ])
-    .select()
-    .single();
+  let docData: any = null;
+  let docErr: any = null;
+
+  try {
+    const res = await supabase
+      .from('knowledge_documents')
+      .insert([
+        {
+          title,
+          file_name: file.name,
+          file_type: fileType,
+          file_size: file.size,
+          category: category || 'General',
+          extracted_text: fullText,
+          content: fullText,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        },
+      ])
+      .select()
+      .single();
+
+    docData = res.data;
+    docErr = res.error;
+  } catch (e: any) {
+    docErr = e;
+  }
 
   if (docErr || !docData) {
-    console.error('[Supabase Insert Error] Failed inserting document:', docErr);
-    throw new Error(`Failed to save document in database: ${docErr?.message || 'Unknown database error'}`);
+    console.warn('[KnowledgeService] Direct upload insert notice:', docErr?.message, 'Trying server upload endpoint proxy...');
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('category', category || 'General');
+      if (customTitle) formData.append('title', customTitle);
+
+      const apiRes = await fetch('/api/knowledge/upload', {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (apiRes.ok) {
+        const json = await apiRes.json();
+        if (json.success && json.document) {
+          return {
+            document: {
+              id: json.document.id,
+              title: json.document.title || title,
+              file_name: json.document.file_name || file.name,
+              file_type: fileType,
+              file_size: file.size,
+              category: json.document.category || category || 'General',
+              extracted_text: fullText,
+              content: fullText,
+              created_at: json.document.created_at || new Date().toISOString(),
+              updated_at: json.document.updated_at || new Date().toISOString(),
+              chunk_count: chunkTexts.length,
+              page_count: extracted.pages,
+              char_count: fullText.length,
+              status: 'indexed',
+            },
+            extraction: {
+              fileName: file.name,
+              pages: extracted.pages,
+              charactersExtracted: fullText.length,
+              previewText: fullText.slice(0, 1500) + (fullText.length > 1500 ? '...' : ''),
+              chunkCount: chunkTexts.length,
+            },
+          };
+        }
+      }
+    } catch (proxyErr) {
+      console.warn('[KnowledgeService] Server upload proxy error:', proxyErr);
+    }
+
+    throw new Error(`Failed to save document in database: ${docErr?.message || 'Database error'}`);
   }
 
   const documentId = docData.id;
@@ -294,27 +356,82 @@ export async function addTextKnowledgeEntry(
   const chunkTexts = chunkTextIntoSegments(cleanContent, 500, 1000, 80);
 
   // Step 2: Insert into knowledge_documents
-  console.log('[Supabase Insert] Inserting manual text into knowledge_documents...');
-  const { data: docData, error: docErr } = await supabase
-    .from('knowledge_documents')
-    .insert([
-      {
-        title: cleanTitle,
-        file_name: `${cleanTitle.toLowerCase().replace(/[^a-z0-9]+/g, '_')}.txt`,
-        file_type: 'text_entry',
-        file_size: cleanContent.length,
-        category: category || 'General',
-        extracted_text: cleanContent,
-        content: cleanContent,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      },
-    ])
-    .select()
-    .single();
+  let docData: any = null;
+  let docErr: any = null;
+
+  try {
+    const res = await supabase
+      .from('knowledge_documents')
+      .insert([
+        {
+          title: cleanTitle,
+          file_name: `${cleanTitle.toLowerCase().replace(/[^a-z0-9]+/g, '_')}.txt`,
+          file_type: 'text_entry',
+          file_size: cleanContent.length,
+          category: category || 'General',
+          extracted_text: cleanContent,
+          content: cleanContent,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        },
+      ])
+      .select()
+      .single();
+
+    docData = res.data;
+    docErr = res.error;
+  } catch (e: any) {
+    docErr = e;
+  }
 
   if (docErr || !docData) {
-    console.error('[Supabase Insert Error] Failed inserting text entry:', docErr);
+    console.warn('[KnowledgeService] Direct text insert notice:', docErr?.message, 'Trying server text-entry endpoint proxy...');
+    try {
+      const apiRes = await fetch('/api/knowledge/text-entry', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title: cleanTitle,
+          category: category || 'General',
+          content: cleanContent,
+        }),
+      });
+
+      if (apiRes.ok) {
+        const json = await apiRes.json();
+        if (json.success && json.document) {
+          const pageCount = Math.max(1, Math.ceil(cleanContent.length / 2500));
+          return {
+            document: {
+              id: json.document.id,
+              title: json.document.title || cleanTitle,
+              file_name: `${cleanTitle.toLowerCase().replace(/[^a-z0-9]+/g, '_')}.txt`,
+              file_type: 'text_entry',
+              file_size: cleanContent.length,
+              category: json.document.category || category || 'General',
+              extracted_text: cleanContent,
+              content: cleanContent,
+              created_at: json.document.created_at || new Date().toISOString(),
+              updated_at: json.document.updated_at || new Date().toISOString(),
+              chunk_count: chunkTexts.length,
+              page_count: pageCount,
+              char_count: cleanContent.length,
+              status: 'indexed',
+            },
+            extraction: {
+              fileName: cleanTitle,
+              pages: pageCount,
+              charactersExtracted: cleanContent.length,
+              previewText: cleanContent.slice(0, 1500) + (cleanContent.length > 1500 ? '...' : ''),
+              chunkCount: chunkTexts.length,
+            },
+          };
+        }
+      }
+    } catch (proxyErr) {
+      console.warn('[KnowledgeService] Server text entry proxy error:', proxyErr);
+    }
+
     throw new Error(`Failed to save text entry in database: ${docErr?.message || 'Database error'}`);
   }
 
@@ -387,22 +504,58 @@ export async function editTextKnowledgeEntry(
 
   console.log(`[KnowledgeService] Updating document ID ${id}...`);
 
-  // Update document record
-  const { data: updatedDoc, error: updateErr } = await supabase
-    .from('knowledge_documents')
-    .update({
-      title: cleanTitle,
-      category: category || 'General',
-      extracted_text: cleanContent,
-      content: cleanContent,
-      updated_at: new Date().toISOString(),
-    })
-    .eq('id', id)
-    .select()
-    .single();
+  let updatedDoc: any = null;
+  let updateErr: any = null;
+
+  try {
+    const res = await supabase
+      .from('knowledge_documents')
+      .update({
+        title: cleanTitle,
+        category: category || 'General',
+        extracted_text: cleanContent,
+        content: cleanContent,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', id)
+      .select()
+      .single();
+
+    updatedDoc = res.data;
+    updateErr = res.error;
+  } catch (e: any) {
+    updateErr = e;
+  }
 
   if (updateErr || !updatedDoc) {
-    console.error('[KnowledgeService] Update error:', updateErr);
+    console.warn('[KnowledgeService] Direct update notice:', updateErr?.message, 'Trying server proxy endpoint...');
+    try {
+      const apiRes = await fetch(`/api/knowledge/text-entry/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title: cleanTitle,
+          category,
+          content: cleanContent,
+        }),
+      });
+
+      if (apiRes.ok) {
+        const json = await apiRes.json();
+        if (json.success && json.document) {
+          const chunkTexts = chunkTextIntoSegments(cleanContent, 500, 1000, 80);
+          return {
+            ...json.document,
+            chunk_count: chunkTexts.length,
+            char_count: cleanContent.length,
+            page_count: Math.max(1, Math.ceil(cleanContent.length / 2500)),
+          };
+        }
+      }
+    } catch (proxyErr) {
+      console.warn('[KnowledgeService] Server update proxy error:', proxyErr);
+    }
+
     throw new Error(`Failed to update knowledge entry: ${updateErr?.message || 'Database error'}`);
   }
 
@@ -435,20 +588,27 @@ export async function editTextKnowledgeEntry(
 export async function deleteKnowledgeDocument(id: string | number): Promise<boolean> {
   console.log(`[KnowledgeService] Deleting document ID ${id}...`);
   try {
-    // 1. Delete associated chunks
+    // 1. Try direct Supabase delete
     await supabase.from('knowledge_chunks').delete().eq('document_id', id);
-
-    // 2. Delete document
     const { error } = await supabase.from('knowledge_documents').delete().eq('id', id);
-    if (error) {
-      console.error('[KnowledgeService] Delete error:', error);
-      throw error;
+
+    if (!error) return true;
+
+    // 2. Try server delete proxy endpoint
+    console.warn('[KnowledgeService] Direct delete notice:', error.message, 'Trying server delete proxy...');
+    const apiRes = await fetch(`/api/knowledge/documents/${id}`, {
+      method: 'DELETE',
+    });
+
+    if (apiRes.ok) {
+      const json = await apiRes.json();
+      return Boolean(json.success);
     }
-    console.log(`[KnowledgeService] Document ${id} deleted successfully.`);
-    return true;
+
+    return false;
   } catch (err: any) {
     console.error('[KnowledgeService] Error deleting document:', err);
-    throw new Error(`Failed to delete document: ${err.message || 'Database error'}`);
+    return false;
   }
 }
 
@@ -771,7 +931,7 @@ export async function searchKnowledgeChunks(query: string, limit = 5): Promise<{
 
   for (const ch of chunks) {
     const chunkTextLower = (ch.chunk_text || '').toLowerCase();
-    const docMeta = docMap.get(ch.document_id) || { title: 'Mana Naukari Document', category: 'General' };
+    const docMeta = docMap.get(ch.document_id) || { title: 'ManaCarrier Document', category: 'General' };
     const docTitleLower = docMeta.title.toLowerCase();
 
     let score = 0;
@@ -824,12 +984,12 @@ export async function searchKnowledgeChunks(query: string, limit = 5): Promise<{
 }
 
 /**
- * Check if the user query is completely unrelated to Mana Naukari domains
+ * Check if the user query is completely unrelated to ManaCarrier domains
  */
 function isUnrelatedTopic(query: string): boolean {
   const q = query.toLowerCase().trim();
   const domainKeywords = [
-    'mana', 'naukari', 'job', 'jobs', 'intern', 'internship', 'resume', 'ats',
+    'mana', 'carrier', 'naukari', 'job', 'jobs', 'intern', 'internship', 'resume', 'ats',
     'portfolio', 'recruiter', 'hire', 'hiring', 'interview', 'salary', 'fresher',
     'campus', 'career', 'service', 'apply', 'application', 'company', 'vacanc',
     'role', 'drive', 'off-campus', 'support', 'contact', 'post', 'developer', 'engineer',
@@ -855,7 +1015,7 @@ function isUnrelatedTopic(query: string): boolean {
 
 /**
  * 11. AI Chatbot RAG Answer Generation
- * Strictly answers only from retrieved knowledge chunks
+ * Strictly answers only from verified ManaCarrier knowledge base and jobs.
  */
 export async function queryChatbotRag(
   userQuery: string,
@@ -864,56 +1024,25 @@ export async function queryChatbotRag(
   const query = userQuery.trim();
   console.log(`[Chatbot RAG] Query received: "${query}"`);
 
+  const EXACT_FALLBACK = "I couldn't find a clear answer to this question in the ManaCarrier knowledge base. Please try rephrasing your question or contact the ManaCarrier team at manishmudrakola8@gmail.com.";
+
   // Step 1: Check for unrelated questions
   if (isUnrelatedTopic(query)) {
-    const unrelatedResponse =
-      'I can assist with Mana Naukari jobs, internships, resume services, portfolio services, recruiter services, and information available in the Knowledge Base.';
-
-    // Save conversation to Supabase
-    saveChatConversation(query, unrelatedResponse, 'Policy: Domain Restriction');
+    saveChatConversation(query, EXACT_FALLBACK, 'Policy: Domain Restriction');
     return {
-      answer: unrelatedResponse,
+      answer: EXACT_FALLBACK,
       citations: [],
       matched: false,
     };
   }
 
-  // Step 2: Retrieve relevant chunks from Supabase
-  const matchedChunks = await searchKnowledgeChunks(query, 5);
-
-  if (!matchedChunks || matchedChunks.length === 0 || matchedChunks[0].score < 10) {
-    console.log('[Chatbot RAG] No matching knowledge chunks found in database.');
-    const notFoundResponse = 'I could not find this information in the Mana Naukari Knowledge Base.';
-
-    // Save conversation to Supabase
-    saveChatConversation(query, notFoundResponse, null);
-    return {
-      answer: notFoundResponse,
-      citations: [],
-      matched: false,
-    };
-  }
-
-  // Prepare retrieved context
-  const retrievedContext = matchedChunks
-    .map((item, idx) => `[Source ${idx + 1}: "${item.documentTitle}" (${item.category})]\n${item.chunk.chunk_text}`)
-    .join('\n\n---\n\n');
-
-  const citations: ChatCitation[] = matchedChunks.slice(0, 3).map((item) => ({
-    source: item.documentTitle,
-    category: item.category,
-    snippet: item.chunk.chunk_text.slice(0, 150) + (item.chunk.chunk_text.length > 150 ? '...' : ''),
-  }));
-
-  // Step 3: Call Server-side AI endpoint if available, or fall back to synthesis
-  let answer = '';
+  // Step 2: Try Server-side RAG Chat Endpoint first (has access to full vector store, seed FAQs, and jobs)
   try {
     const res = await fetch('/api/knowledge/chat', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         message: query,
-        retrievedContext,
         history: history || [],
       }),
     });
@@ -922,24 +1051,45 @@ export async function queryChatbotRag(
     if (res.ok && contentType.includes('application/json')) {
       const data = await res.json();
       if (data.success && data.answer) {
-        answer = data.answer;
+        const isRefusal = data.answer.includes(EXACT_FALLBACK) || data.answer.includes("couldn't find a clear answer") || data.answer.includes('could not find this information');
+        const finalAnswer = isRefusal ? EXACT_FALLBACK : data.answer;
+
+        saveChatConversation(query, finalAnswer, data.citations?.[0]?.source || 'ManaCarrier Server Knowledge Engine');
+        return {
+          answer: finalAnswer,
+          citations: isRefusal ? [] : (data.citations || []),
+          matched: !isRefusal,
+        };
       }
     }
   } catch (apiErr) {
-    console.warn('[Chatbot RAG] Server endpoint unavailable, using client synthesis fallback:', apiErr);
+    console.warn('[Chatbot RAG] Server endpoint unavailable, using client search fallback:', apiErr);
   }
 
-  // If server-side wasn't available (e.g. Netlify static SPA), synthesize answer directly from chunks
-  if (!answer) {
-    answer = synthesizeAnswerFromChunks(query, matchedChunks);
+  // Step 3: Client-side Supabase Chunk Retrieval Fallback
+  const matchedChunks = await searchKnowledgeChunks(query, 5);
+
+  if (!matchedChunks || matchedChunks.length === 0 || matchedChunks[0].score < 5) {
+    console.log('[Chatbot RAG] No matching knowledge chunks found in database or client search.');
+    saveChatConversation(query, EXACT_FALLBACK, null);
+    return {
+      answer: EXACT_FALLBACK,
+      citations: [],
+      matched: false,
+    };
   }
 
-  // Double check anti-hallucination guarantee: if answer is empty
-  if (!answer || answer.trim().length === 0) {
-    answer = 'I could not find this information in the Mana Naukari Knowledge Base.';
+  const citations: ChatCitation[] = matchedChunks.slice(0, 3).map((item) => ({
+    source: item.documentTitle,
+    category: item.category,
+    snippet: item.chunk.chunk_text.slice(0, 150) + (item.chunk.chunk_text.length > 150 ? '...' : ''),
+  }));
+
+  let answer = synthesizeAnswerFromChunks(query, matchedChunks);
+  if (!answer || answer.trim().length === 0 || answer.includes('could not find this information')) {
+    answer = EXACT_FALLBACK;
   }
 
-  // Save conversation to Supabase
   saveChatConversation(query, answer, matchedChunks[0]?.documentTitle || 'Knowledge Base');
 
   return {
@@ -957,7 +1107,7 @@ function synthesizeAnswerFromChunks(
   matched: { chunk: KnowledgeChunkRecord; documentTitle: string; category: string; score: number }[]
 ): string {
   if (matched.length === 0) {
-    return 'I could not find this information in the Mana Naukari Knowledge Base.';
+    return "I couldn't find a clear answer to this question in the ManaCarrier knowledge base. Please try rephrasing your question or contact the ManaCarrier team at manishmudrakola8@gmail.com.";
   }
 
   const primary = matched[0];
@@ -1018,22 +1168,22 @@ export async function seedInitialKnowledgeIfEmpty(): Promise<boolean> {
       return false; // Already populated
     }
 
-    console.log('[KnowledgeService] Knowledge Base is empty. Seeding initial Mana Naukari knowledge documents...');
+    console.log('[KnowledgeService] Knowledge Base is empty. Seeding initial ManaCarrier knowledge documents...');
 
     const initialDocs = [
       {
-        title: 'Mana Naukari Platform Overview & Candidate Guidelines',
+        title: 'ManaCarrier Platform Overview & Candidate Guidelines',
         category: 'Company Information',
-        content: `Mana Naukari is a dedicated Indian employment and career discovery platform connecting freshers, campus graduates, internship seekers, and early-career professionals directly with verified hiring companies and official career portal opportunities.
-All job requisitions on Mana Naukari link directly to official corporate career portals (Workday, Greenhouse, Lever, Google Forms, or official HR sites).
-Mana Naukari is 100% free for candidates and job seekers. We never charge any middleman fees, registration fees, or application fees.
+        content: `ManaCarrier is a dedicated Indian employment and career discovery platform connecting freshers, campus graduates, internship seekers, and early-career professionals directly with verified hiring companies and official career portal opportunities.
+All job requisitions on ManaCarrier link directly to official corporate career portals (Workday, Greenhouse, Lever, Google Forms, or official HR sites).
+ManaCarrier is 100% free for candidates and job seekers. We never charge any middleman fees, registration fees, or application fees.
 We verify every listing manually to ensure there are no fraudulent schemes, multi-level marketing, or fee demands.
-Candidates can reach support through the Contact page or email mananaukari2026@gmail.com.`,
+Candidates can reach support through the Contact page or email manishmudrakola8@gmail.com.`,
       },
       {
         title: 'ATS Resume Review & Optimization Service',
         category: 'Resume Review',
-        content: `The Mana Naukari ATS Resume Review service is a professional service where career coaches and recruitment experts evaluate candidate resumes against Applicant Tracking Systems (ATS).
+        content: `The ManaCarrier ATS Resume Review service is a professional service where career coaches and recruitment experts evaluate candidate resumes against Applicant Tracking Systems (ATS).
 Key features of the service include:
 1. ATS Compatibility Check: Verifying that standard ATS scanners (Workday, Taleo, Greenhouse) can accurately parse headings, work experience, and educational background.
 2. Keyword Optimization: Recommending industry-standard technical and domain keywords based on the candidate's target job role.
@@ -1043,7 +1193,7 @@ Key features of the service include:
       {
         title: 'Recruiter Services & Job Posting Verification Policy',
         category: 'Recruiter Services',
-        content: `Recruiters and corporate talent acquisition teams can register on the Mana Naukari Recruiter Portal to post job openings and discover verified entry-level talent.
+        content: `Recruiters and corporate talent acquisition teams can register on the ManaCarrier Recruiter Portal to post job openings and discover verified entry-level talent.
 Verification Policy:
 1. Every recruiter must register using an official company email address (free public domains like @gmail.com or @yahoo.com require additional corporate documentation).
 2. The administration team verifies the company website, corporate registration, and posting authenticity before approving job listings.
@@ -1054,7 +1204,7 @@ Verification Policy:
       {
         title: 'Internship & Fresher Job Categories',
         category: 'Jobs',
-        content: `Mana Naukari features job and internship opportunities across key career categories:
+        content: `ManaCarrier features job and internship opportunities across key career categories:
 1. Software Engineering & Development: Frontend (React, Angular), Backend (Java, Node.js, Python), Full Stack, Mobile App Development (Flutter, Android).
 2. Data & Analytics: Data Analyst Intern, Machine Learning Trainee, Business Analyst, SQL and PowerBI roles.
 3. QA & Software Testing: Manual Testing, Automation with Selenium and Cypress, Performance Testing.
@@ -1065,7 +1215,7 @@ All opportunities are indexed with experience levels (Fresher, 0-1 Years, 1-3 Ye
       {
         title: 'Technical Portfolio Review & Career Mentorship',
         category: 'Portfolio Service',
-        content: `The Mana Naukari Portfolio Service helps software engineering and design candidates showcase their practical projects effectively to tech hiring managers.
+        content: `The ManaCarrier Portfolio Service helps software engineering and design candidates showcase their practical projects effectively to tech hiring managers.
 Our mentors provide:
 - GitHub Profile Optimization: structuring README files, pinning relevant repositories, demonstrating Git workflow discipline.
 - Live Web Deployment Guidance: hosting demo apps on Vercel, Netlify, or Render to provide instant working links for recruiters.

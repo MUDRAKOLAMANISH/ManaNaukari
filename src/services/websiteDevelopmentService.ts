@@ -5,7 +5,7 @@ import {
   WebsiteLeadStatus,
 } from '../types/database.types';
 
-const LOCAL_STORAGE_LEADS_KEY = 'mana_naukari_website_dev_leads';
+const LOCAL_STORAGE_LEADS_KEY = 'mana_carrier_website_dev_leads';
 
 export interface SubmitWebsiteLeadInput {
   customerName: string;

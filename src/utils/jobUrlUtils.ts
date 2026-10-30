@@ -1,7 +1,7 @@
 import { WEBSITE_URL } from '../constants/links';
 
 /**
- * Slug and URL helpers for Mana Naukari
+ * Slug and URL helpers for ManaCarrier
  * Supports SEO-friendly dynamic URLs:
  * e.g. /jobs/software-engineer-microsoft-123 or /jobs/123
  */
@@ -74,8 +74,8 @@ export function extractJobIdFromSlug(slugOrId: string): string {
  * Returns full absolute URL for sharing or copying
  * Requirements:
  * - Never use AI Studio preview URLs or run.app domains
- * - Use WEBSITE_URL constant: https://mana-naukari.netlify.app
- * - Formats as https://mana-naukari.netlify.app/jobs/{job_id}
+ * - Use WEBSITE_URL constant: https://manacarrier.netlify.app
+ * - Formats as https://manacarrier.netlify.app/jobs/{job_id}
  */
 export function getAbsoluteJobUrl(jobUrlPath: string): string {
   if (!jobUrlPath) return WEBSITE_URL;

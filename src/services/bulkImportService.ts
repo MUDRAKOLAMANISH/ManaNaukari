@@ -193,7 +193,7 @@ export const bulkImportService = {
               ? raw.skills_required 
               : ['Problem Solving', 'Communication', 'Technical Fundamentals'],
             salary: raw.salary || 'Best in Industry',
-            description: raw.description || `### Opportunity Details\n\nOfficial opening with **${raw.company || this.extractDomainHint(trimmedUrl)}**.\n\n- Position: ${raw.title || 'Technical Role'}\n- Location: ${raw.location || 'Pan India'}\n- Experience: ${raw.experience || 'Fresher'}\n\nApply online through Mana Naukari direct portal.`,
+            description: raw.description || `### Opportunity Details\n\nOfficial opening with **${raw.company || this.extractDomainHint(trimmedUrl)}**.\n\n- Position: ${raw.title || 'Technical Role'}\n- Location: ${raw.location || 'Pan India'}\n- Experience: ${raw.experience || 'Fresher'}\n\nApply online through ManaCarrier direct portal.`,
             apply_link: raw.apply_link || trimmedUrl,
             source: raw.source || 'Official Careers Portal',
           };
@@ -247,7 +247,7 @@ export const bulkImportService = {
   },
 
   /**
-   * Process a single URL: Extract -> Safely Insert in Database -> Generate Mana Naukari link
+   * Process a single URL: Extract -> Safely Insert in Database -> Generate ManaCarrier link
    * Handles missing optional fields (is_featured, etc.) gracefully without failing
    */
   async processSingleUrl(url: string): Promise<{ success: boolean; data?: BulkImportSuccessItem; error?: string }> {
@@ -324,7 +324,7 @@ export const bulkImportService = {
         throw new Error(insertError?.message || 'Database insert failed to return valid Job ID.');
       }
 
-      // 4. Generate SEO-friendly slug & absolute Mana Naukari URL
+      // 4. Generate SEO-friendly slug & absolute ManaCarrier URL
       const seoSlugPath = generateJobUrlPath(createdJob);
       const manaNaukariUrl = getAbsoluteJobUrl(seoSlugPath);
 
@@ -413,7 +413,7 @@ export const bulkImportService = {
 
   /**
    * Generate professional WhatsApp shareable message
-   * Uses ONLY Mana Naukari URLs (Never original company career URLs).
+   * Uses ONLY ManaCarrier URLs (Never original company career URLs).
    */
   generateWhatsAppMessage(jobs: BulkImportSuccessItem[]): string {
     if (!jobs || jobs.length === 0) return '';

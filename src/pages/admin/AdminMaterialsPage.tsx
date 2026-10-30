@@ -598,7 +598,7 @@ export const AdminMaterialsPage: React.FC<{ onNavigate: (path: string) => void }
 
 const MATERIALS_SQL_SCRIPT = `-- ============================================================================
 -- SQL Migration: Notes, Links & Materials Module
--- Platform: Mana Naukari (Supabase / PostgreSQL)
+-- Platform: ManaCarrier (Supabase / PostgreSQL)
 -- Description:
 --   Creates the public.materials table, enables RLS, adds performance indexes,
 --   and configures policies for public reading/tracking and admin write access.

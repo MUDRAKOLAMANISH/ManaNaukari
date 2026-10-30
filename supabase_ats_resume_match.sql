@@ -1,6 +1,6 @@
 -- ============================================================================
 -- SQL Migration: ATS Resume Match Results Persistence
--- Platform: Mana Naukari (Supabase / PostgreSQL)
+-- Platform: ManaCarrier (Supabase / PostgreSQL)
 -- Description:
 --   Creates the resume_match_results table to permanently store ATS analysis,
 --   match scores, skills breakdown, and recommendations.

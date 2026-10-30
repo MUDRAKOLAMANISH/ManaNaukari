@@ -21,11 +21,11 @@ export const WhatsAppChannelBanner: React.FC = () => {
           </div>
 
           <h2 className="text-2xl sm:text-3xl lg:text-4xl font-extrabold font-display tracking-tight text-white">
-            Join the Official Mana Naukari WhatsApp Community
+            Join the Official ManaCarrier WhatsApp Community
           </h2>
 
           <p className="text-xs sm:text-sm text-emerald-100/90 leading-relaxed max-w-xl">
-            Join the official Mana Naukari WhatsApp Community for daily job updates, freshers openings, verified internships, and off-campus drives.
+            Join the official ManaCarrier WhatsApp Community for daily job updates, freshers openings, verified internships, and off-campus drives.
           </p>
 
           <div className="flex flex-wrap items-center justify-center lg:justify-start gap-4 pt-1 text-xs text-emerald-100 font-medium">

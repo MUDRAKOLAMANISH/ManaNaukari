@@ -138,7 +138,7 @@ export const resumeMatchService = {
   async saveMatchResult(result: AtsMatchResult): Promise<void> {
     // 1. LocalStorage Backup
     try {
-      const storageKey = 'mana_naukari_ats_results';
+      const storageKey = 'mana_carrier_ats_results';
       const existingRaw = localStorage.getItem(storageKey);
       const existing = existingRaw ? JSON.parse(existingRaw) : [];
       const updated = [result, ...existing].slice(0, 30);

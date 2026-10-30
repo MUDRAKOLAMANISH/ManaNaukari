@@ -168,7 +168,7 @@ export const BulkImportPage: React.FC<BulkImportPageProps> = ({ onNavigate }) =>
             ),
           };
         });
-        setToastMessage(`✓ Successfully published ${res.count} job(s) to Mana Naukari! Status is now active.`);
+        setToastMessage(`✓ Successfully published ${res.count} job(s) to ManaCarrier! Status is now active.`);
       } else {
         alert(`Failed to publish jobs: ${res.error}`);
       }
@@ -696,7 +696,7 @@ https://jobs.lever.co/company/example-role`}
                     <div className="flex items-center gap-2">
                       <ShieldCheck className="w-4 h-4 text-blue-700 shrink-0" />
                       <span className="font-semibold">
-                        Strict Security Enforced: Announcements contain ONLY absolute Mana Naukari URLs. All original career links are permanently hidden.
+                        Strict Security Enforced: Announcements contain ONLY absolute ManaCarrier URLs. All original career links are permanently hidden.
                       </span>
                     </div>
                   </div>
@@ -1199,7 +1199,7 @@ https://jobs.lever.co/company/example-role`}
 
               <div className="pt-2 border-t border-slate-100 flex flex-col gap-1 text-[11px] font-mono text-slate-500">
                 <p><strong>Original Career URL:</strong> {previewJob.originalUrl}</p>
-                <p><strong>Mana Naukari Link:</strong> {previewJob.manaNaukariUrl}</p>
+                <p><strong>ManaCarrier Link:</strong> {previewJob.manaNaukariUrl}</p>
               </div>
             </div>
 
@@ -1271,7 +1271,7 @@ https://jobs.lever.co/company/example-role`}
                 <h3 className="text-base font-bold font-display text-slate-900">
                   Quick Edit Job Parameters
                 </h3>
-                <p className="text-xs text-slate-500">Edit details before publishing to Mana Naukari</p>
+                <p className="text-xs text-slate-500">Edit details before publishing to ManaCarrier</p>
               </div>
               <button
                 type="button"

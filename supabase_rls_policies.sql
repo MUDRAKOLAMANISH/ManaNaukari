@@ -326,3 +326,143 @@ FOR DELETE
 TO authenticated
 USING (public.is_admin());
 
+
+-- ==============================================================================
+-- 12. POLICIES FOR: RAG Knowledge Base (knowledge_documents, knowledge_chunks, knowledge_faqs, ai_conversations)
+-- ==============================================================================
+ALTER TABLE IF EXISTS public.knowledge_documents ENABLE ROW LEVEL SECURITY;
+ALTER TABLE IF EXISTS public.knowledge_chunks ENABLE ROW LEVEL SECURITY;
+ALTER TABLE IF EXISTS public.knowledge_faqs ENABLE ROW LEVEL SECURITY;
+ALTER TABLE IF EXISTS public.ai_conversations ENABLE ROW LEVEL SECURITY;
+
+-- 12.1 Policies for: knowledge_documents
+DROP POLICY IF EXISTS "Public can view knowledge_documents" ON public.knowledge_documents;
+DROP POLICY IF EXISTS "Allow public select on knowledge_documents" ON public.knowledge_documents;
+DROP POLICY IF EXISTS "Allow all on knowledge_documents" ON public.knowledge_documents;
+DROP POLICY IF EXISTS "Allow admin all on knowledge_documents" ON public.knowledge_documents;
+DROP POLICY IF EXISTS "Admins can insert knowledge_documents" ON public.knowledge_documents;
+DROP POLICY IF EXISTS "Admins can update knowledge_documents" ON public.knowledge_documents;
+DROP POLICY IF EXISTS "Admins can delete knowledge_documents" ON public.knowledge_documents;
+
+CREATE POLICY "Public can view knowledge_documents"
+ON public.knowledge_documents
+FOR SELECT
+TO public
+USING (true);
+
+CREATE POLICY "Admins can insert knowledge_documents"
+ON public.knowledge_documents
+FOR INSERT
+TO authenticated
+WITH CHECK (public.is_admin());
+
+CREATE POLICY "Admins can update knowledge_documents"
+ON public.knowledge_documents
+FOR UPDATE
+TO authenticated
+USING (public.is_admin())
+WITH CHECK (public.is_admin());
+
+CREATE POLICY "Admins can delete knowledge_documents"
+ON public.knowledge_documents
+FOR DELETE
+TO authenticated
+USING (public.is_admin());
+
+
+-- 12.2 Policies for: knowledge_chunks
+DROP POLICY IF EXISTS "Public can view knowledge_chunks" ON public.knowledge_chunks;
+DROP POLICY IF EXISTS "Allow public select on knowledge_chunks" ON public.knowledge_chunks;
+DROP POLICY IF EXISTS "Allow all on knowledge_chunks" ON public.knowledge_chunks;
+DROP POLICY IF EXISTS "Allow admin all on knowledge_chunks" ON public.knowledge_chunks;
+DROP POLICY IF EXISTS "Admins can insert knowledge_chunks" ON public.knowledge_chunks;
+DROP POLICY IF EXISTS "Admins can update knowledge_chunks" ON public.knowledge_chunks;
+DROP POLICY IF EXISTS "Admins can delete knowledge_chunks" ON public.knowledge_chunks;
+
+CREATE POLICY "Public can view knowledge_chunks"
+ON public.knowledge_chunks
+FOR SELECT
+TO public
+USING (true);
+
+CREATE POLICY "Admins can insert knowledge_chunks"
+ON public.knowledge_chunks
+FOR INSERT
+TO authenticated
+WITH CHECK (public.is_admin());
+
+CREATE POLICY "Admins can update knowledge_chunks"
+ON public.knowledge_chunks
+FOR UPDATE
+TO authenticated
+USING (public.is_admin())
+WITH CHECK (public.is_admin());
+
+CREATE POLICY "Admins can delete knowledge_chunks"
+ON public.knowledge_chunks
+FOR DELETE
+TO authenticated
+USING (public.is_admin());
+
+
+-- 12.3 Policies for: knowledge_faqs
+DROP POLICY IF EXISTS "Public can view knowledge_faqs" ON public.knowledge_faqs;
+DROP POLICY IF EXISTS "Allow public select on knowledge_faqs" ON public.knowledge_faqs;
+DROP POLICY IF EXISTS "Allow all on knowledge_faqs" ON public.knowledge_faqs;
+DROP POLICY IF EXISTS "Allow admin all on knowledge_faqs" ON public.knowledge_faqs;
+DROP POLICY IF EXISTS "Admins can insert knowledge_faqs" ON public.knowledge_faqs;
+DROP POLICY IF EXISTS "Admins can update knowledge_faqs" ON public.knowledge_faqs;
+DROP POLICY IF EXISTS "Admins can delete knowledge_faqs" ON public.knowledge_faqs;
+
+CREATE POLICY "Public can view knowledge_faqs"
+ON public.knowledge_faqs
+FOR SELECT
+TO public
+USING (true);
+
+CREATE POLICY "Admins can insert knowledge_faqs"
+ON public.knowledge_faqs
+FOR INSERT
+TO authenticated
+WITH CHECK (public.is_admin());
+
+CREATE POLICY "Admins can update knowledge_faqs"
+ON public.knowledge_faqs
+FOR UPDATE
+TO authenticated
+USING (public.is_admin())
+WITH CHECK (public.is_admin());
+
+CREATE POLICY "Admins can delete knowledge_faqs"
+ON public.knowledge_faqs
+FOR DELETE
+TO authenticated
+USING (public.is_admin());
+
+
+-- 12.4 Policies for: ai_conversations
+DROP POLICY IF EXISTS "Public can view ai_conversations" ON public.ai_conversations;
+DROP POLICY IF EXISTS "Public can insert ai_conversations" ON public.ai_conversations;
+DROP POLICY IF EXISTS "Allow public select on ai_conversations" ON public.ai_conversations;
+DROP POLICY IF EXISTS "Allow all on ai_conversations" ON public.ai_conversations;
+DROP POLICY IF EXISTS "Admins can delete ai_conversations" ON public.ai_conversations;
+
+CREATE POLICY "Public can view ai_conversations"
+ON public.ai_conversations
+FOR SELECT
+TO public
+USING (true);
+
+CREATE POLICY "Public can insert ai_conversations"
+ON public.ai_conversations
+FOR INSERT
+TO public
+WITH CHECK (true);
+
+CREATE POLICY "Admins can delete ai_conversations"
+ON public.ai_conversations
+FOR DELETE
+TO authenticated
+USING (public.is_admin());
+
+

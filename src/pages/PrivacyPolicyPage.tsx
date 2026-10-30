@@ -26,7 +26,7 @@ export const PrivacyPolicyPage: React.FC<PrivacyPolicyPageProps> = ({ onNavigate
           Privacy Policy
         </h1>
         <p className="text-xs sm:text-sm text-slate-500 font-medium">
-          Last Updated: October 2026 · Mana Career (Mana Naukari)
+          Last Updated: October 2026 · ManaCarrier
         </p>
       </div>
 
@@ -205,7 +205,7 @@ export const PrivacyPolicyPage: React.FC<PrivacyPolicyPageProps> = ({ onNavigate
               <span>Contact Email: <a href="mailto:manishmudrakola8@gmail.com" className="text-blue-400 underline">manishmudrakola8@gmail.com</a></span>
             </div>
             <p className="text-xs text-slate-400">
-              Platform: Mana Career (Mana Naukari) · Founded by Manish Mudrakola
+              Platform: ManaCarrier · Founded by Manish Mudrakola
             </p>
             <p className="text-xs text-slate-400">
               Location: Hyderabad, Telangana, India

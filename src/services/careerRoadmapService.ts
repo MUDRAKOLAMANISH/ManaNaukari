@@ -368,7 +368,7 @@ export const careerRoadmapService = {
         },
         {
           title: 'Explore Verified Job Openings',
-          description: 'Browse fresh off-campus drives, internships, and entry-level positions on Mana Naukari.',
+          description: 'Browse fresh off-campus drives, internships, and entry-level positions on ManaCarrier.',
           route: '/jobs',
           badgeText: '100% Official Links',
           ctaText: 'Browse Jobs Now',
@@ -461,7 +461,7 @@ function buildRoleSpecificDetails(role: string, timeline: string, userSkills: st
         commonQuestions: ['Explain a project where you integrated an LLM API.', 'How do you prevent hallucination in AI applications?', 'What is the difference between temperature and top_p in text generation?'],
         codingExercises: ['Write a Python function to parse a JSON response safely with error handling.', 'Implement a basic text chunker with 100-character overlap.'],
         hrPrepTips: ['Emphasize continuous self-learning in rapidly evolving AI tech.', 'Highlight why you are passionate about building real-world AI tools.'],
-        weeklyMockTip: 'Take 1 AI Mock Interview session on Mana Naukari every Saturday.',
+        weeklyMockTip: 'Take 1 AI Mock Interview session on ManaCarrier every Saturday.',
       },
       resources: [
         { title: 'Google AI Studio & GenAI SDK Official Docs', type: 'official_doc' as const, url: 'https://ai.google.dev/docs', description: 'Official guide for Gemini models & TypeScript/Python SDKs.', isFree: true },
@@ -533,7 +533,7 @@ function buildRoleSpecificDetails(role: string, timeline: string, userSkills: st
         commonQuestions: ['Tell me about a data project where you found an unexpected pattern.', 'How would you measure the success of a new feature launched on an app?'],
         codingExercises: ['Write a SQL query to find the top 2 highest-earning employees in each department.', 'Use Pandas to find the monthly average order value from an orders table.'],
         hrPrepTips: ['Demonstrate strong communication and business sense alongside technical query skills.'],
-        weeklyMockTip: 'Practice live SQL whiteboard queries on Mana Naukari.',
+        weeklyMockTip: 'Practice live SQL whiteboard queries on ManaCarrier.',
       },
       resources: [
         { title: 'PostgreSQL Official Documentation', type: 'official_doc' as const, url: 'https://www.postgresql.org/docs/', description: 'Official guide to SQL syntax, queries, and functions.', isFree: true },
@@ -605,7 +605,7 @@ function buildRoleSpecificDetails(role: string, timeline: string, userSkills: st
       commonQuestions: ['Walk me through the architecture of your recent project.', 'How do you handle debugging when code produces unexpected results?', 'Tell me about a time you solved a tough logic bug.'],
       codingExercises: ['Write a program to reverse a string or array without built-in methods.', 'Check if a string is a palindrome or anagram.'],
       hrPrepTips: ['Be ready to articulate your project contribution clearly and honestly.'],
-      weeklyMockTip: 'Use Mana Naukari AI Mock Interview Room to practice answering live technical questions.',
+      weeklyMockTip: 'Use ManaCarrier AI Mock Interview Room to practice answering live technical questions.',
     },
     resources: [
       { title: 'MDN Web Docs (JavaScript & HTML/CSS)', type: 'official_doc' as const, url: 'https://developer.mozilla.org', description: 'The gold-standard reference for web technologies.', isFree: true },

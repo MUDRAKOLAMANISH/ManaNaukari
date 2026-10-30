@@ -1,6 +1,6 @@
 -- ============================================================================
 -- Complete SQL Migration Script: Audit & Upgrade 'recruiters' & 'recruiter_jobs' Tables
--- Platform: Mana Naukari (Supabase / PostgreSQL)
+-- Platform: ManaCarrier (Supabase / PostgreSQL)
 -- Description:
 --   Creates or upgrades the public.recruiters and public.recruiter_jobs tables
 --   with all required columns, aliases (recruiter_name, recruiter_email, phone_number),

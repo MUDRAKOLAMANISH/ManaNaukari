@@ -58,7 +58,7 @@ export const handler = async (event: any) => {
         headers: CORS_HEADERS,
         body: JSON.stringify({
           success: false,
-          answer: 'I could not find this information in the Mana Naukari Knowledge Base.',
+          answer: 'I could not find this information in the ManaCarrier Knowledge Base.',
           citations: [],
           matched: false,
           note: 'GEMINI_API_KEY not configured in Netlify environment variables.',
@@ -68,15 +68,15 @@ export const handler = async (event: any) => {
 
     const ai = new GoogleGenAI({ apiKey });
 
-    const systemInstruction = `You are the official Mana Naukari AI Assistant.
+    const systemInstruction = `You are the official ManaCarrier AI Assistant.
 CRITICAL ANTI-HALLUCINATION RULES:
-1. ONLY answer based strictly and exclusively on the retrieved context provided from the Mana Naukari Knowledge Base documents.
+1. ONLY answer based strictly and exclusively on the retrieved context provided from the ManaCarrier Knowledge Base documents.
 2. If the answer cannot be found in the provided context, respond with:
-"I could not find this information in the Mana Naukari Knowledge Base."
+"I could not find this information in the ManaCarrier Knowledge Base."
 3. Do NOT make up, assume, or hallucinate facts, job openings, or company policies outside the provided text.
 4. Keep answers friendly, professional, clear, and well-formatted with markdown bullet points if helpful.`;
 
-    const prompt = `Retrieved Context from Mana Naukari Knowledge Base:
+    const prompt = `Retrieved Context from ManaCarrier Knowledge Base:
 ${retrievedContext || 'No context retrieved.'}
 
 User Question: ${message}`;
@@ -115,7 +115,7 @@ User Question: ${message}`;
       headers: CORS_HEADERS,
       body: JSON.stringify({
         success: false,
-        answer: 'I could not find this information in the Mana Naukari Knowledge Base.',
+        answer: 'I could not find this information in the ManaCarrier Knowledge Base.',
         citations: [],
         matched: false,
       }),

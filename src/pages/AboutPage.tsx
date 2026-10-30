@@ -105,7 +105,7 @@ export const AboutPage: React.FC<AboutPageProps> = ({ onNavigate }) => {
             <li>100% free candidate job application portal.</li>
             <li>All postings are curated directly from authorized corporate sources.</li>
             <li>Recruiter listings are subjected to manual admin verification.</li>
-            <li>For policy inquiries or disputes, contact our support team at <a href="mailto:mananaukari2026@gmail.com" className="text-blue-600 underline">mananaukari2026@gmail.com</a>.</li>
+            <li>For policy inquiries or disputes, contact our support team at <a href="mailto:manishmudrakola8@gmail.com" className="text-blue-600 underline">manishmudrakola8@gmail.com</a>.</li>
           </ul>
         </div>
 

@@ -125,7 +125,7 @@ export const MockInterviewPage: React.FC<MockInterviewPageProps> = ({ onNavigate
 
     // Load History
     try {
-      const historyStr = localStorage.getItem('mana_naukari_ai_interview_history');
+      const historyStr = localStorage.getItem('mana_carrier_ai_interview_history') || localStorage.getItem('mana_naukari_ai_interview_history');
       if (historyStr) {
         setPastSessions(JSON.parse(historyStr));
       }
@@ -270,7 +270,7 @@ export const MockInterviewPage: React.FC<MockInterviewPageProps> = ({ onNavigate
 
       // Refresh history
       try {
-        const historyStr = localStorage.getItem('mana_naukari_ai_interview_history');
+        const historyStr = localStorage.getItem('mana_carrier_ai_interview_history') || localStorage.getItem('mana_naukari_ai_interview_history');
         if (historyStr) setPastSessions(JSON.parse(historyStr));
       } catch (e) {}
     }
@@ -1039,7 +1039,7 @@ export const MockInterviewPage: React.FC<MockInterviewPageProps> = ({ onNavigate
                 <div className="pt-2 flex flex-col sm:flex-row items-center justify-center gap-3">
                   <a
                     href={`https://wa.me/${submittedBooking.whatsapp_number.replace(/[^\d]/g, '')}?text=${encodeURIComponent(
-                      `Hello Mana Naukari team, I submitted a booking for ₹99 Mock Interview on ${submittedBooking.interview_topic}. My Name: ${submittedBooking.full_name}`
+                      `Hello ManaCarrier team, I submitted a booking for ₹99 Mock Interview on ${submittedBooking.interview_topic}. My Name: ${submittedBooking.full_name}`
                     )}`}
                     target="_blank"
                     rel="noreferrer"

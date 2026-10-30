@@ -169,7 +169,7 @@ export const handler = async (event: any) => {
 
     const ai = new GoogleGenAI({ apiKey });
 
-    const systemInstruction = `You are an expert technical recruitment data extraction assistant for an Indian job portal (Career Vault Jobs / Mana Naukari).
+    const systemInstruction = `You are an expert technical recruitment data extraction assistant for an Indian job portal (ManaCarrier).
 Extract structured job posting fields accurately from the provided job requisition webpage or URL.
 
 Rules:

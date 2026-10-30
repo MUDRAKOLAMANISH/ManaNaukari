@@ -275,7 +275,7 @@ export const ApplyModal: React.FC<ApplyModalProps> = ({
       try {
         const clientText = await resumeMatchService.readClientText(selected);
         if (clientText && typeof window !== 'undefined') {
-          localStorage.setItem('mana_naukari_candidate_resume_text', clientText);
+          localStorage.setItem('mana_carrier_candidate_resume_text', clientText);
         }
       } catch (err) {
         console.warn('[ApplyModal] Text extraction note:', err);
@@ -283,7 +283,7 @@ export const ApplyModal: React.FC<ApplyModalProps> = ({
 
       // If candidate is recognized, persist new resume file name
       if (candidateProfile) {
-        const fakeUrl = `https://storage.mananaukari.in/resumes/${selected.name}`;
+        const fakeUrl = `https://storage.manacarrier.in/resumes/${selected.name}`;
         await candidateProfileService.updateResume(candidateProfile.id, fakeUrl, selected.name);
         const updatedLocal = candidateProfileService.saveLocalProfile({
           ...candidateProfile,
@@ -337,7 +337,7 @@ export const ApplyModal: React.FC<ApplyModalProps> = ({
       }
 
       // 2. Deterministic match from stored resume text or candidate profile metadata
-      const cachedText = typeof window !== 'undefined' ? localStorage.getItem('mana_naukari_candidate_resume_text') || '' : '';
+      const cachedText = typeof window !== 'undefined' ? localStorage.getItem('mana_carrier_candidate_resume_text') || '' : '';
       const textForAnalysis = cachedText || [
         applicantName,
         applicantEmail,
@@ -1099,7 +1099,7 @@ export const ApplyModal: React.FC<ApplyModalProps> = ({
         <div className="px-5 py-3 bg-slate-50 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-400 shrink-0">
           <span className="flex items-center gap-1">
             <ShieldCheck className="w-3.5 h-3.5 text-slate-400" />
-            <span>Mana Naukari Direct Application</span>
+            <span>ManaCarrier Direct Application</span>
           </span>
           <button
             type="button"

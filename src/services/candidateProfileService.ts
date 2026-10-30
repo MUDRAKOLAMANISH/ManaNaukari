@@ -1,7 +1,7 @@
 import { supabase } from '../lib/supabase';
 import { CandidateProfile, CandidateProfileInsert } from '../types/database.types';
 
-export const CANDIDATE_STORAGE_KEY = 'mana_naukari_candidate_profile';
+export const CANDIDATE_STORAGE_KEY = 'mana_carrier_candidate_profile';
 
 export interface StoredCandidateProfile {
   id: string; // numeric string e.g. "42", never "cand_*"

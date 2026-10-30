@@ -257,7 +257,7 @@ export const AdminApplicantsPage: React.FC<AdminApplicantsPageProps> = ({ onNavi
     let clean = phone.replace(/\D/g, '');
     if (clean.length === 10) clean = `91${clean}`;
     const text = encodeURIComponent(
-      `Hello ${name || 'Candidate'}, we noticed your application for ${jobTitle || 'the position'} on Mana Naukari. We would love to discuss the opportunity with you.`
+      `Hello ${name || 'Candidate'}, we noticed your application for ${jobTitle || 'the position'} on ManaCarrier. We would love to discuss the opportunity with you.`
     );
     return `https://wa.me/${clean}?text=${text}`;
   };
@@ -317,7 +317,7 @@ export const AdminApplicantsPage: React.FC<AdminApplicantsPageProps> = ({ onNavi
     const encodedUri = encodeURI(csvContent);
     const link = document.createElement('a');
     link.setAttribute('href', encodedUri);
-    link.setAttribute('download', `mana_naukari_applicants_${new Date().toISOString().split('T')[0]}.csv`);
+    link.setAttribute('download', `mana_carrier_applicants_${new Date().toISOString().split('T')[0]}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);

@@ -129,7 +129,7 @@ export const AdminResumeOrdersPage: React.FC<AdminResumeOrdersPageProps> = ({ on
       clean = `91${clean}`;
     }
     const defaultText = encodeURIComponent(
-      `Hello ${candidateName}, this is regarding your ATS Resume Review request on Mana Naukari.`
+      `Hello ${candidateName}, this is regarding your ATS Resume Review request on ManaCarrier.`
     );
     return `https://wa.me/${clean}?text=${defaultText}`;
   };

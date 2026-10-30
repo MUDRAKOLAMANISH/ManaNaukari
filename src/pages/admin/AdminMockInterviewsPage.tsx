@@ -193,7 +193,7 @@ export const AdminMockInterviewsPage: React.FC<AdminMockInterviewsPageProps> = (
     const digitsOnly = booking.whatsapp_number.replace(/[^\d]/g, '');
     const cleanNumber = digitsOnly.startsWith('91') ? digitsOnly : `91${digitsOnly}`;
 
-    const text = `Hi ${booking.full_name}, thank you for applying for the Mana Naukari Mock Interview.
+    const text = `Hi ${booking.full_name}, thank you for applying for the ManaCarrier Mock Interview.
 
 Selected topic: ${booking.interview_topic}
 Session fee: ₹${MOCK_INTERVIEW_PRICE_INR}
@@ -201,7 +201,7 @@ Session fee: ₹${MOCK_INTERVIEW_PRICE_INR}
 I will share the payment instructions and coordinate a suitable interview time with you. Once payment is verified, your session can be scheduled.
 
 Regards,
-Mana Naukari Team`;
+ManaCarrier Team`;
 
     const url = `https://wa.me/${cleanNumber}?text=${encodeURIComponent(text)}`;
     window.open(url, '_blank');
@@ -217,7 +217,7 @@ Mana Naukari Team`;
       year: 'numeric'
     }) : 'Recent';
 
-    const text = `Mana Naukari — Mock Interview Feedback
+    const text = `ManaCarrier — Mock Interview Feedback
 
 Candidate: ${booking.full_name}
 Topic: ${booking.interview_topic}
@@ -235,7 +235,7 @@ ${booking.areas_for_improvement || 'N/A'}
 Recommended Next Steps:
 ${booking.recommended_next_steps || 'N/A'}
 
-Thank you for choosing Mana Naukari. Keep practicing!`;
+Thank you for choosing ManaCarrier. Keep practicing!`;
 
     const url = `https://wa.me/${cleanNumber}?text=${encodeURIComponent(text)}`;
     window.open(url, '_blank');
@@ -794,8 +794,8 @@ Thank you for choosing Mana Naukari. Keep practicing!`;
                     <span>Send Results on WhatsApp</span>
                   </button>
                   <a
-                    href={`mailto:${selectedBooking.email}?subject=${encodeURIComponent(`Mana Naukari — Mock Interview Feedback (${selectedBooking.interview_topic})`)}&body=${encodeURIComponent(
-                      `Mana Naukari — Mock Interview Feedback\n\nCandidate: ${selectedBooking.full_name}\nTopic: ${selectedBooking.interview_topic}\n\nPerformance Summary:\n${interviewResult || 'N/A'}\n\nStrengths:\n${strengths || 'N/A'}\n\nAreas to Improve:\n${areasForImprovement || 'N/A'}\n\nRecommended Next Steps:\n${recommendedNextSteps || 'N/A'}\n\nThank you,\nMana Naukari Team`
+                    href={`mailto:${selectedBooking.email}?subject=${encodeURIComponent(`ManaCarrier — Mock Interview Feedback (${selectedBooking.interview_topic})`)}&body=${encodeURIComponent(
+                      `ManaCarrier — Mock Interview Feedback\n\nCandidate: ${selectedBooking.full_name}\nTopic: ${selectedBooking.interview_topic}\n\nPerformance Summary:\n${interviewResult || 'N/A'}\n\nStrengths:\n${strengths || 'N/A'}\n\nAreas to Improve:\n${areasForImprovement || 'N/A'}\n\nRecommended Next Steps:\n${recommendedNextSteps || 'N/A'}\n\nThank you,\nManaCarrier Team`
                     )}`}
                     className="px-3.5 py-2 text-xs font-bold text-blue-700 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded-xl transition-all cursor-pointer inline-flex items-center gap-1.5"
                   >

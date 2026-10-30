@@ -419,7 +419,7 @@ export const AdminWebsiteLeadsPage: React.FC<AdminWebsiteLeadsPageProps> = ({ on
                   {filteredLeads.map((lead) => {
                     const cleanPhone = normalizePhoneNumber(lead.whatsapp_number);
                     const waMessage = encodeURIComponent(
-                      `Hi ${lead.customer_name}! I saw your enquiry for an AI Website (${lead.website_type}). I'm the lead engineer at Mana Naukari. Let's discuss your design blueprint!`
+                      `Hi ${lead.customer_name}! I saw your enquiry for an AI Website (${lead.website_type}). I'm the lead engineer at ManaCarrier. Let's discuss your design blueprint!`
                     );
                     const waUrl = `https://wa.me/${cleanPhone.replace(/[^0-9]/g, '')}?text=${waMessage}`;
 

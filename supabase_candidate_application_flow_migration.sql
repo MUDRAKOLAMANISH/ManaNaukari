@@ -1,6 +1,6 @@
 -- ============================================================================
 -- SQL Migration: Candidate Application Deduplication & Reapply System
--- Platform: Mana Naukari (Supabase / PostgreSQL)
+-- Platform: ManaCarrier (Supabase / PostgreSQL)
 -- Description:
 --   1. Ensures candidate_profile_id column exists on public.applicants
 --   2. Adds last_reapplied_at TIMESTAMP WITH TIME ZONE

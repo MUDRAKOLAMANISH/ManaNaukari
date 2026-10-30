@@ -1,6 +1,6 @@
 -- ============================================================================
 -- SQL Migration: Add is_featured column to jobs table
--- Platform: Mana Naukari (Supabase / PostgreSQL)
+-- Platform: ManaCarrier (Supabase / PostgreSQL)
 -- Description:
 --   1. Adds is_featured column with DEFAULT FALSE
 --   2. Synchronizes data with existing featured column

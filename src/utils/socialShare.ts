@@ -1,5 +1,5 @@
 /**
- * Auto Job Social Sharing Utility for Mana Naukari
+ * Auto Job Social Sharing Utility for ManaCarrier
  * Generates formatted social media messages, clipboard copying,
  * and direct links / Telegram Bot API integrations for WhatsApp, Telegram, LinkedIn, X, and Facebook.
  */
@@ -22,26 +22,29 @@ export interface ShareableJob {
 
 export interface TelegramConfig {
   botToken: string;
-  channelId: string; // e.g. "@mananaukari_jobs" or "-100123456789"
+  channelId: string; // e.g. "@manacarrier_jobs" or "-100123456789"
   autoPostOnPublish: boolean;
 }
 
-const STORAGE_KEY_AUTO_SHARE = 'mananaukari_auto_share_enabled';
-const STORAGE_KEY_TELEGRAM_CONFIG = 'mananaukari_telegram_config';
+const STORAGE_KEY_AUTO_SHARE = 'manacarrier_auto_share_enabled';
+const STORAGE_KEY_TELEGRAM_CONFIG = 'manacarrier_telegram_config';
 
 /**
- * Gets absolute Mana Naukari URL for a specific job
+ * Gets absolute ManaCarrier URL for a specific job
  */
-export function getManaNaukariJobUrl(jobId?: string | number): string {
+export function getManaCarrierJobUrl(jobId?: string | number): string {
   if (!jobId) return WEBSITE_URL;
   return `${WEBSITE_URL}/jobs/${jobId}`;
 }
+
+// Alias for backward compatibility
+export const getManaNaukariJobUrl = getManaCarrierJobUrl;
 
 /**
  * Automatically generates a richly formatted job message including all required fields
  */
 export function generateJobSocialMessage(job: ShareableJob): string {
-  const jobUrl = getManaNaukariJobUrl(job.id);
+  const jobUrl = getManaCarrierJobUrl(job.id);
   const salaryDisplay = job.salary && job.salary.trim() ? job.salary.trim() : 'Best in Industry';
   const expDisplay = job.experience && job.experience.trim() ? job.experience.trim() : 'Fresher';
   const locDisplay = job.location && job.location.trim() ? job.location.trim() : 'Pan India';
@@ -55,7 +58,7 @@ export function generateJobSocialMessage(job: ShareableJob): string {
     skillsText = `\n🛠️ *Key Skills:* ${job.skills_required.trim()}`;
   }
 
-  return `🚨 *NEW HIRING ALERT - MANA NAUKARI* 🚨
+  return `🚨 *NEW HIRING ALERT - MANACARRIER* 🚨
 
 🏢 *Company Name:* ${job.company}
 💼 *Job Title:* ${job.title}
@@ -68,7 +71,7 @@ export function generateJobSocialMessage(job: ShareableJob): string {
 🔗 *Official Apply Link:*
 ${job.apply_link}
 
-🌐 *View on Mana Naukari Portal:*
+🌐 *View on ManaCarrier Portal:*
 ${jobUrl}
 
 ━━━━━━━━━━━━━━━━━━━━
@@ -80,7 +83,7 @@ ${jobUrl}
  * Generates concise message optimized for Twitter/X character limits
  */
 export function generateTwitterMessage(job: ShareableJob): string {
-  const jobUrl = getManaNaukariJobUrl(job.id);
+  const jobUrl = getManaCarrierJobUrl(job.id);
   const salaryText = job.salary ? ` | 💰 ${job.salary}` : '';
   const locText = job.location ? ` | 📍 ${job.location}` : '';
   return `🚨 Hiring Alert: ${job.company} is hiring for ${job.title}!
@@ -88,7 +91,7 @@ export function generateTwitterMessage(job: ShareableJob): string {
 🎓 Experience: ${job.experience || 'Fresher'}${locText}${salaryText}
 📂 Category: ${job.category || 'Jobs'}
 
-Apply now on @ManaNaukari:`;
+Apply now on ManaCarrier:`;
 }
 
 /**
@@ -123,7 +126,6 @@ export async function copyJobMessageToClipboard(job: ShareableJob | string): Pro
 
 /**
  * 1. Share to WhatsApp
- * Copies text and opens WhatsApp Web or App using wa.me
  */
 export function openWhatsAppShare(job: ShareableJob, customMessage?: string): void {
   const text = customMessage || generateJobSocialMessage(job);
@@ -137,14 +139,13 @@ export function openWhatsAppShare(job: ShareableJob, customMessage?: string): vo
  */
 export function openTelegramShare(job: ShareableJob, customMessage?: string): void {
   const text = customMessage || generateJobSocialMessage(job);
-  const jobUrl = getManaNaukariJobUrl(job.id);
+  const jobUrl = getManaCarrierJobUrl(job.id);
   const telegramUrl = `https://t.me/share/url?url=${encodeURIComponent(jobUrl)}&text=${encodeURIComponent(text)}`;
   window.open(telegramUrl, '_blank', 'noopener,noreferrer');
 }
 
 /**
  * 3. Send job automatically using Telegram Bot API
- * Posts formatted markdown message directly to the configured Telegram channel
  */
 export async function postToTelegramBotApi(
   job: ShareableJob,
@@ -163,7 +164,7 @@ export async function postToTelegramBotApi(
   if (!config.channelId || !config.channelId.trim()) {
     return {
       success: false,
-      message: 'Telegram Channel ID is not configured (e.g. @mananaukari_jobs or -100xxxxxxxxxx).',
+      message: 'Telegram Channel ID is not configured (e.g. @manacarrier_jobs or -100xxxxxxxxxx).',
     };
   }
 
@@ -216,7 +217,7 @@ export async function postToTelegramBotApi(
  * 4. Share to LinkedIn
  */
 export function openLinkedInShare(job: ShareableJob): void {
-  const jobUrl = getManaNaukariJobUrl(job.id);
+  const jobUrl = getManaCarrierJobUrl(job.id);
   const url = `https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(jobUrl)}`;
   window.open(url, '_blank', 'noopener,noreferrer');
 }
@@ -225,7 +226,7 @@ export function openLinkedInShare(job: ShareableJob): void {
  * 5. Share to Twitter / X
  */
 export function openTwitterShare(job: ShareableJob, customMessage?: string): void {
-  const jobUrl = getManaNaukariJobUrl(job.id);
+  const jobUrl = getManaCarrierJobUrl(job.id);
   const text = customMessage || generateTwitterMessage(job);
   const url = `https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(jobUrl)}`;
   window.open(url, '_blank', 'noopener,noreferrer');
@@ -235,7 +236,7 @@ export function openTwitterShare(job: ShareableJob, customMessage?: string): voi
  * 6. Share to Facebook
  */
 export function openFacebookShare(job: ShareableJob): void {
-  const jobUrl = getManaNaukariJobUrl(job.id);
+  const jobUrl = getManaCarrierJobUrl(job.id);
   const url = `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(jobUrl)}`;
   window.open(url, '_blank', 'noopener,noreferrer');
 }
@@ -244,7 +245,7 @@ export function openFacebookShare(job: ShareableJob): void {
  * Auto-share preference management
  */
 export function getAutoSharePreference(): boolean {
-  if (typeof window === 'undefined') return true; // Default to true for maximum convenience
+  if (typeof window === 'undefined') return true;
   const val = localStorage.getItem(STORAGE_KEY_AUTO_SHARE);
   return val === null ? true : val === 'true';
 }
@@ -268,7 +269,18 @@ export function getTelegramConfig(): TelegramConfig {
 
   try {
     const raw = localStorage.getItem(STORAGE_KEY_TELEGRAM_CONFIG);
-    if (raw) {
+    if (!raw) {
+      // Fallback check old storage key if present
+      const oldRaw = localStorage.getItem('mananaukari_telegram_config');
+      if (oldRaw) {
+        const parsed = JSON.parse(oldRaw);
+        return {
+          botToken: parsed.botToken || '',
+          channelId: parsed.channelId || '',
+          autoPostOnPublish: Boolean(parsed.autoPostOnPublish),
+        };
+      }
+    } else {
       const parsed = JSON.parse(raw);
       return {
         botToken: parsed.botToken || '',

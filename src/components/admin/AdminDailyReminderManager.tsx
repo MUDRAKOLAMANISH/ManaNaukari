@@ -121,21 +121,32 @@ export const AdminDailyReminderManager: React.FC = () => {
 
     setIsSendingTest(true);
     try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const token = session?.access_token || '';
+
       const res = await fetch('/api/admin/daily-reminder-dispatch', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
         body: JSON.stringify({
           test_email: email,
           is_test: true,
         }),
       });
 
-      const result = await res.json();
-      if (!res.ok || !result.success) {
-        throw new Error(result.error || result.message || 'Failed to send test email.');
+      const contentType = res.headers.get('content-type') || '';
+      if (!contentType.includes('application/json')) {
+        throw new Error(`Server returned HTML response (HTTP ${res.status}). Please check Netlify API routing deployment.`);
       }
 
-      setTestSuccessMessage(`Test daily job reminder sent successfully to ${email} with ${result.jobs_count || 0} active jobs!`);
+      const result = await res.json();
+      if (!res.ok || !result.success) {
+        throw new Error(result.error || result.message || `Failed to send test email (HTTP ${res.status}).`);
+      }
+
+      setTestSuccessMessage(`Test daily job reminder sent successfully to ${email} with ${result.jobs_count || 0} active jobs! Message ID: ${result.resend_id || 'N/A'}`);
       fetchData(true);
     } catch (err: any) {
       console.error('[SendTestEmail] Error:', err);
@@ -156,14 +167,25 @@ export const AdminDailyReminderManager: React.FC = () => {
     setIsDispatchingBatch(true);
 
     try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const token = session?.access_token || '';
+
       const res = await fetch('/api/admin/daily-reminder-dispatch', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
         body: JSON.stringify({
           force_run: true,
           is_test: false,
         }),
       });
+
+      const contentType = res.headers.get('content-type') || '';
+      if (!contentType.includes('application/json')) {
+        throw new Error(`Server returned HTML response (HTTP ${res.status}). Please check Netlify API routing deployment.`);
+      }
 
       const result = await res.json();
       if (!res.ok || !result.success) {

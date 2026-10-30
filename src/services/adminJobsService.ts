@@ -493,9 +493,9 @@ export const adminJobsService = {
           .insert({
             id: ARCHIVE_JOB_ID,
             title: 'Archived Job Opportunity (Original Deleted)',
-            company: 'Mana Naukari Archive',
+            company: 'ManaCarrier Archive',
             status: 'deleted',
-            apply_link: 'https://mana-naukari.netlify.app',
+            apply_link: 'https://manacarrier.netlify.app',
             category: targetCategory,
             experience: 'Fresher',
             job_type: 'Full Time',

@@ -43,7 +43,7 @@ export function getMaskedSupabaseKey(key: string): string {
 
 // Log connection status during startup
 console.log(
-  `[Mana Naukari] 🔌 Supabase initialized. Endpoint: ${supabaseUrl} | Key: ${getMaskedSupabaseKey(
+  `[ManaCarrier] 🔌 Supabase initialized. Endpoint: ${supabaseUrl} | Key: ${getMaskedSupabaseKey(
     supabaseAnonKey
   )}`
 );

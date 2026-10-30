@@ -590,7 +590,7 @@ export const RecruiterDashboardPage: React.FC<RecruiterDashboardPageProps> = ({ 
           type: 'approved',
           title: `Job Approved: ${job.title}`,
           time: job.reviewed_at ? new Date(job.reviewed_at).toLocaleDateString() : 'Live',
-          text: `Your requisition "${job.title}" has been reviewed by admins and is now live on Mana Naukari.`,
+          text: `Your requisition "${job.title}" has been reviewed by admins and is now live on ManaCarrier.`,
         });
       } else if (job.status === 'Rejected' || job.status === 'rejected') {
         list.push({
@@ -781,7 +781,7 @@ export const RecruiterDashboardPage: React.FC<RecruiterDashboardPageProps> = ({ 
                   </div>
                   <div>
                     <span className="text-[10px] uppercase font-bold tracking-wider text-blue-400">
-                      Mana Naukari Admin Control
+                      ManaCarrier Admin Control
                     </span>
                     <h4 className="text-sm font-bold text-white">
                       Manage Verification Status for {recruiter.company_name}
@@ -930,7 +930,7 @@ export const RecruiterDashboardPage: React.FC<RecruiterDashboardPageProps> = ({ 
                         Company Verification In Progress
                       </h4>
                       <p className="text-xs text-amber-800/80 mt-1">
-                        Only verified recruiters can publish jobs publicly to candidates on Mana Naukari. Upload your Company Registration Certificate or GST number in the Company Profile tab to expedite review.
+                        Only verified recruiters can publish jobs publicly to candidates on ManaCarrier. Upload your Company Registration Certificate or GST number in the Company Profile tab to expedite review.
                       </p>
                       <button
                         onClick={() => setActiveTab('profile')}

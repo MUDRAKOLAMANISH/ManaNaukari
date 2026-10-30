@@ -130,8 +130,8 @@ export const JobDetailsPage: React.FC<JobDetailsPageProps> = ({ jobId, onNavigat
         });
 
         // Dynamic SEO updates: Title, Description, and OpenGraph tags
-        const pageTitle = `${data.title} at ${data.company} – Apply Online | Mana Naukari`;
-        const pageDesc = `Apply for ${data.title} at ${data.company} in ${data.location}. Experience: ${data.experience || 'Fresher'}. Package: ${data.salary || 'Best in Industry'}. Direct official application link on Mana Naukari.`;
+        const pageTitle = `${data.title} at ${data.company} – Apply Online | ManaCarrier`;
+        const pageDesc = `Apply for ${data.title} at ${data.company} in ${data.location}. Experience: ${data.experience || 'Fresher'}. Package: ${data.salary || 'Best in Industry'}. Direct official application link on ManaCarrier.`;
 
         document.title = pageTitle;
 
@@ -231,7 +231,7 @@ export const JobDetailsPage: React.FC<JobDetailsPageProps> = ({ jobId, onNavigat
     if (!job) return;
     const fullUrl = getAbsoluteJobUrl(generateJobUrlPath(job));
     const title = `${job.title} at ${job.company}`;
-    const text = `Hiring Alert: ${job.title} at ${job.company} (${job.location}) on Mana Naukari. Apply online:`;
+    const text = `Hiring Alert: ${job.title} at ${job.company} (${job.location}) on ManaCarrier. Apply online:`;
 
     if (navigator.share) {
       try {
@@ -378,7 +378,7 @@ export const JobDetailsPage: React.FC<JobDetailsPageProps> = ({ jobId, onNavigat
         await candidateProfileService.recordApplication({
           jobId: job.id,
           candidateProfile: profileData,
-          notes: `Applied from Mana Naukari direct portal (${new Date().toLocaleDateString()})`,
+          notes: `Applied from ManaCarrier direct portal (${new Date().toLocaleDateString()})`,
         });
       }
 
@@ -1072,7 +1072,7 @@ export const JobDetailsPage: React.FC<JobDetailsPageProps> = ({ jobId, onNavigat
           <div className="bg-white rounded-3xl border border-slate-200/90 p-5 space-y-3 text-xs">
             <h4 className="font-bold text-slate-900 font-display pb-2 border-b border-slate-100 flex items-center gap-1.5">
               <ShieldCheck className="w-4 h-4 text-blue-600" />
-              <span>Mana Naukari Trust Guarantee</span>
+              <span>ManaCarrier Trust Guarantee</span>
             </h4>
 
             <div className="space-y-2.5">

@@ -1,6 +1,8 @@
 # Redirects for API endpoints to Netlify Functions
-/api/ai/extract-job  /.netlify/functions/extract-job  200
-/api/alerts/*        /.netlify/functions/alerts       200
+/api/admin/daily-reminder-dispatch  /.netlify/functions/daily-reminder-dispatch  200
+/api/admin/check-availability        /.netlify/functions/check-availability        200
+/api/ai/extract-job                  /.netlify/functions/extract-job                  200
+/api/alerts/*                        /.netlify/functions/alerts                       200
 
 # Single Page Application (SPA) redirect rule
 /*                   /index.html                      200

@@ -1,5 +1,5 @@
 /**
- * Candidate Validation Utilities for Mana Naukari
+ * Candidate Validation Utilities for ManaCarrier
  * Enforces strict verification of Indian Mobile Numbers and Genuine Email Addresses.
  */
 

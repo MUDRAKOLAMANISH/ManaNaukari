@@ -25,7 +25,7 @@ export const CategoriesPage: React.FC<CategoriesPageProps> = ({ onNavigate }) =>
 
   useEffect(() => {
     // Set dynamic SEO tags
-    document.title = 'Job Categories & Disciplines | Mana Naukari';
+    document.title = 'Job Categories & Disciplines | ManaCarrier';
     const metaDescEl = document.querySelector('meta[name="description"]');
     if (metaDescEl) {
       metaDescEl.setAttribute(
