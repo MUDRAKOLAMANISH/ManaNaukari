@@ -5,7 +5,7 @@ const CORS_HEADERS = {
   'Content-Type': 'application/json',
 };
 
-async function verifyAdminNetlifyRequest(event: any, supabaseUrl: string, supabaseAnonKey: string): Promise<boolean> {
+async function verifyAdminNetlifyRequest(event: any, supabaseUrl: string, supabaseAnonKey: string, supabaseServiceKey?: string): Promise<boolean> {
   const headers = event.headers || {};
   const authHeader = headers.authorization || headers.Authorization || '';
 
@@ -29,10 +29,12 @@ async function verifyAdminNetlifyRequest(event: any, supabaseUrl: string, supaba
     const email = userData?.email?.toLowerCase();
     if (!email) return false;
 
+    // Pass user's bearer token or service role key so RLS permits SELECT on admin_users
+    const authQueryHeader = supabaseServiceKey ? `Bearer ${supabaseServiceKey}` : `Bearer ${token}`;
     const adminRes = await fetch(`${supabaseUrl}/rest/v1/admin_users?email=eq.${encodeURIComponent(email)}&select=id`, {
       headers: {
         apikey: supabaseAnonKey,
-        Authorization: `Bearer ${supabaseAnonKey}`,
+        Authorization: authQueryHeader,
       },
     });
 
@@ -60,7 +62,7 @@ export const handler = async (event: any) => {
 
   // 1. Delivery Stats
   if (event.httpMethod === 'GET' || path.endsWith('delivery-stats')) {
-    const isAdmin = await verifyAdminNetlifyRequest(event, supabaseUrl, supabaseAnonKey);
+    const isAdmin = await verifyAdminNetlifyRequest(event, supabaseUrl, supabaseAnonKey, supabaseServiceKey);
     if (!isAdmin) {
       return {
         statusCode: 403,

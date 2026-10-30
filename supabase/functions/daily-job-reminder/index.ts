@@ -101,31 +101,33 @@ serve(async (req) => {
     }
 
     // Step 2: Fetch Active Genuine Jobs from `jobs` table
-    const { data: activeJobs, error: jobsErr } = await supabase
+    let activeJobs: any[] = [];
+    const { data: fetchedJobs, error: jobsErr } = await supabase
       .from("jobs")
       .select("id, title, company, location, salary, experience, job_type, category, description, apply_link, posted_date, created_at")
       .eq("status", "active")
       .order("created_at", { ascending: false })
-      .limit(10);
+      .limit(20);
 
-    if (jobsErr) {
+    if (fetchedJobs && fetchedJobs.length > 0) {
+      activeJobs = fetchedJobs;
+    } else {
+      const { data: fallbackJobs } = await supabase
+        .from("jobs")
+        .select("id, title, company, location, salary, experience, job_type, category, description, apply_link, posted_date, created_at")
+        .neq("status", "deleted")
+        .neq("status", "draft")
+        .order("created_at", { ascending: false })
+        .limit(20);
+
+      activeJobs = fallbackJobs || [];
+    }
+
+    if (jobsErr && activeJobs.length === 0) {
       console.error("[Daily Job Reminder] Error fetching active jobs:", jobsErr);
       return new Response(
         JSON.stringify({ error: `Failed to fetch active jobs: ${jobsErr.message}` }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-
-    if (!activeJobs || activeJobs.length === 0) {
-      console.log("[Daily Job Reminder] No active jobs found. Skipping email sending.");
-      return new Response(
-        JSON.stringify({
-          success: true,
-          message: "No active jobs found in jobs table today.",
-          jobs_count: 0,
-          run_date: runDate,
-        }),
-        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 

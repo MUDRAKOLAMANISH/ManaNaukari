@@ -136,14 +136,22 @@ export const AdminDailyReminderManager: React.FC = () => {
         }),
       });
 
+      let result: any = null;
       const contentType = res.headers.get('content-type') || '';
-      if (!contentType.includes('application/json')) {
-        throw new Error(`Server returned HTML response (HTTP ${res.status}). Please check Netlify API routing deployment.`);
+      if (contentType.includes('application/json')) {
+        try {
+          result = await res.json();
+        } catch {
+          // ignore
+        }
       }
 
-      const result = await res.json();
-      if (!res.ok || !result.success) {
-        throw new Error(result.error || result.message || `Failed to send test email (HTTP ${res.status}).`);
+      if (!res.ok || !result || !result.success) {
+        const serverError = result?.error || result?.message;
+        if (serverError) {
+          throw new Error(serverError);
+        }
+        throw new Error(`Server returned HTTP ${res.status}. Please ensure you are logged in as an administrator.`);
       }
 
       setTestSuccessMessage(`Test daily job reminder sent successfully to ${email} with ${result.jobs_count || 0} active jobs! Message ID: ${result.resend_id || 'N/A'}`);
@@ -182,14 +190,22 @@ export const AdminDailyReminderManager: React.FC = () => {
         }),
       });
 
+      let result: any = null;
       const contentType = res.headers.get('content-type') || '';
-      if (!contentType.includes('application/json')) {
-        throw new Error(`Server returned HTML response (HTTP ${res.status}). Please check Netlify API routing deployment.`);
+      if (contentType.includes('application/json')) {
+        try {
+          result = await res.json();
+        } catch {
+          // ignore
+        }
       }
 
-      const result = await res.json();
-      if (!res.ok || !result.success) {
-        throw new Error(result.error || result.message || 'Failed to dispatch daily reminder batch.');
+      if (!res.ok || !result || !result.success) {
+        const serverError = result?.error || result?.message;
+        if (serverError) {
+          throw new Error(serverError);
+        }
+        throw new Error(`Server returned HTTP ${res.status}. Please ensure you are logged in as an administrator.`);
       }
 
       if (result.skipped) {
