@@ -135,11 +135,14 @@ ALTER TABLE public.job_views ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.whatsapp_popup_events ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.job_alert_subscriptions ENABLE ROW LEVEL SECURITY;
 
--- Allow Public Insert
+-- Allow Public Insert & Select
 CREATE POLICY "Allow public insert to visitor_analytics" ON public.visitor_analytics FOR INSERT WITH CHECK (true);
 CREATE POLICY "Allow public insert to job_views" ON public.job_views FOR INSERT WITH CHECK (true);
 CREATE POLICY "Allow public insert to whatsapp_popup_events" ON public.whatsapp_popup_events FOR INSERT WITH CHECK (true);
 CREATE POLICY "Allow public insert to job_alert_subscriptions" ON public.job_alert_subscriptions FOR INSERT WITH CHECK (true);
+CREATE POLICY "Allow public select on visitor_analytics" ON public.visitor_analytics FOR SELECT USING (true);
+CREATE POLICY "Allow public select on job_views" ON public.job_views FOR SELECT USING (true);
+CREATE POLICY "Allow public select on whatsapp_popup_events" ON public.whatsapp_popup_events FOR SELECT USING (true);
 
 -- Allow Admin & Service Role Access
 CREATE POLICY "Allow full access to admin on visitor_analytics" ON public.visitor_analytics FOR ALL USING (auth.role() = 'authenticated' OR auth.role() = 'service_role');

@@ -4,6 +4,7 @@ import { Job } from '../../types/database.types';
 import { normalizeSkills } from '../../utils/skillUtils';
 import { candidateProfileService } from '../../services/candidateProfileService';
 import { getAbsoluteJobUrl, generateJobUrlPath } from '../../utils/jobUrlUtils';
+import { CompanyLogo } from '../common/CompanyLogo';
 import { 
   Building2, MapPin, Briefcase, IndianRupee, Calendar, 
   ArrowUpRight, CheckCircle2, Bookmark, Copy, Check, Sparkles
@@ -75,19 +76,7 @@ export const JobCard: React.FC<JobCardProps> = ({ job, onViewDetails, onCopyLink
           <div className="flex items-start gap-3.5 sm:gap-4 flex-1 min-w-0">
             
             {/* Company Logo or Fallback Monogram with Subtle Glow */}
-            <div className="w-12 h-12 rounded-2xl bg-white border border-slate-200/80 flex items-center justify-center shrink-0 overflow-hidden text-slate-800 font-bold text-sm tracking-wider shadow-2xs group-hover:border-indigo-200 group-hover:shadow-xs transition-all">
-              {job.company_logo && !imgError ? (
-                <img
-                  src={job.company_logo}
-                  alt={`${job.company} logo`}
-                  referrerPolicy="no-referrer"
-                  onError={() => setImgError(true)}
-                  className="w-full h-full object-contain p-1.5"
-                />
-              ) : (
-                <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-indigo-600 font-display font-extrabold">{initials}</span>
-              )}
-            </div>
+            <CompanyLogo companyName={job.company} logoUrl={job.company_logo || undefined} size="md" />
 
             {/* Title & Company Information */}
             <div className="min-w-0 flex-1">

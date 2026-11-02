@@ -14,11 +14,17 @@ export const LAST_VISIT_DATE_KEY = 'last_visit_date';
  * Returns today's calendar date in YYYY-MM-DD format (local/UTC synchronized)
  */
 export function getTodayDateString(): string {
-  const now = new Date();
-  const year = now.getFullYear();
-  const month = String(now.getMonth() + 1).padStart(2, '0');
-  const day = String(now.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
+  try {
+    const now = new Date();
+    const formatter = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata', year: 'numeric', month: '2-digit', day: '2-digit' });
+    return formatter.format(now); // Formats as YYYY-MM-DD
+  } catch {
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    const day = String(now.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  }
 }
 
 /**
@@ -225,8 +231,7 @@ export const analyticsTracker = {
       return;
     }
 
-    // 2. Count one device as one visitor per day.
-    // Check if this device has already been counted today.
+    // Check if this device has already been recorded for today in this process
     const today = getTodayDateString();
     let lastVisitDate: string | null = null;
     try {
@@ -235,23 +240,13 @@ export const analyticsTracker = {
       // Storage unavailable
     }
 
-    // If last_visit_date is the same as today, DO NOT create a new visitor record (prevents page refresh increase)
     if (lastVisitDate === today) {
-      console.log('[AnalyticsTracker] ℹ️ Device already recorded for today (' + today + '). Skipping duplicate visitor count on page refresh/navigation.');
+      console.log('[AnalyticsTracker] ℹ️ Device already recorded for today (' + today + '). Skipping duplicate visitor count.');
       return;
     }
 
-    // In-memory lock for the current JavaScript process
     if (inMemoryDailyVisitLock === today) {
       return;
-    }
-    inMemoryDailyVisitLock = today;
-
-    // Immediately record last_visit_date in localStorage
-    try {
-      localStorage.setItem(LAST_VISIT_DATE_KEY, today);
-    } catch {
-      // Storage restricted
     }
 
     const sessionId = getOrCreateSessionId();
@@ -314,13 +309,16 @@ export const analyticsTracker = {
         }
 
         if (error) {
-          // If unique constraint triggered on fallback
           if (error.code === '23505' || error.message?.includes('unique') || error.message?.includes('duplicate key')) {
             console.log('[AnalyticsTracker] 🔒 Unique constraint verified in fallback.');
+            try { localStorage.setItem(LAST_VISIT_DATE_KEY, today); } catch {}
+            inMemoryDailyVisitLock = today;
             return;
           }
           console.warn('[AnalyticsTracker] ⚠️ visitor_analytics insert notice:', error.message);
         } else {
+          try { localStorage.setItem(LAST_VISIT_DATE_KEY, today); } catch {}
+          inMemoryDailyVisitLock = today;
           console.log('[AnalyticsTracker] ✅ Daily unique visitor successfully recorded in Supabase visitor_analytics:', {
             visitor_id: visitorId,
             visit_date: today,

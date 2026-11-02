@@ -1528,57 +1528,84 @@ app.post('/api/alerts/subscribe', async (req, res) => {
     return res.status(400).json({ success: false, message: 'Valid email address is required.' });
   }
 
-  const supabaseUrl = process.env.VITE_SUPABASE_URL;
-  const supabaseAnonKey = process.env.VITE_SUPABASE_ANON_KEY;
+  const supabaseUrl = (process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL || 'https://wasiyzakmkrmbxohzfwg.supabase.co').trim();
+  const supabaseAnonKey = (process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY || 'sb_publishable_I0QWuGZ7JNjTbG_aJm-Yeg_bCEKOxf1').trim();
+  const supabaseServiceKey = (process.env.SUPABASE_SERVICE_ROLE_KEY || '').trim();
 
-  if (!supabaseUrl || !supabaseAnonKey) {
-    return res.status(500).json({ success: false, message: 'Supabase configuration missing.' });
-  }
+  // Create dbClient with Service Role Key or Anon Key
+  const dbClient = supabaseServiceKey
+    ? createClient(supabaseUrl, supabaseServiceKey)
+    : createClient(supabaseUrl, supabaseAnonKey);
+
+  const catArray = Array.isArray(categories) && categories.length > 0 ? categories : ['Freshers Jobs'];
+  const freq = frequency === 'instant' ? 'instant' : 'daily';
 
   try {
     // 1. Try PostgreSQL RPC 'subscribe_job_alerts'
-    const rpcRes = await fetch(`${supabaseUrl}/rest/v1/rpc/subscribe_job_alerts`, {
-      method: 'POST',
-      headers: {
-        apikey: supabaseAnonKey,
-        Authorization: `Bearer ${supabaseAnonKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        p_email: cleanEmail,
-        p_categories: Array.isArray(categories) ? categories : ['Freshers'],
-        p_frequency: frequency || 'daily',
-      }),
+    const { data: rpcData, error: rpcErr } = await dbClient.rpc('subscribe_job_alerts', {
+      p_email: cleanEmail,
+      p_categories: catArray,
+      p_frequency: freq,
     });
 
-    if (rpcRes.ok) {
-      const rpcData = await rpcRes.json();
+    if (!rpcErr && rpcData && typeof rpcData === 'object' && (rpcData as any).success) {
       return res.json(rpcData);
     }
 
-    // 2. Fallback REST insert
-    const insertRes = await fetch(`${supabaseUrl}/rest/v1/job_alert_subscribers`, {
-      method: 'POST',
-      headers: {
-        apikey: supabaseAnonKey,
-        Authorization: `Bearer ${supabaseAnonKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        email: cleanEmail,
-        categories: Array.isArray(categories) ? categories : ['Freshers'],
-        frequency: frequency || 'daily',
-        is_active: true,
-      }),
-    });
+    let lastErr: any = rpcErr;
 
-    if (insertRes.ok) {
-      return res.json({ success: true, message: 'Successfully subscribed to daily job alerts!' });
+    // 2. Service-Role Upsert Fallback (Handles reactivation and updating existing record)
+    const { data: existingSub, error: findErr } = await dbClient
+      .from('job_alert_subscribers')
+      .select('id, is_active')
+      .ilike('email', cleanEmail)
+      .maybeSingle();
+
+    if (findErr) lastErr = findErr;
+
+    if (existingSub && existingSub.id) {
+      const { error: updateErr } = await dbClient
+        .from('job_alert_subscribers')
+        .update({
+          categories: catArray,
+          frequency: freq,
+          is_active: true,
+        })
+        .eq('id', existingSub.id);
+
+      if (!updateErr) {
+        return res.json({
+          success: true,
+          message: 'Your job alert preferences have been updated successfully!',
+        });
+      }
+      lastErr = updateErr;
+    } else {
+      const { error: insertErr } = await dbClient
+        .from('job_alert_subscribers')
+        .insert({
+          email: cleanEmail,
+          categories: catArray,
+          frequency: freq,
+          is_active: true,
+        });
+
+      if (!insertErr) {
+        return res.json({
+          success: true,
+          message: 'Successfully subscribed to daily job alerts!',
+        });
+      }
+      lastErr = insertErr;
     }
 
-    return res.status(400).json({ success: false, message: 'Unable to save subscription.' });
+    return res.status(400).json({
+      success: false,
+      message: lastErr?.message || 'Unable to save subscription.',
+      error: lastErr ? { code: lastErr.code, message: lastErr.message, details: lastErr.details } : undefined,
+    });
   } catch (err: any) {
-    return res.status(500).json({ success: false, message: err.message || 'Server error saving subscription.' });
+    return res.status(500).json({ success: false, message: err?.message || 'Server error saving subscription.' });
   }
 });
 
@@ -2115,39 +2142,43 @@ app.get('/api/alerts/delivery-stats', async (req, res) => {
   }
 
   try {
-    const supabaseUrl = process.env.VITE_SUPABASE_URL;
-    const supabaseAnonKey = process.env.VITE_SUPABASE_ANON_KEY;
+    const authHeader = req.headers.authorization || '';
+    const supabaseUrl = (process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL || 'https://wasiyzakmkrmbxohzfwg.supabase.co').trim();
+    const supabaseAnonKey = (process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY || 'sb_publishable_I0QWuGZ7JNjTbG_aJm-Yeg_bCEKOxf1').trim();
+    const supabaseServiceKey = (process.env.SUPABASE_SERVICE_ROLE_KEY || '').trim();
+
+    const dbClient = supabaseServiceKey
+      ? createClient(supabaseUrl, supabaseServiceKey)
+      : createClient(supabaseUrl, supabaseAnonKey, {
+          global: {
+            headers: authHeader ? { Authorization: authHeader } : {},
+          },
+        });
 
     let totalSubscribers = 0;
     let activeSubscribers = 0;
     let logs: any[] = [];
 
-    if (supabaseUrl && supabaseAnonKey) {
-      const [subRes, logRes] = await Promise.all([
-        fetch(`${supabaseUrl}/rest/v1/job_alert_subscribers?select=id,is_active`, {
-          headers: {
-            apikey: supabaseAnonKey,
-            Authorization: `Bearer ${supabaseAnonKey}`,
-          },
-        }),
-        fetch(`${supabaseUrl}/rest/v1/daily_job_reminder_logs?select=*&order=created_at.desc&limit=50`, {
-          headers: {
-            apikey: supabaseAnonKey,
-            Authorization: `Bearer ${supabaseAnonKey}`,
-          },
-        }),
-      ]);
+    const { data: subs, error: subErr } = await dbClient
+      .from('job_alert_subscribers')
+      .select('id, is_active');
 
-      if (subRes.ok) {
-        const subs = await subRes.json();
-        totalSubscribers = subs.length;
-        activeSubscribers = subs.filter((s: any) => s.is_active !== false).length;
-      }
-
-      if (logRes.ok) {
-        logs = await logRes.json();
-      }
+    let subscriberDbError: any = null;
+    if (subErr) {
+      subscriberDbError = { code: subErr.code, message: subErr.message, details: subErr.details };
+      console.warn('[Delivery Stats] job_alert_subscribers query notice:', subErr);
+    } else if (subs) {
+      totalSubscribers = subs.length;
+      activeSubscribers = subs.filter((s: any) => s.is_active !== false).length;
     }
+
+    const { data: logData } = await dbClient
+      .from('daily_job_reminder_logs')
+      .select('*')
+      .order('created_at', { ascending: false })
+      .limit(50);
+
+    logs = logData || [];
 
     const successfulDeliveries = logs.filter((l) => l.status === 'sent' || l.status === 'delivered').length;
     const actualDeliveredCount = logs.filter((l) => l.status === 'delivered').length;
@@ -2166,6 +2197,7 @@ app.get('/api/alerts/delivery-stats', async (req, res) => {
         bouncedCount,
         failedDeliveries,
         recentDeliveries: logs,
+        subscriberDbError,
       },
     });
   } catch (err: any) {

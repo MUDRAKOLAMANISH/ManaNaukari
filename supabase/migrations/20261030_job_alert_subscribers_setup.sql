@@ -2,11 +2,11 @@
 -- MANACARRIER: PRODUCTION-READY HARDENED JOB ALERT & SUBSCRIBERS DATABASE SCHEMA
 -- Date: 2026-10-30
 -- Description:
---   - Removes all direct table permissions for anonymous visitors on job_alert_subscribers,
---     daily_job_reminder_runs, and daily_job_reminder_logs.
---   - Provides SECURITY DEFINER functions with input validation & search_path safety.
---   - Strictly enforces token matching for unsubscribes (rejects email-only unsubscribes).
---   - Prevents admin_users policy recursion by comparing auth.jwt() directly.
+--   - Removes direct table permissions for anonymous visitors on subscriber tables.
+--   - Uses single canonical subscribe_job_alerts() RPC with ATOMIC INSERT ... ON CONFLICT (email).
+--   - Rejects empty/invalid categories instead of falling back to default categories.
+--   - Enforces token-matched unsubscribes with privacy-preserving uniform responses.
+--   - Revokes EXECUTE from PUBLIC and grants specifically to anon, authenticated, service_role.
 -- ============================================================================
 
 -- 1. JOB ALERT SUBSCRIBERS TABLE
@@ -23,7 +23,12 @@ CREATE TABLE IF NOT EXISTS public.job_alert_subscribers (
 
 ALTER TABLE public.job_alert_subscribers ENABLE ROW LEVEL SECURITY;
 
--- Clean up any existing policies
+-- Ensure required columns exist safely for existing tables
+ALTER TABLE public.job_alert_subscribers ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT true;
+ALTER TABLE public.job_alert_subscribers ADD COLUMN IF NOT EXISTS unsubscribe_token TEXT DEFAULT gen_random_uuid()::text;
+ALTER TABLE public.job_alert_subscribers ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT NOW();
+
+-- Clean up table policies on job_alert_subscribers
 DROP POLICY IF EXISTS "Public visitors can subscribe to job alerts" ON public.job_alert_subscribers;
 DROP POLICY IF EXISTS "Public visitors can update subscriptions" ON public.job_alert_subscribers;
 DROP POLICY IF EXISTS "Allow reading subscribers for admin metrics and dispatch" ON public.job_alert_subscribers;
@@ -35,7 +40,10 @@ DROP POLICY IF EXISTS "Token or Admin can update job_alert_subscribers" ON publi
 DROP POLICY IF EXISTS "Admin full access on job_alert_subscribers" ON public.job_alert_subscribers;
 DROP POLICY IF EXISTS "Admins full access on job_alert_subscribers" ON public.job_alert_subscribers;
 
--- Revoke all direct table access from anonymous visitors
+DROP POLICY IF EXISTS "Allow public subscribe" ON public.job_alert_subscribers;
+DROP POLICY IF EXISTS "Allow public subscriptions" ON public.job_alert_subscribers;
+
+-- Revoke direct table access from anonymous visitors and public
 REVOKE ALL ON TABLE public.job_alert_subscribers FROM anon, public;
 
 -- Verified Admins have full access to view, update, and manage subscribers
@@ -74,7 +82,6 @@ CREATE TABLE IF NOT EXISTS public.daily_job_reminder_runs (
 );
 
 ALTER TABLE public.daily_job_reminder_runs ENABLE ROW LEVEL SECURITY;
-
 REVOKE ALL ON TABLE public.daily_job_reminder_runs FROM anon, public;
 
 DROP POLICY IF EXISTS "Allow select on daily job reminder runs" ON public.daily_job_reminder_runs;
@@ -112,7 +119,6 @@ CREATE TABLE IF NOT EXISTS public.daily_job_reminder_logs (
 );
 
 ALTER TABLE public.daily_job_reminder_logs ENABLE ROW LEVEL SECURITY;
-
 REVOKE ALL ON TABLE public.daily_job_reminder_logs FROM anon, public;
 
 DROP POLICY IF EXISTS "Allow select on daily job reminder logs" ON public.daily_job_reminder_logs;
@@ -136,19 +142,13 @@ CREATE POLICY "Admins only access daily_job_reminder_logs"
     )
   );
 
--- 3. ADMIN USERS NON-RECURSIVE POLICY
-ALTER TABLE IF EXISTS public.admin_users ENABLE ROW LEVEL SECURITY;
+-- 3. FUNCTION CLEANUP FOR OVERLOADS
+DROP FUNCTION IF EXISTS public.subscribe_job_alerts(TEXT, TEXT[], TEXT);
+DROP FUNCTION IF EXISTS public.subscribe_job_alerts(TEXT, JSONB, TEXT);
+DROP FUNCTION IF EXISTS public.subscribe_job_alerts(TEXT[], TEXT, TEXT);
+DROP FUNCTION IF EXISTS public.subscribe_job_alerts(JSONB, TEXT, TEXT);
 
-DROP POLICY IF EXISTS "Admins can select admin_users" ON public.admin_users;
-CREATE POLICY "Admins can select admin_users"
-  ON public.admin_users
-  FOR SELECT
-  TO authenticated
-  USING (LOWER(email) = LOWER(auth.jwt() ->> 'email'));
-
--- 4. SECURITY DEFINER RPC FUNCTIONS WITH STRICT INPUT VALIDATION
-
--- RPC A: Public Subscription
+-- 4. SINGLE CANONICAL ATOMIC SUBSCRIPTION RPC
 CREATE OR REPLACE FUNCTION public.subscribe_job_alerts(
   p_email TEXT,
   p_categories TEXT[],
@@ -162,7 +162,6 @@ AS $$
 DECLARE
   clean_email TEXT;
   clean_freq TEXT;
-  existing_id UUID;
   cat_item TEXT;
   validated_categories TEXT[] := '{}';
 BEGIN
@@ -175,7 +174,7 @@ BEGIN
   -- 2. Validate Frequency
   clean_freq := LOWER(TRIM(COALESCE(p_frequency, 'daily')));
   IF clean_freq NOT IN ('daily', 'instant') THEN
-    clean_freq := 'daily';
+    RETURN jsonb_build_object('success', false, 'message', 'Unsupported job alert frequency. Supported values: daily, instant.');
   END IF;
 
   -- 3. Validate Categories Array
@@ -195,39 +194,46 @@ BEGIN
   END LOOP;
 
   IF ARRAY_LENGTH(validated_categories, 1) IS NULL OR ARRAY_LENGTH(validated_categories, 1) = 0 THEN
-    RETURN jsonb_build_object('success', false, 'message', 'Invalid category selection.');
+    RETURN jsonb_build_object('success', false, 'message', 'Please select at least one valid job alert category.');
   END IF;
 
-  -- 4. Check Existing Subscriber & Perform Atomic Upsert
-  SELECT id INTO existing_id
-  FROM public.job_alert_subscribers
-  WHERE LOWER(email) = clean_email
-  LIMIT 1;
+  -- 4. Atomic Upsert ON CONFLICT (email)
+  INSERT INTO public.job_alert_subscribers (
+    email,
+    categories,
+    frequency,
+    is_active,
+    unsubscribe_token,
+    updated_at
+  )
+  VALUES (
+    clean_email,
+    validated_categories,
+    clean_freq,
+    true,
+    gen_random_uuid()::text,
+    NOW()
+  )
+  ON CONFLICT (email) DO UPDATE SET
+    categories = EXCLUDED.categories,
+    frequency = EXCLUDED.frequency,
+    is_active = true,
+    updated_at = NOW();
 
-  IF existing_id IS NOT NULL THEN
-    UPDATE public.job_alert_subscribers
-    SET categories = validated_categories,
-        frequency = clean_freq,
-        is_active = true,
-        updated_at = NOW()
-    WHERE id = existing_id;
-
-    RETURN jsonb_build_object('success', true, 'message', 'Your job alert preferences have been updated successfully!');
-  ELSE
-    INSERT INTO public.job_alert_subscribers (email, categories, frequency, is_active)
-    VALUES (clean_email, validated_categories, clean_freq, true);
-
-    RETURN jsonb_build_object('success', true, 'message', 'Successfully subscribed to daily job alerts!');
-  END IF;
+  RETURN jsonb_build_object('success', true, 'message', 'Successfully subscribed to job alerts!');
 
 EXCEPTION WHEN OTHERS THEN
   RETURN jsonb_build_object('success', false, 'message', 'Unable to complete subscription at this time.');
 END;
 $$;
 
-GRANT EXECUTE ON FUNCTION public.subscribe_job_alerts(TEXT, TEXT[], TEXT) TO anon, authenticated;
+-- Explicitly REVOKE EXECUTE from PUBLIC, then GRANT to anon, authenticated, service_role
+REVOKE EXECUTE ON FUNCTION public.subscribe_job_alerts(TEXT, TEXT[], TEXT) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.subscribe_job_alerts(TEXT, TEXT[], TEXT) TO anon, authenticated, service_role;
 
--- RPC B: Token-Based Unsubscribe ONLY
+-- 5. TOKEN-BASED UNSUBSCRIBE RPC
+DROP FUNCTION IF EXISTS public.unsubscribe_job_alerts(TEXT, TEXT);
+
 CREATE OR REPLACE FUNCTION public.unsubscribe_job_alerts(
   p_email TEXT,
   p_token TEXT
@@ -245,8 +251,8 @@ BEGIN
   clean_email := LOWER(TRIM(COALESCE(p_email, '')));
   clean_token := TRIM(COALESCE(p_token, ''));
 
-  -- Reject email-only requests without a valid token
-  IF clean_email = '' OR clean_email NOT LIKE '%@%' OR clean_token = '' THEN
+  -- Reject email-only requests without a valid non-empty token
+  IF clean_email = '' OR clean_email NOT LIKE '%@%.%' OR clean_token = '' THEN
     RETURN jsonb_build_object(
       'success', false,
       'message', 'A valid email address and unsubscribe token are required.'
@@ -267,7 +273,7 @@ BEGIN
     WHERE id = sub_id;
   END IF;
 
-  -- Return uniform response to prevent user enumeration
+  -- Return uniform privacy-preserving response to prevent email enumeration
   RETURN jsonb_build_object(
     'success', true,
     'message', 'If the subscription exists and the provided token is valid, you have been unsubscribed.'
@@ -280,4 +286,9 @@ EXCEPTION WHEN OTHERS THEN
 END;
 $$;
 
-GRANT EXECUTE ON FUNCTION public.unsubscribe_job_alerts(TEXT, TEXT) TO anon, authenticated;
+-- Explicitly REVOKE EXECUTE from PUBLIC, then GRANT to anon, authenticated, service_role
+REVOKE EXECUTE ON FUNCTION public.unsubscribe_job_alerts(TEXT, TEXT) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.unsubscribe_job_alerts(TEXT, TEXT) TO anon, authenticated, service_role;
+
+-- 6. REFRESH POSTGREST SCHEMA CACHE
+NOTIFY pgrst, 'reload schema';

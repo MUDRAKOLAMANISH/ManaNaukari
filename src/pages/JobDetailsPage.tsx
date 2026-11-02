@@ -10,6 +10,7 @@ import { Toast } from '../components/common/Toast';
 import { ApplyModal } from '../components/jobs/ApplyModal';
 import { ApplyChoiceModal } from '../components/jobs/ApplyChoiceModal';
 import { AtsResumeMatchModal } from '../components/jobs/AtsResumeMatchModal';
+import { CompanyLogo } from '../components/common/CompanyLogo';
 import { analyticsTracker } from '../services/analyticsTracker';
 import { 
   Building2, MapPin, Briefcase, IndianRupee, Calendar, 
@@ -387,14 +388,15 @@ export const JobDetailsPage: React.FC<JobDetailsPageProps> = ({ jobId, onNavigat
       setAlreadyAppliedDate(new Date().toISOString());
       setLeadSuccess(true);
 
-      // Step 4: Open official company apply_link in a new tab
-      setTimeout(() => {
-        console.log('[JobDetailsPage.handleSubmitLead] Opening official link:', job.apply_link);
-        window.open(job.apply_link, '_blank', 'noopener,noreferrer');
-        setIsApplyModalOpen(false);
-        setLeadSuccess(false);
-        setIsSubmittingLead(false);
-      }, 600);
+      // Step 4: Open official company apply_link instantly
+      console.log('[JobDetailsPage.handleSubmitLead] Opening official link:', job.apply_link);
+      const applyTab = window.open(job.apply_link, '_blank', 'noopener,noreferrer');
+      if (!applyTab) {
+        window.location.href = job.apply_link;
+      }
+      setIsApplyModalOpen(false);
+      setLeadSuccess(false);
+      setIsSubmittingLead(false);
 
     } catch (err: any) {
       console.warn('[JobDetailsPage.handleSubmitLead] Exception note:', err);
@@ -409,12 +411,13 @@ export const JobDetailsPage: React.FC<JobDetailsPageProps> = ({ jobId, onNavigat
       setAlreadyAppliedDate(new Date().toISOString());
       setLeadSuccess(true);
 
-      setTimeout(() => {
-        window.open(job.apply_link, '_blank', 'noopener,noreferrer');
-        setIsApplyModalOpen(false);
-        setLeadSuccess(false);
-        setIsSubmittingLead(false);
-      }, 600);
+      const applyTab = window.open(job.apply_link, '_blank', 'noopener,noreferrer');
+      if (!applyTab) {
+        window.location.href = job.apply_link;
+      }
+      setIsApplyModalOpen(false);
+      setLeadSuccess(false);
+      setIsSubmittingLead(false);
     }
   };
 
@@ -499,18 +502,7 @@ export const JobDetailsPage: React.FC<JobDetailsPageProps> = ({ jobId, onNavigat
           
           <div className="flex items-start gap-5">
             {/* 3. Company Logo / Initials */}
-            <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl bg-blue-50 border border-blue-100/90 text-blue-700 font-display font-extrabold text-xl sm:text-2xl flex items-center justify-center shrink-0 shadow-2xs overflow-hidden">
-              {job.company_logo ? (
-                <img
-                  src={job.company_logo}
-                  alt={job.company}
-                  className="w-full h-full object-contain p-2"
-                  referrerPolicy="no-referrer"
-                />
-              ) : (
-                <span>{job.company.substring(0, 2).toUpperCase()}</span>
-              )}
-            </div>
+            <CompanyLogo companyName={job.company} logoUrl={job.company_logo || undefined} size="lg" />
 
             <div className="space-y-2">
               <div className="flex items-center gap-2.5 flex-wrap">

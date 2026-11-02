@@ -6,6 +6,7 @@ import { WhatsAppCommunityPopup } from '../common/WhatsAppCommunityPopup';
 import { FloatingChatbot } from '../chat/FloatingChatbot';
 import { FloatingOfferWidget } from '../common/FloatingOfferWidget';
 import { TopJobAnnouncementTicker } from '../home/TopJobAnnouncementTicker';
+import { CompanyLogosMarquee } from '../common/CompanyLogosMarquee';
 
 interface MainLayoutProps {
   children: React.ReactNode;
@@ -67,6 +68,9 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ children, currentPath, o
         {(currentPath === '/' || currentPath === '') && (
           <TopJobAnnouncementTicker onNavigate={onNavigate} />
         )}
+
+        {/* Scrolling Company Logos Marquee (Amazon, Apple, TCS, Wipro, Accenture, Salesforce, IBM, Flipkart, etc.) */}
+        <CompanyLogosMarquee onCompanyClick={(company) => onNavigate(`/jobs?q=${encodeURIComponent(company)}`)} />
 
         {/* Main Page Content */}
         <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8">

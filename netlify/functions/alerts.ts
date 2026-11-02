@@ -78,6 +78,8 @@ export const handler = async (event: any) => {
     let activeSubscribers = 0;
     let logs: any[] = [];
 
+    let subscriberDbError: any = null;
+
     if (supabaseUrl && supabaseServiceKey) {
       try {
         const [subRes, logRes] = await Promise.all([
@@ -99,12 +101,16 @@ export const handler = async (event: any) => {
           const subs = await subRes.json();
           totalSubscribers = subs.length;
           activeSubscribers = subs.filter((s: any) => s.is_active !== false).length;
+        } else {
+          const errText = await subRes.text();
+          subscriberDbError = { status: subRes.status, body: errText };
         }
 
         if (logRes.ok) {
           logs = await logRes.json();
         }
-      } catch (err) {
+      } catch (err: any) {
+        subscriberDbError = { message: err?.message || 'Fetch error' };
         console.warn('[alerts.ts delivery-stats] Supabase fetch warning:', err);
       }
     }
@@ -128,6 +134,7 @@ export const handler = async (event: any) => {
           bouncedCount,
           failedDeliveries,
           recentDeliveries: logs,
+          subscriberDbError,
         },
       }),
     };
@@ -164,11 +171,85 @@ export const handler = async (event: any) => {
 
         if (rpcRes.ok) {
           const rpcData = await rpcRes.json();
-          return {
-            statusCode: 200,
-            headers: CORS_HEADERS,
-            body: JSON.stringify(rpcData),
-          };
+          if (rpcData && typeof rpcData === 'object' && rpcData.success) {
+            return {
+              statusCode: 200,
+              headers: CORS_HEADERS,
+              body: JSON.stringify(rpcData),
+            };
+          }
+        }
+
+        // Service Role Fallback Upsert if RPC fails or returns error
+        if (supabaseServiceKey) {
+          const catArray = Array.isArray(categories) ? categories : ['Freshers'];
+          const freq = frequency || 'daily';
+
+          const checkRes = await fetch(`${supabaseUrl}/rest/v1/job_alert_subscribers?email=ilike.${encodeURIComponent(cleanEmail)}&select=id,is_active`, {
+            headers: {
+              apikey: supabaseServiceKey,
+              Authorization: `Bearer ${supabaseServiceKey}`,
+            },
+          });
+
+          if (checkRes.ok) {
+            const existing = await checkRes.json();
+            if (Array.isArray(existing) && existing.length > 0) {
+              const subId = existing[0].id;
+              const updateRes = await fetch(`${supabaseUrl}/rest/v1/job_alert_subscribers?id=eq.${encodeURIComponent(subId)}`, {
+                method: 'PATCH',
+                headers: {
+                  apikey: supabaseServiceKey,
+                  Authorization: `Bearer ${supabaseServiceKey}`,
+                  'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                  categories: catArray,
+                  frequency: freq,
+                  is_active: true,
+                  updated_at: new Date().toISOString(),
+                }),
+              });
+
+              if (updateRes.ok) {
+                return {
+                  statusCode: 200,
+                  headers: CORS_HEADERS,
+                  body: JSON.stringify({
+                    success: true,
+                    message: 'Your job alert preferences have been updated successfully!',
+                  }),
+                };
+              }
+            } else {
+              const insertRes = await fetch(`${supabaseUrl}/rest/v1/job_alert_subscribers`, {
+                method: 'POST',
+                headers: {
+                  apikey: supabaseServiceKey,
+                  Authorization: `Bearer ${supabaseServiceKey}`,
+                  'Content-Type': 'application/json',
+                  Prefer: 'return=representation',
+                },
+                body: JSON.stringify({
+                  email: cleanEmail,
+                  categories: catArray,
+                  frequency: freq,
+                  is_active: true,
+                }),
+              });
+
+              if (insertRes.ok) {
+                return {
+                  statusCode: 200,
+                  headers: CORS_HEADERS,
+                  body: JSON.stringify({
+                    success: true,
+                    message: 'Successfully subscribed to daily job alerts!',
+                  }),
+                };
+              }
+            }
+          }
         }
       }
 

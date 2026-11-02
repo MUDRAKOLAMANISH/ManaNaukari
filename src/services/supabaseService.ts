@@ -31,8 +31,18 @@ export interface FetchJobsFilters {
   limit?: number;
 }
 
+// High-performance client-side in-memory cache for instant page loads
+const jobsCache = new Map<string, { data: any; timestamp: number }>();
+const CACHE_TTL = 30000; // 30 seconds cache TTL
+
 export const jobsService = {
   async getAll(filters: FetchJobsFilters = {}): Promise<{ data: Job[] | null; error: Error | null }> {
+    const cacheKey = `jobs_all_${JSON.stringify(filters)}`;
+    const cached = jobsCache.get(cacheKey);
+    if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
+      return { data: cached.data as Job[], error: null };
+    }
+
     try {
       let query = supabase.from('jobs').select('*').order('created_at', { ascending: false });
 
@@ -62,6 +72,13 @@ export const jobsService = {
       }
 
       const { data, error } = await query;
+      if (!error && data) {
+        jobsCache.set(cacheKey, { data, timestamp: Date.now() });
+        // Cache individual jobs for getById
+        (data as Job[]).forEach((j) => {
+          if (j.id) jobsCache.set(`job_id_${j.id}`, { data: j, timestamp: Date.now() });
+        });
+      }
       return { data: data as Job[] | null, error };
     } catch (err: any) {
       return { data: null, error: err };
@@ -69,8 +86,17 @@ export const jobsService = {
   },
 
   async getById(id: string): Promise<{ data: Job | null; error: Error | null }> {
+    const cacheKey = `job_id_${id}`;
+    const cached = jobsCache.get(cacheKey);
+    if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
+      return { data: cached.data as Job, error: null };
+    }
+
     try {
       const { data, error } = await supabase.from('jobs').select('*').eq('id', id).single();
+      if (!error && data) {
+        jobsCache.set(cacheKey, { data, timestamp: Date.now() });
+      }
       return { data: data as Job | null, error };
     } catch (err: any) {
       return { data: null, error: err };
@@ -78,11 +104,20 @@ export const jobsService = {
   },
 
   async getActiveCount(): Promise<{ count: number; error: Error | null }> {
+    const cacheKey = 'jobs_active_count';
+    const cached = jobsCache.get(cacheKey);
+    if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
+      return { count: cached.data as number, error: null };
+    }
+
     try {
       const { count, error } = await supabase
         .from('jobs')
         .select('id', { count: 'exact', head: true })
         .eq('status', 'active');
+      if (!error && typeof count === 'number') {
+        jobsCache.set(cacheKey, { data: count, timestamp: Date.now() });
+      }
       return { count: count || 0, error };
     } catch (err: any) {
       return { count: 0, error: err };

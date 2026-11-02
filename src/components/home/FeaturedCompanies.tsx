@@ -1,6 +1,7 @@
 import React from 'react';
 import { motion } from 'framer-motion';
 import { Building2, ArrowUpRight, Sparkles } from 'lucide-react';
+import { CompanyLogo } from '../common/CompanyLogo';
 
 interface FeaturedCompaniesProps {
   companies: string[];
@@ -33,13 +34,6 @@ export const FeaturedCompanies: React.FC<FeaturedCompaniesProps> = ({
 
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 sm:gap-4">
         {displayList.map((company, index) => {
-          const initials = company
-            .split(' ')
-            .map((w) => w[0])
-            .slice(0, 2)
-            .join('')
-            .toUpperCase() || 'CO';
-
           return (
             <motion.button
               key={index}
@@ -48,9 +42,7 @@ export const FeaturedCompanies: React.FC<FeaturedCompaniesProps> = ({
               onClick={() => onCompanyClick(company)}
               className="card-modern p-4 text-center group flex flex-col items-center justify-between cursor-pointer h-32 border border-slate-200/90 hover:border-indigo-300"
             >
-              <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-slate-50 to-blue-50/50 border border-slate-200/80 flex items-center justify-center text-blue-700 font-bold font-display text-xs group-hover:bg-blue-600 group-hover:text-white group-hover:border-blue-600 transition-all duration-300 shadow-2xs">
-                {initials}
-              </div>
+              <CompanyLogo companyName={company} size="md" />
 
               <div className="w-full">
                 <span className="block text-xs font-bold text-slate-800 group-hover:text-blue-600 transition-colors truncate">

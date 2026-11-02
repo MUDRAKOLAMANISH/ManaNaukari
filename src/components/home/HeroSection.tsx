@@ -6,6 +6,7 @@ import {
   Video
 } from 'lucide-react';
 import { FeatureCarousel } from './FeatureCarousel';
+import { CompanyLogo } from '../common/CompanyLogo';
 
 interface HeroSectionProps {
   onSearch: (keyword: string, location: string) => void;
@@ -252,23 +253,14 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
 
             <div className="flex flex-wrap items-center justify-center gap-3 sm:gap-4">
               {companies.slice(0, 8).map((company, i) => {
-                const initials = company
-                  .split(' ')
-                  .map((w) => w[0])
-                  .slice(0, 2)
-                  .join('')
-                  .toUpperCase() || 'CO';
-
                 return (
                   <button
                     key={i}
                     type="button"
                     onClick={() => onNavigate(`/jobs?q=${encodeURIComponent(company)}`)}
-                    className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-white border border-slate-200/80 shadow-2xs hover:border-blue-300 hover:text-blue-600 transition-all cursor-pointer"
+                    className="flex items-center gap-2 px-3.5 py-1.5 rounded-xl bg-white border border-slate-200/80 shadow-2xs hover:border-blue-300 hover:text-blue-600 transition-all cursor-pointer"
                   >
-                    <div className="w-6 h-6 rounded-lg bg-blue-50 text-blue-700 text-[10px] font-bold flex items-center justify-center">
-                      {initials}
-                    </div>
+                    <CompanyLogo companyName={company} size="sm" />
                     <span className="text-xs font-bold text-slate-800">{company}</span>
                   </button>
                 );

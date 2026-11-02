@@ -48,6 +48,9 @@ export const AdminDailyReminderManager: React.FC = () => {
   const [batchSuccessMessage, setBatchSuccessMessage] = useState<string | null>(null);
   const [batchErrorMessage, setBatchErrorMessage] = useState<string | null>(null);
 
+  // DB Notice State
+  const [dbNoticeMessage, setDbNoticeMessage] = useState<string | null>(null);
+
   // SQL Toggle
   const [showSql, setShowSql] = useState<boolean>(false);
   const [copiedSql, setCopiedSql] = useState<boolean>(false);
@@ -57,16 +60,50 @@ export const AdminDailyReminderManager: React.FC = () => {
     else setLoading(true);
 
     try {
-      // 1. Fetch Subscriber Counts
-      const { data: subsData } = await supabase
+      const { data: { session } } = await supabase.auth.getSession();
+      const token = session?.access_token || '';
+
+      // 1. Fetch Subscriber Counts via Supabase Client
+      const { data: subsData, error: subsErr } = await supabase
         .from('job_alert_subscribers')
         .select('id, is_active');
 
-      if (subsData) {
+      if (subsData && subsData.length > 0) {
         setTotalSubscribersCount(subsData.length);
         const active = subsData.filter((s: any) => s.is_active !== false).length;
         setActiveSubscribersCount(active);
         setUnsubscribedCount(subsData.length - active);
+        setDbNoticeMessage(null);
+      } else if (subsErr) {
+        setDbNoticeMessage(`Supabase Client Notice (${subsErr.code}): ${subsErr.message}`);
+      }
+
+      // 1b. Fetch authoritative delivery & subscriber stats from server endpoint
+      try {
+        const statsRes = await fetch('/api/alerts/delivery-stats', {
+          headers: token ? { Authorization: `Bearer ${token}` } : {},
+        });
+        if (statsRes.ok) {
+          const statsJson = await statsRes.json();
+          if (statsJson?.success && statsJson?.data) {
+            const { totalSubscribers, activeSubscribers, subscriberDbError } = statsJson.data;
+            if (typeof totalSubscribers === 'number' && (totalSubscribers > 0 || !subsData || subsData.length === 0)) {
+              setTotalSubscribersCount(totalSubscribers);
+              if (typeof activeSubscribers === 'number') {
+                setActiveSubscribersCount(activeSubscribers);
+                setUnsubscribedCount(totalSubscribers - activeSubscribers);
+              }
+            }
+
+            if (subscriberDbError && totalSubscribers === 0) {
+              setDbNoticeMessage(
+                `Supabase Migration Required: RPC / RLS permissions check failed (${subscriberDbError.code || subscriberDbError.status || 'PGRST202'}). Please execute migration 20261030_job_alert_subscribers_setup.sql in Supabase SQL Editor.`
+              );
+            }
+          }
+        }
+      } catch {
+        // Fall back to client query if server endpoint not reachable
       }
 
       // 2. Fetch Active Jobs Count
@@ -271,6 +308,16 @@ SELECT cron.schedule(
           <span>Refresh Metrics</span>
         </button>
       </div>
+
+      {dbNoticeMessage && (
+        <div className="p-4 bg-amber-50 border border-amber-200 text-amber-900 rounded-2xl text-xs flex items-start gap-3 shadow-2xs">
+          <AlertCircle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+          <div className="space-y-1">
+            <div className="font-bold">Database Setup Notice</div>
+            <div className="text-amber-800 leading-relaxed">{dbNoticeMessage}</div>
+          </div>
+        </div>
+      )}
 
       {/* KPI Stats Grid */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">

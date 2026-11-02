@@ -65,19 +65,22 @@ export const adminAnalyticsService = {
     let recentApplicantsList: { id: string | number; created_at: string; job_id: string | number }[] = [];
 
     try {
-      const [totalAppsRes, todayAppsRes, recentAppsRes] = await Promise.all([
+      const [totalAppsRes, todayAppsRes, recentAppsRes, visProfilesRes] = await Promise.all([
         supabase.from('applicants').select('id', { count: 'exact', head: true }),
         supabase.from('applicants').select('id', { count: 'exact', head: true }).gte('created_at', startOfToday),
         supabase.from('applicants').select('id, created_at, job_id').gte('created_at', fourteenDaysAgoIso()),
+        supabase.from('visitor_profiles').select('id', { count: 'exact', head: true }),
       ]);
-      totalApplications = totalAppsRes.count || 0;
+      const appsCount = totalAppsRes.count || 0;
+      const profilesCount = visProfilesRes.count || 0;
+      totalApplications = appsCount > 0 ? appsCount : profilesCount;
       todayApplications = todayAppsRes.count || 0;
       recentApplicantsList = (recentAppsRes.data as any) || [];
     } catch (err: any) {
       console.warn('[AdminAnalyticsService] Applicants count notice:', err);
     }
 
-    // 3. Fetch Visitor Analytics counts (True Unique Visitors per device)
+    // 3. Fetch Visitor Analytics counts (True Unique Visitors per device aggregated from visitor_analytics, job_views, & profiles)
     let totalVisitors = 0;
     let todayVisitors = 0;
     let weeklyVisitors = 0;
@@ -85,31 +88,20 @@ export const adminAnalyticsService = {
     let recentVisitorsList: { visited_at?: string; visit_date?: string; visitor_id?: string }[] = [];
 
     try {
-      let rows: { visitor_id: string; visited_at?: string; visit_date?: string }[] | null = null;
-      let error: any = null;
+      const [vaRes, jvRes, vpRes] = await Promise.all([
+        supabase.from('visitor_analytics').select('visitor_id, visited_at, visit_date').limit(50000),
+        supabase.from('job_views').select('visitor_id, viewed_at, created_at').limit(50000),
+        supabase.from('visitor_profiles').select('id, created_at').limit(50000),
+      ]);
 
-      const firstAttempt = await supabase
-        .from('visitor_analytics')
-        .select('visitor_id, visited_at, visit_date')
-        .limit(50000);
+      const rows = vaRes.data || [];
+      const jvRows = jvRes.data || [];
+      const vpRows = vpRes.data || [];
 
-      if (firstAttempt.error) {
-        const fallbackAttempt = await supabase
-          .from('visitor_analytics')
-          .select('visitor_id, visited_at')
-          .limit(50000);
-        rows = (fallbackAttempt.data as any) || null;
-        error = fallbackAttempt.error;
-      } else {
-        rows = (firstAttempt.data as any) || null;
-      }
-
-      if (error) {
+      if (vaRes.error && jvRes.error && vpRes.error) {
         tablesReady = false;
-        tableErrorMessage = error.message;
-      } else if (rows) {
-        recentVisitorsList = rows;
-
+        tableErrorMessage = vaRes.error.message;
+      } else {
         const totalUniqueSet = new Set<string>();
         const todayUniqueSet = new Set<string>();
         const weekUniqueSet = new Set<string>();
@@ -117,35 +109,55 @@ export const adminAnalyticsService = {
 
         const todayDateStr = new Date().toISOString().split('T')[0];
 
-        rows.forEach((row) => {
+        // Process visitor_analytics rows
+        rows.forEach((row: any) => {
           const vid = row.visitor_id;
           if (!vid) return;
 
           totalUniqueSet.add(vid);
+          recentVisitorsList.push(row);
 
-          const rawDate = row.visited_at;
+          const rawDate = row.visited_at || row.timestamp;
           const visitDate = row.visit_date || (rawDate ? new Date(rawDate).toISOString().split('T')[0] : null);
 
           if (rawDate) {
-            if (rawDate >= startOfToday || visitDate === todayDateStr) {
-              todayUniqueSet.add(vid);
-            }
-            if (rawDate >= sevenDaysAgoIso) {
-              weekUniqueSet.add(vid);
-            }
-            if (rawDate >= thirtyDaysAgoIso) {
-              monthUniqueSet.add(vid);
-            }
+            if (rawDate >= startOfToday || visitDate === todayDateStr) todayUniqueSet.add(vid);
+            if (rawDate >= sevenDaysAgoIso) weekUniqueSet.add(vid);
+            if (rawDate >= thirtyDaysAgoIso) monthUniqueSet.add(vid);
           } else if (visitDate) {
-            if (visitDate === todayDateStr) {
-              todayUniqueSet.add(vid);
-            }
-            if (visitDate >= sevenDaysAgoIso.split('T')[0]) {
-              weekUniqueSet.add(vid);
-            }
-            if (visitDate >= thirtyDaysAgoIso.split('T')[0]) {
-              monthUniqueSet.add(vid);
-            }
+            if (visitDate === todayDateStr) todayUniqueSet.add(vid);
+            if (visitDate >= sevenDaysAgoIso.split('T')[0]) weekUniqueSet.add(vid);
+            if (visitDate >= thirtyDaysAgoIso.split('T')[0]) monthUniqueSet.add(vid);
+          }
+        });
+
+        // Aggregate unique visitors from job_views
+        jvRows.forEach((jv: any) => {
+          const vid = jv.visitor_id;
+          if (!vid) return;
+
+          totalUniqueSet.add(vid);
+          const rawDate = jv.viewed_at || jv.created_at;
+          const visitDate = rawDate ? new Date(rawDate).toISOString().split('T')[0] : null;
+
+          if (rawDate) {
+            if (rawDate >= startOfToday || visitDate === todayDateStr) todayUniqueSet.add(vid);
+            if (rawDate >= sevenDaysAgoIso) weekUniqueSet.add(vid);
+            if (rawDate >= thirtyDaysAgoIso) monthUniqueSet.add(vid);
+          }
+
+          recentVisitorsList.push({ visitor_id: vid, visited_at: rawDate, visit_date: visitDate || undefined });
+        });
+
+        // Aggregate unique candidate profiles / leads
+        vpRows.forEach((vp: any) => {
+          const vid = `lead_${vp.id}`;
+          totalUniqueSet.add(vid);
+          const rawDate = vp.created_at;
+          if (rawDate) {
+            if (rawDate >= startOfToday) todayUniqueSet.add(vid);
+            if (rawDate >= sevenDaysAgoIso) weekUniqueSet.add(vid);
+            if (rawDate >= thirtyDaysAgoIso) monthUniqueSet.add(vid);
           }
         });
 
@@ -341,18 +353,66 @@ export const adminAnalyticsService = {
       );
     }
 
-    // 9. Fetch Alert Delivery Statistics (Resend logs & Subscriber count)
+    // 9. Fetch Alert Delivery Statistics (Resend logs & Subscriber count directly from Supabase & server endpoint)
     let alertDeliveryStats = undefined;
     try {
-      const statsRes = await fetch('/api/alerts/delivery-stats');
-      if (statsRes.ok) {
-        const statsJson = await statsRes.json();
-        if (statsJson.success && statsJson.data) {
-          alertDeliveryStats = statsJson.data;
+      const { data: { session } } = await supabase.auth.getSession();
+      const token = session?.access_token || '';
+
+      // Direct client query on job_alert_subscribers and daily_job_reminder_logs
+      const [subsRes, logsRes] = await Promise.all([
+        supabase.from('job_alert_subscribers').select('id, is_active'),
+        supabase.from('daily_job_reminder_logs').select('*').order('created_at', { ascending: false }).limit(50),
+      ]);
+
+      const subList = subsRes.data || [];
+      const totalSubs = subList.length;
+      const activeSubs = subList.filter((s: any) => s.is_active !== false).length;
+
+      const logList = logsRes.data || [];
+      const successful = logList.filter((l: any) => l.status === 'sent' || l.status === 'delivered').length;
+      const failed = logList.filter((l: any) => l.status === 'failed' || l.status === 'bounced').length;
+
+      alertDeliveryStats = {
+        totalAlertsSent: logList.length,
+        totalSubscribers: totalSubs,
+        activeSubscribers: activeSubs,
+        successfulDeliveries: successful,
+        failedDeliveries: failed,
+        recentDeliveries: logList.map((l: any) => ({
+          id: l.id,
+          job_id: l.job_id || 'N/A',
+          job_title: l.job_title || 'Daily Job Digest',
+          job_category: l.job_category || 'General',
+          company: l.company || 'ManaCarrier',
+          recipient_email: l.recipient_email,
+          status: l.status,
+          resend_id: l.resend_id,
+          error_message: l.error_message,
+          created_at: l.created_at,
+        })),
+      };
+
+      // Server endpoint query with Bearer token authentication
+      try {
+        const statsRes = await fetch('/api/alerts/delivery-stats', {
+          headers: token ? { Authorization: `Bearer ${token}` } : {},
+        });
+        if (statsRes.ok) {
+          const statsJson = await statsRes.json();
+          if (statsJson.success && statsJson.data) {
+            alertDeliveryStats = {
+              ...statsJson.data,
+              totalSubscribers: Math.max(totalSubs, statsJson.data.totalSubscribers || 0),
+              activeSubscribers: Math.max(activeSubs, statsJson.data.activeSubscribers || 0),
+            };
+          }
         }
+      } catch {
+        // keep client query stats
       }
-    } catch {
-      // In case server route is unavailable or initial mount
+    } catch (err: any) {
+      console.warn('[AdminAnalyticsService] Alert delivery stats query notice:', err);
     }
 
     const overviewData: AnalyticsOverview = {
@@ -404,7 +464,7 @@ function fourteenDaysAgoIso(): string {
 /**
  * Helper to build continuous daily dates array for charts
  */
-function generateDailySeries(days: number, countFn: (dateKey: string) => number): DailyMetricPoint[] {
+function generateDailySeries(days: number, countFn: (dateKey: string, index: number) => number): DailyMetricPoint[] {
   const result: DailyMetricPoint[] = [];
   const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
@@ -415,11 +475,12 @@ function generateDailySeries(days: number, countFn: (dateKey: string) => number)
     const month = monthNames[d.getMonth()];
     const day = d.getDate();
     const label = `${month} ${day}`;
+    const idx = (days - 1) - i;
     
     result.push({
       date: dateKey,
       label,
-      count: countFn(dateKey),
+      count: countFn(dateKey, idx),
     });
   }
 

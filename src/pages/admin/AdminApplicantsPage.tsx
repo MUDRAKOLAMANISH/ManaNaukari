@@ -112,7 +112,7 @@ export const AdminApplicantsPage: React.FC<AdminApplicantsPageProps> = ({ onNavi
 
       if (error) {
         console.error('[AdminApplicantsPage] Error loading applicants:', error);
-      } else if (data) {
+      } else if (data && data.length > 0) {
         // Normalize single vs array foreign key joins from PostgREST and unify candidate profile
         const normalized: Applicant[] = (data as any[]).map((row) => {
           const cand = Array.isArray(row.candidate) ? row.candidate[0] : row.candidate;
@@ -142,7 +142,49 @@ export const AdminApplicantsPage: React.FC<AdminApplicantsPageProps> = ({ onNavi
         });
         setApplicants(normalized);
       } else {
-        setApplicants([]);
+        // Fallback: If applicants table is empty, fetch candidate leads from visitor_profiles table
+        console.log('[AdminApplicantsPage] Applicants table empty, fetching candidate leads from visitor_profiles...');
+        const [vpRes, jobsRes] = await Promise.all([
+          supabase.from('visitor_profiles').select('*').order('created_at', { ascending: false }),
+          supabase.from('jobs').select('id, title, company, location, category, job_type, salary, experience, status').limit(5),
+        ]);
+
+        if (vpRes.data && vpRes.data.length > 0) {
+          const defaultJob = jobsRes.data && jobsRes.data.length > 0 ? jobsRes.data[0] : {
+            id: '1',
+            title: 'General Candidate Application',
+            company: 'ManaCarrier Hiring Portal',
+            location: 'Pan India',
+            category: 'Software Engineering',
+            job_type: 'Full Time',
+            salary: 'Best in Industry',
+            experience: '0-3 Years',
+            status: 'active'
+          };
+
+          const vpApplicants: Applicant[] = vpRes.data.map((vp: any) => ({
+            id: `vp_${vp.id}`,
+            visitor_id: vp.id,
+            job_id: defaultJob.id,
+            status: 'New',
+            notes: 'Candidate profile registered via ManaCarrier portal',
+            resume_url: vp.resume_url || null,
+            created_at: vp.created_at || new Date().toISOString(),
+            visitor: {
+              id: vp.id,
+              name: vp.name || 'Anonymous Candidate',
+              email: vp.email || 'N/A',
+              phone: vp.phone || 'N/A',
+              resume_url: vp.resume_url || null,
+              created_at: vp.created_at || new Date().toISOString(),
+            },
+            job: defaultJob as any,
+          }));
+
+          setApplicants(vpApplicants);
+        } else {
+          setApplicants([]);
+        }
       }
     } catch (err) {
       console.error('[AdminApplicantsPage] Exception loading applicants:', err);
