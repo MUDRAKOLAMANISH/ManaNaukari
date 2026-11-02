@@ -85,8 +85,9 @@ export function getOrCreateSessionId(): string {
   return sessionId;
 }
 
-// In-memory locks to prevent concurrent race-condition inserts during the same page render cycle
+// In-memory locks to prevent concurrent race-condition inserts during React re-renders or multi-init
 let inMemoryDailyVisitLock: string | null = null;
+let isVisitorTrackInFlight = false;
 const recentJobHits = new Map<string, number>();
 const DEBOUNCE_WINDOW_MS = 3000;
 
@@ -185,14 +186,10 @@ export const analyticsTracker = {
    * Tracks a visitor event in `visitor_analytics`.
    * 
    * Strict Visitor Rules:
-   * 1. Count one device as one visitor per day.
-   * 2. Do not increase visitor count on page refresh.
-   * 3. Store a unique visitor_id in localStorage.
-   * 4. Store last_visit_date in localStorage.
-   * 5. Only create a new visitor record if last_visit_date is different from today's date.
-   * 6. Enforces database unique constraint on (visitor_id, visit_date).
-   * 7. Exclude admin pages from visitor tracking.
-   * 8. Works in AI Studio preview and Netlify production environments.
+   * 1. Plain .insert(payload) WITHOUT .select() so anonymous visitors are not blocked by SELECT RLS policies.
+   * 2. Only updates localStorage after Supabase confirms success or duplicate key constraint (23505).
+   * 3. Retries on transient failure without marking localStorage premature success.
+   * 4. Excludes admin pages automatically.
    */
   trackPageView(optionsOrType?: string | TrackPageViewOptions, maybePath?: string) {
     if (typeof window === 'undefined') return;
@@ -231,7 +228,7 @@ export const analyticsTracker = {
       return;
     }
 
-    // Check if this device has already been recorded for today in this process
+    // Check if this device has already been recorded for today
     const today = getTodayDateString();
     let lastVisitDate: string | null = null;
     try {
@@ -245,13 +242,15 @@ export const analyticsTracker = {
       return;
     }
 
-    if (inMemoryDailyVisitLock === today) {
+    if (inMemoryDailyVisitLock === today || isVisitorTrackInFlight) {
       return;
     }
 
     const sessionId = getOrCreateSessionId();
     const visitorId = getOrCreateVisitorId();
     const timestampIso = new Date().toISOString();
+
+    isVisitorTrackInFlight = true;
 
     console.log('[AnalyticsTracker] 🚀 Recording new daily unique visitor:', {
       visitor_id: visitorId,
@@ -279,20 +278,20 @@ export const analyticsTracker = {
           referrer: document.referrer ? document.referrer.slice(0, 255) : 'direct',
         };
 
-        // Step 1: Attempt insert with full payload including visit_date
-        let { error, data } = await supabase.from('visitor_analytics').insert(fullPayload).select();
+        // PLAIN INSERT WITHOUT .select() - Prevents HTTP 403 permission denied for anonymous users
+        let { error } = await supabase.from('visitor_analytics').insert(fullPayload);
 
-        // Step 2: Handle unique constraint violation (database unique constraint on visitor_id, visit_date)
+        // Handle unique constraint violation (database unique constraint 23505 on visitor_id, visit_date)
         if (error && (error.code === '23505' || error.message?.includes('unique') || error.message?.includes('duplicate key'))) {
-          console.log('[AnalyticsTracker] 🔒 Database unique constraint prevented duplicate visitor count for today:', { visitorId, today });
+          console.log('[AnalyticsTracker] 🔒 Unique constraint verified: Visitor already recorded for today.');
           try {
             localStorage.setItem(LAST_VISIT_DATE_KEY, today);
           } catch {}
+          inMemoryDailyVisitLock = today;
           return;
         }
 
-        // Step 3: Resilient Schema Fallback
-        // If Supabase returns PGRST204 or 42703 (column visit_date or optional columns do not exist yet)
+        // Resilient Schema Fallback
         if (error && (error.code === 'PGRST204' || error.code === '42703' || error.message?.includes('schema cache') || error.message?.includes('column'))) {
           console.debug('[AnalyticsTracker] Adapting to baseline database schema:', error.message);
           
@@ -303,19 +302,18 @@ export const analyticsTracker = {
             visited_at: timestampIso,
           };
 
-          const fallbackResult = await supabase.from('visitor_analytics').insert(baselinePayload).select();
+          const fallbackResult = await supabase.from('visitor_analytics').insert(baselinePayload);
           error = fallbackResult.error;
-          data = fallbackResult.data;
         }
 
         if (error) {
           if (error.code === '23505' || error.message?.includes('unique') || error.message?.includes('duplicate key')) {
-            console.log('[AnalyticsTracker] 🔒 Unique constraint verified in fallback.');
             try { localStorage.setItem(LAST_VISIT_DATE_KEY, today); } catch {}
             inMemoryDailyVisitLock = today;
             return;
           }
           console.warn('[AnalyticsTracker] ⚠️ visitor_analytics insert notice:', error.message);
+          // Do NOT mark as success in localStorage on failed insert, allowing retry
         } else {
           try { localStorage.setItem(LAST_VISIT_DATE_KEY, today); } catch {}
           inMemoryDailyVisitLock = today;
@@ -323,18 +321,19 @@ export const analyticsTracker = {
             visitor_id: visitorId,
             visit_date: today,
             page_name: pageName,
-            id: data && data[0] ? data[0].id : 'recorded'
           });
         }
       } catch (err: any) {
         console.debug('[AnalyticsTracker] Visitor tracking exception:', err);
+      } finally {
+        isVisitorTrackInFlight = false;
       }
     }, 40);
   },
 
   /**
    * Tracks a job view event in `job_views`.
-   * Supports both trackJobView({ id, title, company }) and trackJobView(jobId, jobTitle, company)
+   * Uses plain .insert(payload) without .select()
    */
   trackJobView(
     jobIdOrObj: string | number | { id?: string | number; title?: string; company?: string },
@@ -370,13 +369,10 @@ export const analyticsTracker = {
     const visitorId = getOrCreateVisitorId();
     const timestampIso = new Date().toISOString();
 
-    const numericJobId = typeof jobId === 'number' ? jobId : parseInt(String(jobId), 10);
-    const resolvedJobId = !isNaN(numericJobId) ? numericJobId : jobId;
-
     setTimeout(async () => {
       try {
         const payload: JobViewInsert = {
-          job_id: resolvedJobId,
+          job_id: jobId,
           visitor_id: visitorId,
           session_id: sessionId,
           job_title: jobTitle ? jobTitle.slice(0, 255) : null,
@@ -384,22 +380,22 @@ export const analyticsTracker = {
           viewed_at: timestampIso,
         };
 
-        const { error, data } = await supabase.from('job_views').insert(payload).select();
+        // Plain insert without .select()
+        const { error } = await supabase.from('job_views').insert(payload);
 
         if (error) {
           console.debug('[AnalyticsTracker] Retrying job_views with baseline columns...', error.message);
           const baselineJobView = {
-            job_id: resolvedJobId,
+            job_id: jobId,
             visitor_id: visitorId,
             viewed_at: timestampIso,
           };
           await supabase.from('job_views').insert(baselineJobView);
         } else {
           console.log('[AnalyticsTracker] ✅ Job view recorded:', {
-            job_id: resolvedJobId,
+            job_id: jobId,
             job_title: jobTitle,
             visitor_id: visitorId,
-            id: data && data[0] ? data[0].id : 'recorded'
           });
         }
 
@@ -434,7 +430,7 @@ export const analyticsTracker = {
 
   /**
    * Tracks WhatsApp Community Join Popup interactions:
-   * Saves to Supabase `whatsapp_popup_events` and caches locally
+   * Saves to Supabase `whatsapp_popup_events` using plain .insert(payload)
    */
   trackWhatsAppPopup(eventType: WhatsAppPopupEventType, customPath?: string) {
     if (typeof window === 'undefined') return;
@@ -455,7 +451,7 @@ export const analyticsTracker = {
         const { error } = await supabase.from('whatsapp_popup_events').insert(payload);
         if (error) {
           if (error.message?.includes('schema cache') || error.message?.includes('relation')) {
-            console.warn('[AnalyticsTracker] ℹ️ Supabase table "whatsapp_popup_events" is missing. Stats are being securely cached in localStorage. To enable live analytics, please run the SQL migration script from the Admin Performance Analytics page.');
+            console.warn('[AnalyticsTracker] ℹ️ Supabase table "whatsapp_popup_events" is missing. Stats are being cached locally.');
           } else {
             console.warn('[AnalyticsTracker] ⚠️ Supabase whatsapp_popup_events insert failed:', error.message);
           }
@@ -469,7 +465,7 @@ export const analyticsTracker = {
   },
 
   /**
-   * Subscribes a user to daily job alerts with selected category preferences
+   * Subscribes a user to daily job alerts
    */
   async subscribeJobAlerts(email: string, categories: string[], frequency: string = 'daily') {
     try {
