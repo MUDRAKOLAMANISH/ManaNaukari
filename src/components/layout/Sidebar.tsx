@@ -114,7 +114,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           label: 'Mock Interview',
           path: '/mock-interview',
           icon: Video,
-          badge: '₹99',
+          badge: '₹49',
           badgeColor: 'bg-gradient-to-r from-amber-500 to-orange-500 text-white font-bold shadow-2xs',
         },
         {
@@ -292,7 +292,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
               1-on-1 Mock Interview
             </h4>
             <p className="text-[11px] text-slate-300 mb-3 leading-snug">
-              Practice with IT experts for <span className="text-amber-300 font-bold">₹99</span> &amp; get hired faster.
+              Practice with IT experts for <span className="text-amber-300 font-bold">₹49</span> &amp; get hired faster.
             </p>
             <button
               onClick={() => handleNav('/mock-interview')}

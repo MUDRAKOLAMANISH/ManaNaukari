@@ -119,7 +119,7 @@ export const AdminHeader: React.FC<AdminHeaderProps> = ({
             }`}
           >
             <Sparkles className="w-3.5 h-3.5 text-amber-600" />
-            <span>Mock Interviews (₹99)</span>
+            <span>Mock Interviews (₹49)</span>
           </button>
 
           <button

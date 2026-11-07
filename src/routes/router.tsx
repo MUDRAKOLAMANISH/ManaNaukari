@@ -329,7 +329,7 @@ export function matchRoute(path: string, onNavigate: (targetPath: string) => voi
     case '/mock-interviews':
       return {
         component: <MockInterviewPage onNavigate={onNavigate} />,
-        title: 'Tech Mock Interview Practice (₹99) | Mana Career',
+        title: 'Tech Mock Interview Practice (₹49) | Mana Career',
       };
     case '/jobs':
       return {

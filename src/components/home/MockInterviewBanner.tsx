@@ -73,7 +73,7 @@ export const MockInterviewBanner: React.FC<MockInterviewBannerProps> = ({ onNavi
               <div>
                 <div className="text-[11px] font-bold text-amber-300 uppercase tracking-wider">Session Price</div>
                 <div className="text-2xl sm:text-3xl font-black font-display text-white tracking-tight flex items-baseline gap-1.5">
-                  <span>₹99</span>
+                  <span>₹49</span>
                   <span className="text-xs font-semibold text-slate-400">PER MOCK INTERVIEW</span>
                 </div>
               </div>
@@ -131,7 +131,7 @@ export const MockInterviewBanner: React.FC<MockInterviewBannerProps> = ({ onNavi
                     </div>
                   </div>
                   <span className="text-xs font-black text-amber-400 bg-amber-500/10 px-2.5 py-1 rounded-lg border border-amber-500/20">
-                    ₹99
+                    ₹49
                   </span>
                 </div>
 

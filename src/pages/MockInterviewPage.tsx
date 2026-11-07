@@ -71,7 +71,7 @@ export const MockInterviewPage: React.FC<MockInterviewPageProps> = ({ onNavigate
   // Past Practice Session History
   const [pastSessions, setPastSessions] = useState<any[]>([]);
 
-  // --- HUMAN MOCK INTERVIEW (₹99) BOOKING FORM STATES ---
+  // --- HUMAN MOCK INTERVIEW (₹49) BOOKING FORM STATES ---
   const [bookFullName, setBookFullName] = useState('');
   const [bookEmail, setBookEmail] = useState('');
   const [bookWhatsapp, setBookWhatsapp] = useState('');
@@ -379,7 +379,7 @@ export const MockInterviewPage: React.FC<MockInterviewPageProps> = ({ onNavigate
               }`}
             >
               <Video className="w-4 h-4 text-amber-300" />
-              <span>Book 1-on-1 Human Interview (₹99)</span>
+              <span>Book 1-on-1 Human Interview (₹49)</span>
             </button>
 
             {pastSessions.length > 0 && (
@@ -972,7 +972,7 @@ export const MockInterviewPage: React.FC<MockInterviewPageProps> = ({ onNavigate
                           Want 1-on-1 Guidance from an Expert Interviewer?
                         </h3>
                         <p className="text-xs text-slate-300 max-w-xl">
-                          Book a 30-minute 1-on-1 live human mock interview session for only <strong>₹99</strong>. Get personalized feedback, detailed resume review, and salary negotiation tips.
+                          Book a 30-minute 1-on-1 live human mock interview session for only <strong>₹49</strong>. Get personalized feedback, detailed resume review, and salary negotiation tips.
                         </p>
                       </div>
 
@@ -980,7 +980,7 @@ export const MockInterviewPage: React.FC<MockInterviewPageProps> = ({ onNavigate
                         onClick={() => setActiveTab('book-human')}
                         className="px-6 py-3.5 rounded-2xl bg-gradient-to-r from-amber-500 to-orange-500 text-white font-extrabold text-xs shadow-xl shadow-amber-500/30 hover:opacity-90 transition-all cursor-pointer whitespace-nowrap"
                       >
-                        Book Human Interview (₹99) →
+                        Book Human Interview (₹49) →
                       </button>
                     </div>
 
@@ -1004,7 +1004,7 @@ export const MockInterviewPage: React.FC<MockInterviewPageProps> = ({ onNavigate
           </div>
         )}
 
-        {/* TAB 2: BOOK 1-ON-1 HUMAN MOCK INTERVIEW (₹99) */}
+        {/* TAB 2: BOOK 1-ON-1 HUMAN MOCK INTERVIEW (₹49) */}
         {activeTab === 'book-human' && (
           <div className="space-y-8 animate-fade-in">
             {submittedBooking ? (
@@ -1066,7 +1066,7 @@ export const MockInterviewPage: React.FC<MockInterviewPageProps> = ({ onNavigate
                       <Video className="w-4 h-4 text-amber-400" />
                       <span>1-on-1 Live Google Meet Session</span>
                     </div>
-                    <h2 className="text-2xl font-black text-white mt-2">Book Expert Human Mock Interview (₹99)</h2>
+                    <h2 className="text-2xl font-black text-white mt-2">Book Expert Human Mock Interview (₹49)</h2>
                     <p className="text-xs text-slate-300 mt-1">
                       Practice 1-on-1 with senior recruiters and engineers from TCS, Infosys, & top tech firms.
                     </p>
@@ -1074,7 +1074,7 @@ export const MockInterviewPage: React.FC<MockInterviewPageProps> = ({ onNavigate
 
                   <div className="bg-amber-950/60 border border-amber-500/40 rounded-2xl p-4 text-center">
                     <div className="text-[10px] text-amber-300 font-bold uppercase">Special Price</div>
-                    <div className="text-3xl font-black text-amber-400">₹99</div>
+                    <div className="text-3xl font-black text-amber-400">₹49</div>
                     <div className="text-[10px] text-slate-400">30 Min Live Session</div>
                   </div>
                 </div>
@@ -1220,7 +1220,7 @@ export const MockInterviewPage: React.FC<MockInterviewPageProps> = ({ onNavigate
                     ) : (
                       <>
                         <Video className="w-5 h-5" />
-                        <span>Confirm Booking for ₹99</span>
+                        <span>Confirm Booking for ₹49</span>
                       </>
                     )}
                   </button>

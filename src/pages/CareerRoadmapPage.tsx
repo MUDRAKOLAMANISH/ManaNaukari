@@ -1392,7 +1392,7 @@ export const CareerRoadmapPage: React.FC<CareerRoadmapPageProps> = ({ onNavigate
                 className="px-4 py-2 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-slate-950 font-bold text-xs rounded-xl shadow-2xs transition-all cursor-pointer flex items-center gap-1.5 shrink-0"
               >
                 <Sparkles className="w-3.5 h-3.5" />
-                <span>Practice Mock Interview (₹99)</span>
+                <span>Practice Mock Interview (₹49)</span>
               </button>
             </div>
 

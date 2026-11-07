@@ -222,7 +222,7 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
         categoryCounts={{}}
       />
 
-      {/* 3b. Premium ₹99 Mock Interview Service Promotional Banner */}
+      {/* 3b. Premium ₹49 Mock Interview Service Promotional Banner */}
       <MockInterviewBanner onNavigate={onNavigate} />
 
       {/* 4. Latest Verified Jobs Section with Workplace Imagery Banner */}

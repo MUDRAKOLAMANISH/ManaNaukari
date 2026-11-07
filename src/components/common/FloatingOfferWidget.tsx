@@ -176,7 +176,7 @@ export const FloatingOfferWidget: React.FC<FloatingOfferWidgetProps> = ({ onNavi
                   </div>
 
                   <div className="text-right shrink-0">
-                    <div className="font-black text-amber-400 text-sm">₹99</div>
+                    <div className="font-black text-amber-400 text-sm">₹49</div>
                     <div className="text-[9px] text-slate-500 line-through">₹499</div>
                   </div>
                 </div>

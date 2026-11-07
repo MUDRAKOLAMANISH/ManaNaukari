@@ -6,7 +6,7 @@ import {
   MockInterviewPaymentStatus,
 } from '../types/database.types';
 
-export const MOCK_INTERVIEW_PRICE_INR = 99;
+export const MOCK_INTERVIEW_PRICE_INR = 49;
 
 export interface SubmitMockInterviewInput {
   fullName: string;
@@ -75,7 +75,7 @@ export function normalizeWhatsAppNumber(phone: string): string {
 
 export const mockInterviewService = {
   /**
-   * Submit candidate booking for ₹99 Mock Interview
+   * Submit candidate booking for ₹49 Mock Interview
    */
   async createBooking(input: SubmitMockInterviewInput): Promise<{
     success: boolean;

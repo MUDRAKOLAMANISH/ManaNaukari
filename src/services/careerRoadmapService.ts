@@ -354,9 +354,9 @@ export const careerRoadmapService = {
           title: 'AI & 1-on-1 Mock Interview Room',
           description: 'Practice role-specific interview questions with instant AI feedback or book a live 1-on-1 mentor session.',
           route: '/mock-interview',
-          badgeText: '₹99 Human Mock',
+          badgeText: '₹49 Human Mock',
           ctaText: 'Start Interview Practice',
-          priceTag: 'Free / ₹99',
+          priceTag: 'Free / ₹49',
         },
         {
           title: 'Personal Developer Portfolio Service',

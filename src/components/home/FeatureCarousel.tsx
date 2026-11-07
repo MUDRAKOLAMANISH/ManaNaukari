@@ -126,7 +126,7 @@ export const FeatureCarousel: React.FC<FeatureCarouselProps> = ({ onNavigate }) 
               </div>
             </div>
             <span className="text-[10px] font-bold text-amber-300 bg-amber-500/10 border border-amber-500/30 px-2 py-0.5 rounded-full">
-              ₹99 Mentor Option
+              ₹49 Mentor Option
             </span>
           </div>
 

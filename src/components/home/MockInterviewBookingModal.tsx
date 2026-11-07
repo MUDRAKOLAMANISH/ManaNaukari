@@ -209,7 +209,7 @@ export const MockInterviewBookingModal: React.FC<MockInterviewBookingModalProps>
                 </h4>
                 <ol className="text-xs text-amber-950 font-medium space-y-1.5 list-decimal list-inside leading-relaxed">
                   <li>Our team will send payment details to <strong className="font-bold">{submittedBooking.whatsapp_number}</strong>.</li>
-                  <li>After completing ₹99 payment, your time slot will be confirmed.</li>
+                  <li>After completing ₹{MOCK_INTERVIEW_PRICE_INR} payment, your time slot will be confirmed.</li>
                 </ol>
               </div>
 
@@ -252,7 +252,7 @@ export const MockInterviewBookingModal: React.FC<MockInterviewBookingModalProps>
                   <span>1-on-1 Practice + Feedback Report</span>
                 </div>
                 <span className="text-amber-700 font-bold bg-amber-50 px-2 py-0.5 rounded border border-amber-200 text-[11px]">
-                  ₹99 Flat Fee
+                  ₹{MOCK_INTERVIEW_PRICE_INR} Flat Fee
                 </span>
               </div>
 

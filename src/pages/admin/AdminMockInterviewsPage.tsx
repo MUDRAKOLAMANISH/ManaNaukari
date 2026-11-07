@@ -29,7 +29,7 @@ CREATE TABLE IF NOT EXISTS public.mock_interview_bookings (
     interview_mode VARCHAR(100) NOT NULL DEFAULT 'Technical Interview',
     preferred_availability TEXT,
     additional_information TEXT,
-    price_inr INTEGER NOT NULL DEFAULT 99,
+    price_inr INTEGER NOT NULL DEFAULT 49,
     payment_status VARCHAR(50) NOT NULL DEFAULT 'pending',
     booking_status VARCHAR(50) NOT NULL DEFAULT 'pending_payment',
     admin_notes TEXT,
@@ -180,7 +180,7 @@ export const AdminMockInterviewsPage: React.FC<AdminMockInterviewsPageProps> = (
       setPaymentStatus('paid');
       setBookingStatus('payment_received');
       if (data) setSelectedBooking(data);
-      showToast('Payment marked as Received (₹99 Verified)!', 'success');
+      showToast('Payment marked as Received (₹49 Verified)!', 'success');
       fetchBookings();
     } catch (err: any) {
       showToast(err?.message || 'Failed to mark payment.', 'error');
@@ -310,7 +310,7 @@ Thank you for choosing ManaCarrier. Keep practicing!`;
         
         {/* Header */}
         <AdminHeader
-          title="Mock Interview Bookings (₹99)"
+          title="Mock Interview Bookings (₹49)"
           subtitle="Manage candidate practice bookings, WhatsApp payment coordination, scheduling, and feedback reports"
           onNavigate={onNavigate}
           showAddButton={false}
@@ -418,7 +418,7 @@ Thank you for choosing ManaCarrier. Keep practicing!`;
             >
               <option value="All">All Payments</option>
               <option value="pending">Pending</option>
-              <option value="paid">Paid (₹99)</option>
+              <option value="paid">Paid (₹49)</option>
               <option value="refunded">Refunded</option>
               <option value="cancelled">Cancelled</option>
             </select>
@@ -584,7 +584,7 @@ Thank you for choosing ManaCarrier. Keep practicing!`;
                     className="px-3.5 py-2 text-xs font-bold text-slate-950 bg-amber-400 hover:bg-amber-300 rounded-xl transition-all cursor-pointer inline-flex items-center gap-1.5 shadow-xs"
                   >
                     <CheckCircle2 className="w-4 h-4" />
-                    <span>Mark Payment Received (₹99)</span>
+                    <span>Mark Payment Received (₹49)</span>
                   </button>
                 )}
               </div>
@@ -645,7 +645,7 @@ Thank you for choosing ManaCarrier. Keep practicing!`;
                     className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl font-semibold cursor-pointer"
                   >
                     <option value="pending">Pending</option>
-                    <option value="paid">Paid (₹99 Verified)</option>
+                    <option value="paid">Paid (₹49 Verified)</option>
                     <option value="refunded">Refunded</option>
                     <option value="cancelled">Cancelled</option>
                   </select>

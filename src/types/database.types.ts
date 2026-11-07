@@ -551,7 +551,7 @@ export type MaterialInsert = Omit<Material, 'id' | 'views' | 'downloads' | 'crea
   updated_at?: string;
 };
 
-// 14. Table: mock_interview_bookings (₹99 Tech Mock Interview Practice)
+// 14. Table: mock_interview_bookings (₹49 Tech Mock Interview Practice)
 export type MockInterviewPaymentStatus = 'pending' | 'paid' | 'refunded' | 'cancelled';
 export type MockInterviewBookingStatus = 
   | 'pending_payment' 
