@@ -3,6 +3,16 @@ import { supabase } from '../../lib/supabase';
 import { applicantsService } from '../../services/supabaseService';
 import { Applicant, ApplicantStatus } from '../../types/database.types';
 import { AdminHeader } from '../../components/admin/AdminHeader';
+import {
+  getISTStartOfToday,
+  getISTStartOfWeek,
+  getISTStartOfMonth,
+  getISTStartOfNextDay,
+  getISTStartOfNextWeek,
+  getISTStartOfNextMonth,
+  formatISTDate,
+  parseToUtcMs,
+} from '../../utils/dateUtils';
 import { 
   Users, Search, Filter, Download, ExternalLink, 
   FileText, Calendar, Clock, CheckCircle2, XCircle, 
@@ -24,6 +34,7 @@ export const AdminApplicantsPage: React.FC<AdminApplicantsPageProps> = ({ onNavi
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   // Search & Filter State
   const [searchQuery, setSearchQuery] = useState('');
@@ -49,6 +60,7 @@ export const AdminApplicantsPage: React.FC<AdminApplicantsPageProps> = ({ onNavi
   const fetchApplicants = async (isManual = false) => {
     if (isManual) setRefreshing(true);
     else setLoading(true);
+    setErrorMessage(null);
 
     try {
       // First attempt: Select applicants with joined candidate_profiles, visitor_profiles and jobs
@@ -110,21 +122,44 @@ export const AdminApplicantsPage: React.FC<AdminApplicantsPageProps> = ({ onNavi
         error = fallbackRes.error;
       }
 
+      // Fallback 3: Un-joined query if all relationship-based queries failed
       if (error) {
-        console.error('[AdminApplicantsPage] Error loading applicants:', error);
+        console.warn('[AdminApplicantsPage] Joined relationship queries failed, running un-joined fallback query:', error.message);
+        const fallbackRaw = await supabase
+          .from('applicants')
+          .select('*')
+          .order('created_at', { ascending: false });
+
+        data = fallbackRaw.data as any;
+        error = fallbackRaw.error;
+      }
+
+      if (error) {
+        console.error('[AdminApplicantsPage] Error loading applicants after all query attempts:', error);
+        setErrorMessage(`Unable to load applications from database: ${error.message || 'Unknown database error'}`);
+        setApplicants([]);
       } else if (data && data.length > 0) {
         // Normalize single vs array foreign key joins from PostgREST and unify candidate profile
         const normalized: Applicant[] = (data as any[]).map((row) => {
           const cand = Array.isArray(row.candidate) ? row.candidate[0] : row.candidate;
           const vis = Array.isArray(row.visitor) ? row.visitor[0] : row.visitor;
 
+          // Priority for resume URL: 1. applicants.resume_url, 2. candidate_profiles.resume_url
+          const resolvedResumeUrl = row.resume_url || cand?.resume_url || null;
+
+          const candidateName = cand?.name || vis?.name || null;
+          const candidateEmail = cand?.email || vis?.email || null;
+          const candidatePhone = cand?.mobile || vis?.phone || null;
+
+          const hasLinkedProfile = Boolean(cand || vis || row.candidate_profile_id || row.visitor_id);
+
           // Consolidated unified profile
           const unifiedVisitor = {
             id: cand?.id || vis?.id || row.candidate_profile_id || row.visitor_id,
-            name: cand?.name || vis?.name || 'Anonymous Candidate',
-            email: cand?.email || vis?.email || 'N/A',
-            phone: cand?.mobile || vis?.phone || 'N/A',
-            resume_url: cand?.resume_url || row.resume_url || vis?.resume_url || null,
+            name: candidateName || (hasLinkedProfile ? 'Candidate (Un-named)' : 'Profile not linked'),
+            email: candidateEmail || (hasLinkedProfile ? 'Not provided' : 'Profile not linked'),
+            phone: candidatePhone || (hasLinkedProfile ? 'Not provided' : 'Profile not linked'),
+            resume_url: resolvedResumeUrl,
             created_at: cand?.created_at || vis?.created_at || row.created_at,
           };
 
@@ -133,7 +168,7 @@ export const AdminApplicantsPage: React.FC<AdminApplicantsPageProps> = ({ onNavi
             candidate_profile_id: row.candidate_profile_id || cand?.id || null,
             status: row.status || 'New',
             notes: row.notes || null,
-            resume_url: cand?.resume_url || row.resume_url || vis?.resume_url || null,
+            resume_url: resolvedResumeUrl,
             resume_file_name: cand?.resume_file_name || row.resume_file_name || null,
             visitor: unifiedVisitor,
             candidate: cand || null,
@@ -172,9 +207,9 @@ export const AdminApplicantsPage: React.FC<AdminApplicantsPageProps> = ({ onNavi
             created_at: vp.created_at || new Date().toISOString(),
             visitor: {
               id: vp.id,
-              name: vp.name || 'Anonymous Candidate',
-              email: vp.email || 'N/A',
-              phone: vp.phone || 'N/A',
+              name: vp.name || 'Candidate (Un-named)',
+              email: vp.email || 'Not provided',
+              phone: vp.phone || 'Not provided',
               resume_url: vp.resume_url || null,
               created_at: vp.created_at || new Date().toISOString(),
             },
@@ -367,30 +402,30 @@ export const AdminApplicantsPage: React.FC<AdminApplicantsPageProps> = ({ onNavi
     showToast(`Exported ${filteredApplicants.length} applicants to CSV`);
   };
 
-  // Dashboard Statistics Cards
+  // Dashboard Statistics Cards (Asia/Kolkata Calendar Boundaries)
   const stats = useMemo(() => {
     const total = applicants.length;
     const now = new Date();
     
-    // Start of Today (local)
-    const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+    const todayStartMs = getISTStartOfToday(now).getTime();
+    const todayNextMs = getISTStartOfNextDay(now).getTime();
     
-    // Start of This Week (last 7 days)
-    const weekStart = now.getTime() - 7 * 24 * 60 * 60 * 1000;
+    const weekStartMs = getISTStartOfWeek(now).getTime();
+    const weekNextMs = getISTStartOfNextWeek(now).getTime();
     
-    // Start of This Month (last 30 days)
-    const monthStart = now.getTime() - 30 * 24 * 60 * 60 * 1000;
+    const monthStartMs = getISTStartOfMonth(now).getTime();
+    const monthNextMs = getISTStartOfNextMonth(now).getTime();
 
     let todayCount = 0;
     let weekCount = 0;
     let monthCount = 0;
 
     applicants.forEach((app) => {
-      if (!app.created_at) return;
-      const t = new Date(app.created_at).getTime();
-      if (t >= todayStart) todayCount++;
-      if (t >= weekStart) weekCount++;
-      if (t >= monthStart) monthCount++;
+      const t = parseToUtcMs(app.created_at);
+      if (t === null) return;
+      if (t >= todayStartMs && t < todayNextMs) todayCount++;
+      if (t >= weekStartMs && t < weekNextMs) weekCount++;
+      if (t >= monthStartMs && t < monthNextMs) monthCount++;
     });
 
     return {
@@ -424,13 +459,15 @@ export const AdminApplicantsPage: React.FC<AdminApplicantsPageProps> = ({ onNavi
       const category = app.job?.category || 'General';
       categoryCountMap[category] = (categoryCountMap[category] || 0) + 1;
 
-      // Day counting
+      // Day counting in IST
       if (app.created_at) {
-        const dateKey = new Date(app.created_at).toLocaleDateString('en-IN', {
+        const dateKey = formatISTDate(app.created_at, {
           month: 'short',
           day: 'numeric',
         });
-        dayCountMap[dateKey] = (dayCountMap[dateKey] || 0) + 1;
+        if (dateKey !== 'N/A') {
+          dayCountMap[dateKey] = (dayCountMap[dateKey] || 0) + 1;
+        }
       }
     });
 
@@ -456,18 +493,26 @@ export const AdminApplicantsPage: React.FC<AdminApplicantsPageProps> = ({ onNavi
 
   // Search & Filter Pipeline
   const filteredApplicants = useMemo(() => {
+    const now = new Date();
+    const todayStartMs = getISTStartOfToday(now).getTime();
+    const todayNextMs = getISTStartOfNextDay(now).getTime();
+    const weekStartMs = getISTStartOfWeek(now).getTime();
+    const weekNextMs = getISTStartOfNextWeek(now).getTime();
+    const monthStartMs = getISTStartOfMonth(now).getTime();
+    const monthNextMs = getISTStartOfNextMonth(now).getTime();
+
     return applicants.filter((app) => {
-      // 1. Date Filter
+      // 1. Date Filter (Asia/Kolkata Calendar Boundaries)
       if (dateFilter !== 'all' && app.created_at) {
-        const t = new Date(app.created_at).getTime();
-        const now = Date.now();
-        if (dateFilter === 'today') {
-          const midnight = new Date().setHours(0, 0, 0, 0);
-          if (t < midnight) return false;
-        } else if (dateFilter === 'week') {
-          if (now - t > 7 * 24 * 60 * 60 * 1000) return false;
-        } else if (dateFilter === 'month') {
-          if (now - t > 30 * 24 * 60 * 60 * 1000) return false;
+        const t = parseToUtcMs(app.created_at);
+        if (t !== null) {
+          if (dateFilter === 'today') {
+            if (t < todayStartMs || t >= todayNextMs) return false;
+          } else if (dateFilter === 'week') {
+            if (t < weekStartMs || t >= weekNextMs) return false;
+          } else if (dateFilter === 'month') {
+            if (t < monthStartMs || t >= monthNextMs) return false;
+          }
         }
       }
 
@@ -517,6 +562,22 @@ export const AdminApplicantsPage: React.FC<AdminApplicantsPageProps> = ({ onNavi
           <div className="fixed bottom-6 right-6 z-50 bg-slate-900 text-white text-xs sm:text-sm font-semibold py-3 px-5 rounded-2xl shadow-xl border border-slate-700 animate-slideUp flex items-center gap-2">
             <CheckCircle2 className="w-4 h-4 text-emerald-400" />
             <span>{toastMessage}</span>
+          </div>
+        )}
+
+        {/* Database Error Alert Banner */}
+        {errorMessage && (
+          <div className="bg-rose-50 border border-rose-200 rounded-2xl p-4 flex items-center justify-between text-rose-800 text-xs sm:text-sm font-medium shadow-2xs">
+            <div className="flex items-center gap-2.5">
+              <AlertCircle className="w-5 h-5 text-rose-600 shrink-0" />
+              <span>{errorMessage}</span>
+            </div>
+            <button
+              onClick={() => fetchApplicants(true)}
+              className="px-3.5 py-1.5 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-bold transition-colors cursor-pointer shrink-0"
+            >
+              Retry Load
+            </button>
           </div>
         )}
 
@@ -809,14 +870,11 @@ export const AdminApplicantsPage: React.FC<AdminApplicantsPageProps> = ({ onNavi
                 <tbody className="divide-y divide-slate-100">
                   {filteredApplicants.map((app) => {
                     const normStatus = getNormalizedStatus(app.status);
-                    const resumeUrl = app.resume_url || app.visitor?.resume_url;
-                    const formattedDate = app.created_at
-                      ? new Date(app.created_at).toLocaleDateString('en-IN', {
-                          month: 'short',
-                          day: 'numeric',
-                          year: 'numeric',
-                        })
-                      : 'Recently';
+                    const resumeUrl = app.resume_url || app.candidate?.resume_url || app.visitor?.resume_url || null;
+                    const formattedDate = app.created_at ? formatISTDate(app.created_at) : 'Recently';
+                    const candName = app.visitor?.name || app.candidate?.name || (app.visitor_id || app.candidate_profile_id ? 'Candidate (Un-named)' : 'Profile not linked');
+                    const candEmail = app.visitor?.email || app.candidate?.email || (app.visitor_id || app.candidate_profile_id ? 'Not provided' : 'Profile not linked');
+                    const candPhone = app.visitor?.phone || app.candidate?.mobile || (app.visitor_id || app.candidate_profile_id ? 'Not provided' : 'Profile not linked');
 
                     return (
                       <tr 
@@ -830,10 +888,10 @@ export const AdminApplicantsPage: React.FC<AdminApplicantsPageProps> = ({ onNavi
                         {/* 1. Applicant Name */}
                         <td className="py-4 px-4 sm:px-6">
                           <div className="font-bold text-slate-900 text-sm flex items-center gap-1.5 flex-wrap">
-                            <span>{app.visitor?.name || 'Anonymous Candidate'}</span>
+                            <span>{candName}</span>
                             {(() => {
-                              const emailKey = (app.visitor?.email || '').toLowerCase().trim();
-                              const historyCount = candidateApplicationsMap.get(emailKey)?.length || 1;
+                              const emailKey = (candEmail !== 'Not provided' && candEmail !== 'Profile not linked' ? candEmail : '').toLowerCase().trim();
+                              const historyCount = emailKey ? (candidateApplicationsMap.get(emailKey)?.length || 1) : 1;
                               return historyCount > 1 ? (
                                 <span 
                                   className="text-[10px] font-bold bg-blue-50 text-blue-700 px-2 py-0.5 rounded-full border border-blue-200"
@@ -857,19 +915,25 @@ export const AdminApplicantsPage: React.FC<AdminApplicantsPageProps> = ({ onNavi
                         {/* 2. Email & Mobile Number */}
                         <td className="py-4 px-4">
                           <div className="text-slate-800 font-medium">
-                            <a
-                              href={`mailto:${app.visitor?.email || ''}`}
-                              onClick={(e) => e.stopPropagation()}
-                              className="hover:text-blue-600 transition-colors"
-                            >
-                              {app.visitor?.email || 'No email provided'}
-                            </a>
+                            {candEmail && candEmail !== 'Not provided' && candEmail !== 'Profile not linked' ? (
+                              <a
+                                href={`mailto:${candEmail}`}
+                                onClick={(e) => e.stopPropagation()}
+                                className="hover:text-blue-600 transition-colors"
+                              >
+                                {candEmail}
+                              </a>
+                            ) : (
+                              <span className="text-slate-400 italic">{candEmail}</span>
+                            )}
                           </div>
                           <div className="flex items-center gap-1.5 text-slate-500 text-[11px] mt-0.5">
-                            <span>{app.visitor?.phone || 'No phone'}</span>
-                            {app.visitor?.phone && (
+                            <span className={candPhone === 'Not provided' || candPhone === 'Profile not linked' ? 'text-slate-400 italic' : ''}>
+                              {candPhone}
+                            </span>
+                            {candPhone && candPhone !== 'Not provided' && candPhone !== 'Profile not linked' && (
                               <a
-                                href={getWhatsAppUrl(app.visitor?.phone, app.visitor?.name, app.job?.title)}
+                                href={getWhatsAppUrl(candPhone, candName, app.job?.title)}
                                 target="_blank"
                                 rel="noreferrer"
                                 onClick={(e) => e.stopPropagation()}
@@ -929,7 +993,7 @@ export const AdminApplicantsPage: React.FC<AdminApplicantsPageProps> = ({ onNavi
                           {resumeUrl ? (
                             <div className="flex items-center gap-1.5">
                               <button
-                                onClick={(e) => handleOpenResume(e, resumeUrl, app.visitor?.name)}
+                                onClick={(e) => handleOpenResume(e, resumeUrl, candName)}
                                 className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 transition-colors cursor-pointer"
                                 title="View or Download Candidate Resume"
                               >
@@ -1005,7 +1069,7 @@ export const AdminApplicantsPage: React.FC<AdminApplicantsPageProps> = ({ onNavi
                   Applicant Profile
                 </div>
                 <h3 className="text-xl font-bold font-display text-slate-900 mt-0.5">
-                  {selectedApplicant.visitor?.name || 'Anonymous Candidate'}
+                  {selectedApplicant.visitor?.name || selectedApplicant.candidate?.name || (selectedApplicant.visitor_id || selectedApplicant.candidate_profile_id ? 'Candidate (Un-named)' : 'Profile not linked')}
                 </h3>
               </div>
               <button
@@ -1062,12 +1126,16 @@ export const AdminApplicantsPage: React.FC<AdminApplicantsPageProps> = ({ onNavi
                     <Mail className="w-4 h-4 text-slate-400 shrink-0" />
                     <div>
                       <span className="text-slate-400 text-[10px] block">Email Address</span>
-                      <a 
-                        href={`mailto:${selectedApplicant.visitor?.email}`}
-                        className="font-semibold text-slate-800 hover:text-blue-600"
-                      >
-                        {selectedApplicant.visitor?.email || 'Not available'}
-                      </a>
+                      {selectedApplicant.visitor?.email || selectedApplicant.candidate?.email ? (
+                        <a 
+                          href={`mailto:${selectedApplicant.visitor?.email || selectedApplicant.candidate?.email}`}
+                          className="font-semibold text-slate-800 hover:text-blue-600"
+                        >
+                          {selectedApplicant.visitor?.email || selectedApplicant.candidate?.email}
+                        </a>
+                      ) : (
+                        <span className="text-slate-400 italic">Not provided</span>
+                      )}
                     </div>
                   </div>
 
@@ -1077,16 +1145,16 @@ export const AdminApplicantsPage: React.FC<AdminApplicantsPageProps> = ({ onNavi
                       <div>
                         <span className="text-slate-400 text-[10px] block">Mobile Number</span>
                         <span className="font-semibold text-slate-800">
-                          {selectedApplicant.visitor?.phone || 'Not available'}
+                          {selectedApplicant.visitor?.phone || selectedApplicant.candidate?.mobile || 'Not provided'}
                         </span>
                       </div>
                     </div>
 
-                    {selectedApplicant.visitor?.phone && (
+                    {(selectedApplicant.visitor?.phone || selectedApplicant.candidate?.mobile) && (
                       <a
                         href={getWhatsAppUrl(
-                          selectedApplicant.visitor?.phone,
-                          selectedApplicant.visitor?.name,
+                          selectedApplicant.visitor?.phone || selectedApplicant.candidate?.mobile,
+                          selectedApplicant.visitor?.name || selectedApplicant.candidate?.name,
                           selectedApplicant.job?.title
                         )}
                         target="_blank"
@@ -1146,7 +1214,7 @@ export const AdminApplicantsPage: React.FC<AdminApplicantsPageProps> = ({ onNavi
                 </h4>
                 
                 <div className="bg-white border border-slate-200 rounded-2xl p-4">
-                  {(selectedApplicant.resume_url || selectedApplicant.visitor?.resume_url) ? (
+                  {(selectedApplicant.resume_url || selectedApplicant.candidate?.resume_url || selectedApplicant.visitor?.resume_url) ? (
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2.5">
                         <div className="w-9 h-9 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center">
@@ -1161,8 +1229,8 @@ export const AdminApplicantsPage: React.FC<AdminApplicantsPageProps> = ({ onNavi
                       <button
                         onClick={(e) => handleOpenResume(
                           e,
-                          selectedApplicant.resume_url || selectedApplicant.visitor?.resume_url,
-                          selectedApplicant.visitor?.name
+                          selectedApplicant.resume_url || selectedApplicant.candidate?.resume_url || selectedApplicant.visitor?.resume_url,
+                          selectedApplicant.visitor?.name || selectedApplicant.candidate?.name
                         )}
                         className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-blue-600 hover:bg-blue-500 text-white transition-colors cursor-pointer shadow-2xs"
                       >

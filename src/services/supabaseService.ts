@@ -140,8 +140,8 @@ export const jobsService = {
 
   /**
    * Top Job Announcement Ticker:
-   * Priority A: Job with is_featured = true (or featured = true), status = 'active'
-   * Priority B: Most recently uploaded active job (status = 'active', created_at DESC)
+   * Priority A: Query job with featured = true, status = 'active' ordered by created_at DESC
+   * Priority B: Fallback to latest active job (status = 'active', created_at DESC)
    */
   async getTopAnnouncementJob(): Promise<{
     job: Job | null;
@@ -151,57 +151,37 @@ export const jobsService = {
     try {
       let featuredJob: Job | null = null;
 
-      // Priority A1: Query active job with is_featured = true
+      // Priority A: Query active job with featured = true
       try {
-        const { data: featData, error: featErr } = await (supabase as any)
+        const { data: featData, error: featErr } = await supabase
           .from('jobs')
           .select('*')
           .eq('status', 'active')
-          .eq('is_featured', true)
-          .order('updated_at', { ascending: false })
+          .eq('featured', true)
+          .order('created_at', { ascending: false })
           .limit(1)
           .maybeSingle();
 
         if (!featErr && featData) {
           featuredJob = featData as Job;
-        } else if (featErr && (featErr.message?.includes('Failed to fetch') || featErr.name === 'TypeError')) {
-          return { job: null, isFeatured: false, error: featErr as any };
+        } else if (featErr) {
+          if (featErr.message?.includes('Failed to fetch') || featErr.name === 'TypeError') {
+            return { job: null, isFeatured: false, error: featErr as any };
+          }
+          console.warn('[jobsService.getTopAnnouncementJob] Featured job query note:', featErr.message || featErr);
         }
       } catch (e: any) {
         if (e?.message?.includes('Failed to fetch') || e?.name === 'TypeError') {
           return { job: null, isFeatured: false, error: e };
         }
-      }
-
-      // Priority A2: If is_featured returned nothing, check legacy featured column
-      if (!featuredJob) {
-        try {
-          const { data: legFeatData, error: legFeatErr } = await supabase
-            .from('jobs')
-            .select('*')
-            .eq('status', 'active')
-            .eq('featured', true)
-            .order('updated_at', { ascending: false })
-            .limit(1)
-            .maybeSingle();
-
-          if (!legFeatErr && legFeatData) {
-            featuredJob = legFeatData as Job;
-          } else if (legFeatErr && (legFeatErr.message?.includes('Failed to fetch') || legFeatErr.name === 'TypeError')) {
-            return { job: null, isFeatured: false, error: legFeatErr as any };
-          }
-        } catch (e: any) {
-          if (e?.message?.includes('Failed to fetch') || e?.name === 'TypeError') {
-            return { job: null, isFeatured: false, error: e };
-          }
-        }
+        console.warn('[jobsService.getTopAnnouncementJob] Featured job query exception:', e?.message || e);
       }
 
       if (featuredJob) {
         return { job: featuredJob, isFeatured: true, error: null };
       }
 
-      // Priority B: If no featured job exists, fetch the newest active job
+      // Priority B: If no featured job exists or query failed gracefully, fetch the newest active job
       const { data: latestData, error: latestErr } = await supabase
         .from('jobs')
         .select('*')
@@ -211,7 +191,7 @@ export const jobsService = {
         .maybeSingle();
 
       if (latestErr) {
-        console.warn('[jobsService.getTopAnnouncementJob] Notice:', latestErr.message || latestErr);
+        console.warn('[jobsService.getTopAnnouncementJob] Fallback query error:', latestErr.message || latestErr);
         return { job: null, isFeatured: false, error: latestErr as any };
       }
 
@@ -517,22 +497,43 @@ export const visitorProfilesService = {
         }
       }
 
-      // Step C: Create new visitor profile if not found
-      // Only insert core columns: name, email, phone
-      console.log('[visitorProfilesService.upsert] No existing profile found. Inserting new visitor_profiles record...');
+      // Step C: Atomic upsert or insert on visitor_profiles
+      console.log('[visitorProfilesService.upsert] Inserting/Upserting visitor_profiles record...');
+      const insertPayload = {
+        name: cleanName,
+        email: cleanEmail,
+        phone: cleanPhone,
+      };
+
+      if (cleanEmail) {
+        const { data: upsertRes, error: upsertErr } = await supabase
+          .from('visitor_profiles')
+          .upsert(insertPayload, { onConflict: 'email' })
+          .select('id, name, email, phone, created_at')
+          .single();
+
+        if (!upsertErr && upsertRes && upsertRes.id) {
+          const numId = Number(upsertRes.id);
+          if (!isNaN(numId) && numId > 0 && numId < 100000000000) {
+            return {
+              data: {
+                ...upsertRes,
+                id: String(numId),
+              } as VisitorProfile,
+              error: null,
+            };
+          }
+        }
+      }
+
       const { data: insertRes, error: insertErr } = await supabase
         .from('visitor_profiles')
-        .insert({
-          name: cleanName,
-          email: cleanEmail,
-          phone: cleanPhone,
-        })
+        .insert(insertPayload)
         .select('id, name, email, phone, created_at')
         .single();
 
       if (insertErr) {
-        console.warn('[visitorProfilesService.upsert] Insert error, checking race condition:', insertErr.message);
-        // Retry check on email
+        console.warn('[visitorProfilesService.upsert] Insert warning, checking race condition:', insertErr.message);
         if (cleanEmail) {
           const { data: retryData } = await supabase
             .from('visitor_profiles')
@@ -541,13 +542,16 @@ export const visitorProfilesService = {
             .limit(1)
             .maybeSingle();
           if (retryData && retryData.id) {
-            return {
-              data: {
-                ...retryData,
-                id: String(Number(retryData.id)),
-              } as VisitorProfile,
-              error: null,
-            };
+            const numId = Number(retryData.id);
+            if (!isNaN(numId) && numId > 0 && numId < 100000000000) {
+              return {
+                data: {
+                  ...retryData,
+                  id: String(numId),
+                } as VisitorProfile,
+                error: null,
+              };
+            }
           }
         }
         return { data: null, error: insertErr };
@@ -587,14 +591,6 @@ export const visitorProfilesService = {
 export const applicantsService = {
   /**
    * Record Application in applicants table with guaranteed numeric bigint foreign key.
-   * Requirements fulfilled:
-   * 1. Find existing visitor profile using email or phone
-   * 2. Create visitor profile if not found
-   * 3. Get numeric visitor_profiles.id
-   * 4. Save that numeric ID into applicants.visitor_id
-   * 5. Never save cand_* strings into applicants.visitor_id
-   * 6. Keep foreign key relationships intact
-   * 7. Proper error handling and success messages
    */
   async recordApplication(applicant: ApplicantInsert): Promise<{ data: Applicant | null; error: any }> {
     console.log('[applicantsService.recordApplication] Starting application record with payload:', applicant);
@@ -609,13 +605,31 @@ export const applicantsService = {
       }
 
       // 2. Resolve and validate numeric visitor_id (bigint)
-      // NEVER save or pass "cand_*" strings into applicants.visitor_id
       let numericVisitorId: number | null = null;
       const rawVisitorId = String(applicant.visitor_id || '');
 
-      if (rawVisitorId && !rawVisitorId.startsWith('cand_') && !isNaN(Number(rawVisitorId)) && Number(rawVisitorId) > 0) {
-        numericVisitorId = Number(rawVisitorId);
-      } else {
+      // Verify that rawVisitorId is valid numeric ID < 100000000000 and actually exists in visitor_profiles
+      if (
+        rawVisitorId &&
+        !rawVisitorId.startsWith('cand_') &&
+        !isNaN(Number(rawVisitorId)) &&
+        Number(rawVisitorId) > 0 &&
+        Number(rawVisitorId) < 100000000000
+      ) {
+        const checkNum = Number(rawVisitorId);
+        const { data: checkVis } = await supabase
+          .from('visitor_profiles')
+          .select('id')
+          .eq('id', checkNum)
+          .limit(1)
+          .maybeSingle();
+
+        if (checkVis && checkVis.id) {
+          numericVisitorId = checkNum;
+        }
+      }
+
+      if (!numericVisitorId) {
         // Resolve or create visitor profile using email or phone
         const targetEmail = applicant.email || applicant.visitor?.email || '';
         const targetPhone = applicant.phone || applicant.visitor?.phone || '';
@@ -634,10 +648,13 @@ export const applicantsService = {
           };
         }
 
-        numericVisitorId = Number(profileRes.id);
+        const numId = Number(profileRes.id);
+        if (!isNaN(numId) && numId > 0 && numId < 100000000000) {
+          numericVisitorId = numId;
+        }
       }
 
-      if (!numericVisitorId || isNaN(numericVisitorId) || numericVisitorId <= 0) {
+      if (!numericVisitorId || isNaN(numericVisitorId) || numericVisitorId <= 0 || numericVisitorId >= 100000000000) {
         return {
           data: null,
           error: new Error('Failed to resolve numeric visitor ID for application.'),

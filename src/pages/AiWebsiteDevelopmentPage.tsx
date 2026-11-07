@@ -6,6 +6,7 @@ import {
   AlertCircle
 } from 'lucide-react';
 import { websiteDevelopmentService } from '../services/websiteDevelopmentService';
+import { MANACARRIER_WHATSAPP_NUMBER } from '../constants/links';
 
 interface AiWebsiteDevelopmentPageProps {
   onNavigate: (path: string) => void;
@@ -215,7 +216,7 @@ export const AiWebsiteDevelopmentPage: React.FC<AiWebsiteDevelopmentPageProps> =
         const text = encodeURIComponent(
           `Hi ManaCarrier AI Dev Team!\nI would like to order the *${planName}* package (${planPrice}).\n\nName: ${clientName}\nEmail: ${clientEmail}\nWhatsApp: ${clientPhone}\nWebsite Category: ${websiteType}\nPages: ${numberOfPages}\nBudget: ${budgetRange}\nIdea: ${websiteIdea}\nReference: ${referenceWebsiteUrl || 'None'}\n\nPlease review my enquiry!`
         );
-        window.open(`https://wa.me/91${clientPhone.replace(/[^0-9]/g, '')}?text=${text}`, '_blank');
+        window.open(`https://wa.me/${MANACARRIER_WHATSAPP_NUMBER}?text=${text}`, '_blank');
       } else {
         setErrorMessage(result.message || 'Failed to submit enquiry. Please try again.');
       }

@@ -181,9 +181,8 @@ export const candidateProfileService = {
 
         if (!emailErr && existingByEmail && existingByEmail.id) {
           const numId = Number(existingByEmail.id);
-          if (!isNaN(numId) && numId > 0) {
+          if (!isNaN(numId) && numId > 0 && numId < 100000000000) {
             console.log('[candidateProfileService.getOrCreateVisitorProfile] ✅ Found existing visitor profile by email. Numeric ID:', numId);
-            // Synchronize name, phone if updated
             try {
               await supabase
                 .from('visitor_profiles')
@@ -211,58 +210,90 @@ export const candidateProfileService = {
 
         if (!phoneErr && existingByPhone && existingByPhone.id) {
           const numId = Number(existingByPhone.id);
-          if (!isNaN(numId) && numId > 0) {
+          if (!isNaN(numId) && numId > 0 && numId < 100000000000) {
             console.log('[candidateProfileService.getOrCreateVisitorProfile] ✅ Found existing visitor profile by phone. Numeric ID:', numId);
             return { visitorId: numId, data: existingByPhone, error: null };
           }
         }
       }
 
-      // Step C: Create visitor profile if not found
-      // Standard schema: (id, name, email, phone)
-      console.log('[candidateProfileService.getOrCreateVisitorProfile] No existing profile found. Creating new visitor_profiles record...');
+      // Step C: Atomic insert or update using upsert on email
+      console.log('[candidateProfileService.getOrCreateVisitorProfile] Inserting/Upserting visitor_profiles record...');
       const insertPayload = {
         name: cleanName,
         email: cleanEmail,
         phone: cleanPhone,
       };
 
+      // Try 1: Upsert on email
+      if (cleanEmail) {
+        const { data: upsertRes, error: upsertErr } = await supabase
+          .from('visitor_profiles')
+          .upsert(insertPayload, { onConflict: 'email' })
+          .select('id, name, email, phone')
+          .single();
+
+        if (!upsertErr && upsertRes && upsertRes.id) {
+          const numId = Number(upsertRes.id);
+          if (!isNaN(numId) && numId > 0 && numId < 100000000000) {
+            console.log('[candidateProfileService.getOrCreateVisitorProfile] ✅ Upserted visitor profile by email. Generated Numeric ID:', numId);
+            return { visitorId: numId, data: upsertRes, error: null };
+          }
+        }
+      }
+
+      // Try 2: Standard insert with select
       const { data: newVisitor, error: insertErr } = await supabase
         .from('visitor_profiles')
         .insert(insertPayload)
         .select('id, name, email, phone')
         .single();
 
-      if (insertErr) {
-        console.warn('[candidateProfileService.getOrCreateVisitorProfile] Insert warning, checking if record was created concurrently:', insertErr.message);
-        // If unique constraint or race condition, query once more
-        if (cleanEmail) {
-          const { data: retryCheck } = await supabase
-            .from('visitor_profiles')
-            .select('id, name, email, phone')
-            .ilike('email', cleanEmail)
-            .limit(1)
-            .maybeSingle();
-
-          if (retryCheck && retryCheck.id) {
-            const numId = Number(retryCheck.id);
-            if (!isNaN(numId) && numId > 0) {
-              return { visitorId: numId, data: retryCheck, error: null };
-            }
-          }
-        }
-        return { visitorId: 0, data: null, error: insertErr };
-      }
-
-      if (newVisitor && newVisitor.id) {
+      if (!insertErr && newVisitor && newVisitor.id) {
         const numId = Number(newVisitor.id);
-        if (!isNaN(numId) && numId > 0) {
+        if (!isNaN(numId) && numId > 0 && numId < 100000000000) {
           console.log('[candidateProfileService.getOrCreateVisitorProfile] ✅ Created new visitor profile. Generated Numeric ID:', numId);
           return { visitorId: numId, data: newVisitor, error: null };
         }
       }
 
-      return { visitorId: 0, data: null, error: new Error('Failed to retrieve numeric ID from visitor_profiles.') };
+      // Try 3: Plain insert without select (in case select is RLS restricted) and re-query
+      console.warn('[candidateProfileService.getOrCreateVisitorProfile] Insert with select warning, attempting plain insert & re-query:', insertErr?.message);
+      await supabase.from('visitor_profiles').insert(insertPayload);
+
+      if (cleanEmail) {
+        const { data: retryCheck } = await supabase
+          .from('visitor_profiles')
+          .select('id, name, email, phone')
+          .ilike('email', cleanEmail)
+          .limit(1)
+          .maybeSingle();
+
+        if (retryCheck && retryCheck.id) {
+          const numId = Number(retryCheck.id);
+          if (!isNaN(numId) && numId > 0 && numId < 100000000000) {
+            return { visitorId: numId, data: retryCheck, error: null };
+          }
+        }
+      }
+
+      if (cleanPhone) {
+        const { data: retryPhone } = await supabase
+          .from('visitor_profiles')
+          .select('id, name, email, phone')
+          .eq('phone', cleanPhone)
+          .limit(1)
+          .maybeSingle();
+
+        if (retryPhone && retryPhone.id) {
+          const numId = Number(retryPhone.id);
+          if (!isNaN(numId) && numId > 0 && numId < 100000000000) {
+            return { visitorId: numId, data: retryPhone, error: null };
+          }
+        }
+      }
+
+      return { visitorId: 0, data: null, error: insertErr || new Error('Failed to retrieve numeric ID from visitor_profiles.') };
     } catch (err: any) {
       console.error('[candidateProfileService.getOrCreateVisitorProfile] Exception:', err);
       return { visitorId: 0, data: null, error: err };
@@ -438,18 +469,17 @@ export const candidateProfileService = {
           phone: cleanMobile,
           resume_url: input.resume_url,
         });
-        if (visitorRes.visitorId && visitorRes.visitorId > 0) {
+        if (visitorRes.visitorId && visitorRes.visitorId > 0 && visitorRes.visitorId < 100000000000) {
           numericVisitorId = visitorRes.visitorId;
         }
       } catch (e) {
         console.warn('[candidateProfileService.saveOrUpdateProfile] Visitor profile resolution note:', e);
       }
 
-      if (!numericVisitorId) {
-        numericVisitorId = Date.now();
-      }
-
-      const stringId = String(numericVisitorId);
+      // CRITICAL SECURITY FIX: Never use Date.now() as a fallback visitor_id!
+      // Using Date.now() produces timestamp numbers like 1762168370000 which do NOT exist in visitor_profiles
+      // and violate foreign key constraint applicants_visitor_id_fkey.
+      const stringId = numericVisitorId > 0 ? String(numericVisitorId) : '';
 
       // Step B: Synchronize verification status to visitor_profiles
       if (input.email_verified && numericVisitorId > 0) {
@@ -468,26 +498,28 @@ export const candidateProfileService = {
       }
 
       // Step C: Optional sync to candidate_profiles table
-      try {
-        await supabase
-          .from('candidate_profiles')
-          .upsert({
-            id: stringId,
-            name: cleanName,
-            email: cleanEmail,
-            mobile: cleanMobile,
-            resume_url: input.resume_url || null,
-            resume_file_name: input.resume_file_name || null,
-            email_verified: input.email_verified ?? false,
-            verified_at: input.verified_at || null,
-            last_verified_at: input.last_verified_at || null,
-            updated_at: nowIso,
-          } as any);
-      } catch {
-        // candidate_profiles table may be optional
+      if (stringId) {
+        try {
+          await supabase
+            .from('candidate_profiles')
+            .upsert({
+              id: stringId,
+              name: cleanName,
+              email: cleanEmail,
+              mobile: cleanMobile,
+              resume_url: input.resume_url || null,
+              resume_file_name: input.resume_file_name || null,
+              email_verified: input.email_verified ?? false,
+              verified_at: input.verified_at || null,
+              last_verified_at: input.last_verified_at || null,
+              updated_at: nowIso,
+            } as any);
+        } catch {
+          // candidate_profiles table may be optional
+        }
       }
 
-      // Step D: Construct validated CandidateProfile with guaranteed ID
+      // Step D: Construct validated CandidateProfile
       const savedCandidate: CandidateProfile = {
         id: stringId,
         name: cleanName,
@@ -505,7 +537,7 @@ export const candidateProfileService = {
       // Step E: Update localStorage with clean profile details
       this.saveLocalProfile({
         id: stringId,
-        visitor_id: numericVisitorId,
+        visitor_id: numericVisitorId > 0 ? numericVisitorId : null,
         name: savedCandidate.name,
         email: savedCandidate.email,
         mobile: savedCandidate.mobile,
@@ -516,13 +548,12 @@ export const candidateProfileService = {
         last_verified_at: savedCandidate.last_verified_at,
       });
 
-      console.log('[candidateProfileService.saveOrUpdateProfile] ✅ Saved profile successfully:', stringId);
+      console.log('[candidateProfileService.saveOrUpdateProfile] ✅ Saved profile successfully. Visitor ID:', stringId || 'unassigned');
       return { data: savedCandidate, error: null };
     } catch (err: any) {
       console.warn('[candidateProfileService.saveOrUpdateProfile] Graceful fallback on exception:', err);
-      const fallbackId = Date.now();
       const fallbackCandidate: CandidateProfile = {
-        id: String(fallbackId),
+        id: '',
         name: cleanName,
         email: cleanEmail,
         mobile: cleanMobile,
@@ -535,8 +566,8 @@ export const candidateProfileService = {
         updated_at: nowIso,
       };
       this.saveLocalProfile({
-        id: String(fallbackId),
-        visitor_id: fallbackId,
+        id: '',
+        visitor_id: null,
         name: cleanName,
         email: cleanEmail,
         mobile: cleanMobile,
@@ -577,7 +608,7 @@ export const candidateProfileService = {
     const rawId = profileId || local?.visitor_id || local?.id;
     if (rawId && !String(rawId).startsWith('cand_')) {
       const parsedNum = Number(rawId);
-      if (!isNaN(parsedNum) && parsedNum > 0) {
+      if (!isNaN(parsedNum) && parsedNum > 0 && parsedNum < 100000000000) {
         numericVisitorId = parsedNum;
       }
     }
@@ -611,7 +642,7 @@ export const candidateProfileService = {
 
         if (vis && vis.id) {
           const numVisId = Number(vis.id);
-          if (!isNaN(numVisId) && numVisId > 0) {
+          if (!isNaN(numVisId) && numVisId > 0 && numVisId < 100000000000) {
             const { data: emailAppData } = await supabase
               .from('applicants')
               .select('id, created_at')
@@ -640,7 +671,7 @@ export const candidateProfileService = {
 
         if (visMob && visMob.id) {
           const numVisId = Number(visMob.id);
-          if (!isNaN(numVisId) && numVisId > 0) {
+          if (!isNaN(numVisId) && numVisId > 0 && numVisId < 100000000000) {
             const { data: mobAppData } = await supabase
               .from('applicants')
               .select('id, created_at')
@@ -685,12 +716,13 @@ export const candidateProfileService = {
 
     // 1. Resolve & Validate Numeric Job ID (bigint)
     const numericJobId = Number(jobId);
-    if (isNaN(numericJobId) || numericJobId <= 0) {
+    if (isNaN(numericJobId) || numericJobId <= 0 || !Number.isInteger(numericJobId)) {
+      console.warn('[candidateProfileService.recordApplication] Invalid numeric Job ID:', jobId);
       return {
-        data: { visitor_id: 1, job_id: jobId },
+        data: null,
         hasAppliedBefore: false,
-        appliedAt: nowIso,
-        error: null,
+        appliedAt: undefined,
+        error: new Error('Invalid numeric Job ID'),
       };
     }
 
@@ -698,9 +730,30 @@ export const candidateProfileService = {
     let numericVisitorId: number | null = null;
     const rawCandId = String(candidateProfile.id || '');
 
-    if (rawCandId && !rawCandId.startsWith('cand_') && !isNaN(Number(rawCandId)) && Number(rawCandId) > 0) {
-      numericVisitorId = Number(rawCandId);
-    } else {
+    // Check if rawCandId is valid integer > 0 AND < 100000000000 (reject fake Date.now() timestamps)
+    if (
+      rawCandId &&
+      !rawCandId.startsWith('cand_') &&
+      !isNaN(Number(rawCandId)) &&
+      Number(rawCandId) > 0 &&
+      Number(rawCandId) < 100000000000
+    ) {
+      const parsedCandId = Number(rawCandId);
+      // Double check that parsedCandId exists in visitor_profiles
+      const { data: checkVis } = await supabase
+        .from('visitor_profiles')
+        .select('id')
+        .eq('id', parsedCandId)
+        .limit(1)
+        .maybeSingle();
+
+      if (checkVis && checkVis.id) {
+        numericVisitorId = Number(checkVis.id);
+      }
+    }
+
+    // If ID was missing, timestamp-based, or not in visitor_profiles, resolve or create via getOrCreateVisitorProfile
+    if (!numericVisitorId) {
       try {
         const visitorRes = await this.getOrCreateVisitorProfile({
           name: candidateProfile.name,
@@ -708,17 +761,23 @@ export const candidateProfileService = {
           phone: candidateProfile.mobile,
         });
 
-        if (visitorRes.visitorId && visitorRes.visitorId > 0) {
+        if (visitorRes.visitorId && visitorRes.visitorId > 0 && visitorRes.visitorId < 100000000000) {
           numericVisitorId = visitorRes.visitorId;
           candidateProfile.id = String(numericVisitorId);
         }
       } catch (e) {
         console.warn('[candidateProfileService.recordApplication] Visitor profile resolution note:', e);
       }
+    }
 
-      if (!numericVisitorId) {
-        numericVisitorId = Date.now();
-      }
+    if (!numericVisitorId || isNaN(numericVisitorId) || numericVisitorId <= 0 || !Number.isInteger(numericVisitorId) || numericVisitorId >= 100000000000) {
+      console.warn('[candidateProfileService.recordApplication] Unable to resolve valid numeric visitor ID');
+      return {
+        data: null,
+        hasAppliedBefore: false,
+        appliedAt: undefined,
+        error: new Error('Unable to create or locate candidate visitor profile in database. Please check your name, email, and phone details.'),
+      };
     }
 
     // 3. Pre-flight Deduplication check
@@ -739,31 +798,39 @@ export const candidateProfileService = {
       };
     }
 
-    // 4. Insert into applicants table with fail-safe fallback
+    // 4. Insert into applicants table (using plain insert without .select() because anonymous users lack SELECT permission)
     try {
-      const { data, error } = await supabase
+      const { error } = await supabase
         .from('applicants')
         .insert({
           visitor_id: numericVisitorId,
           job_id: numericJobId,
-        })
-        .select()
-        .single();
+        });
 
       if (error) {
-        console.warn('[candidateProfileService] Applicants DB insert notice (marking local application success):', error.message || error);
-        this.markJobAsApplied(String(numericJobId), nowIso);
+        // Handle duplicate key constraint gracefully
+        if (error.code === '23505' || error.message?.includes('duplicate key') || error.message?.includes('unique constraint')) {
+          console.warn('[candidateProfileService] Duplicate application recorded by DB constraint (visitor_id:', numericVisitorId, 'job_id:', numericJobId, ')');
+          this.markJobAsApplied(String(numericJobId), nowIso);
+          return {
+            data: { visitor_id: numericVisitorId, job_id: numericJobId },
+            hasAppliedBefore: true,
+            appliedAt: nowIso,
+            error: null,
+          };
+        }
+        console.error('[candidateProfileService] Applicants DB insert failed:', error.message || error);
         return {
-          data: { visitor_id: numericVisitorId, job_id: numericJobId },
+          data: null,
           hasAppliedBefore: false,
-          appliedAt: nowIso,
-          error: null,
+          appliedAt: undefined,
+          error: error,
         };
       }
 
-      console.log('[candidateProfileService] ✅ Application recorded successfully in Supabase:', data);
+      console.log('[candidateProfileService] ✅ Application recorded successfully in Supabase (visitor_id:', numericVisitorId, 'job_id:', numericJobId, ')');
 
-      // 5. Update local cache
+      // 5. Update local cache ONLY upon successful database insert
       this.markJobAsApplied(String(numericJobId), nowIso);
       this.saveLocalProfile({
         id: String(numericVisitorId),
@@ -778,15 +845,19 @@ export const candidateProfileService = {
         last_verified_at: candidateProfile.last_verified_at,
       });
 
-      return { data, hasAppliedBefore: false, appliedAt: nowIso, error: null };
-    } catch (err: any) {
-      console.warn('[candidateProfileService] recordApplication caught exception (marking local success):', err);
-      this.markJobAsApplied(String(numericJobId), nowIso);
       return {
         data: { visitor_id: numericVisitorId, job_id: numericJobId },
         hasAppliedBefore: false,
         appliedAt: nowIso,
         error: null,
+      };
+    } catch (err: any) {
+      console.error('[candidateProfileService] recordApplication caught exception:', err);
+      return {
+        data: null,
+        hasAppliedBefore: false,
+        appliedAt: undefined,
+        error: err,
       };
     }
   },

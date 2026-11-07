@@ -376,11 +376,18 @@ export const JobDetailsPage: React.FC<JobDetailsPageProps> = ({ jobId, onNavigat
 
       // Step 2: Record Application with Unique Deduplication
       if (profileData) {
-        await candidateProfileService.recordApplication({
+        const appRes = await candidateProfileService.recordApplication({
           jobId: job.id,
           candidateProfile: profileData,
           notes: `Applied from ManaCarrier direct portal (${new Date().toLocaleDateString()})`,
         });
+
+        if (appRes.error) {
+          console.error('[JobDetailsPage.handleSubmitLead] Database submission error:', appRes.error);
+          setLeadError(appRes.error?.message || 'Failed to record application in database. Please try again.');
+          setIsSubmittingLead(false);
+          return;
+        }
       }
 
       // Step 3: Mark as applied and show success state

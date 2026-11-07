@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, Sparkles, CheckCircle2, ShieldCheck, AlertCircle, MessageSquare, ChevronDown } from 'lucide-react';
+import { X, Sparkles, CheckCircle2, ShieldCheck, AlertCircle, MessageSquare, ChevronDown, Smartphone } from 'lucide-react';
 import {
   mockInterviewService,
   INTERVIEW_TOPICS,
@@ -8,6 +8,7 @@ import {
   MOCK_INTERVIEW_PRICE_INR,
 } from '../../services/mockInterviewService';
 import { MockInterviewBooking } from '../../types/database.types';
+import { MANACARRIER_WHATSAPP_NUMBER } from '../../constants/links';
 
 interface MockInterviewBookingModalProps {
   isOpen: boolean;
@@ -212,12 +213,24 @@ export const MockInterviewBookingModal: React.FC<MockInterviewBookingModalProps>
                 </ol>
               </div>
 
-              <div className="pt-2 flex items-center justify-center gap-3">
+              <div className="pt-2 flex flex-col sm:flex-row items-center justify-center gap-3">
+                <a
+                  href={`https://wa.me/${MANACARRIER_WHATSAPP_NUMBER}?text=${encodeURIComponent(
+                    `Hello ManaCarrier team, I submitted a booking for ₹${MOCK_INTERVIEW_PRICE_INR} Mock Interview on ${submittedBooking.interview_topic}.\n\nCandidate Name: ${submittedBooking.full_name}\nCandidate WhatsApp: ${submittedBooking.whatsapp_number}\n\nPlease share payment details and available time slots.`
+                  )}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="w-full sm:w-auto px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold text-xs flex items-center justify-center gap-2 transition-all cursor-pointer shadow-xs"
+                >
+                  <Smartphone className="w-4 h-4" />
+                  <span>Chat on WhatsApp for Payment</span>
+                </a>
+
                 <button
                   onClick={handleResetAndClose}
-                  className="px-6 py-2.5 text-xs font-extrabold text-slate-950 bg-amber-400 hover:bg-amber-300 rounded-xl transition-colors cursor-pointer shadow-xs"
+                  className="w-full sm:w-auto px-5 py-2.5 text-xs font-bold text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-xl transition-colors cursor-pointer"
                 >
-                  Done
+                  Close
                 </button>
               </div>
             </div>

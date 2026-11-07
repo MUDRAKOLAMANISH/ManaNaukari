@@ -27,7 +27,7 @@ import { calculateFallbackAtsMatch } from './src/utils/atsKeywordMatcher';
 import { jobAvailabilityService } from './src/services/jobAvailabilityService';
 
 const app = express();
-const port = 3000;
+const port = Number(process.env.PORT) || 3000;
 
 app.use(express.json());
 

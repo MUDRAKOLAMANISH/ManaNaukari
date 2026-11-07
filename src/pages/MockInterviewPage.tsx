@@ -21,6 +21,7 @@ import {
   PracticeSessionConfig,
 } from '../services/aiMockInterviewService';
 import { MockInterviewBooking } from '../types/database.types';
+import { MANACARRIER_WHATSAPP_NUMBER } from '../constants/links';
 
 interface MockInterviewPageProps {
   onNavigate: (path: string) => void;
@@ -1038,8 +1039,8 @@ export const MockInterviewPage: React.FC<MockInterviewPageProps> = ({ onNavigate
 
                 <div className="pt-2 flex flex-col sm:flex-row items-center justify-center gap-3">
                   <a
-                    href={`https://wa.me/${submittedBooking.whatsapp_number.replace(/[^\d]/g, '')}?text=${encodeURIComponent(
-                      `Hello ManaCarrier team, I submitted a booking for ₹99 Mock Interview on ${submittedBooking.interview_topic}. My Name: ${submittedBooking.full_name}`
+                    href={`https://wa.me/${MANACARRIER_WHATSAPP_NUMBER}?text=${encodeURIComponent(
+                      `Hello ManaCarrier team, I submitted a booking for ₹${MOCK_INTERVIEW_PRICE_INR} Mock Interview on ${submittedBooking.interview_topic}.\n\nCandidate Name: ${submittedBooking.full_name}\nCandidate WhatsApp: ${submittedBooking.whatsapp_number}\n\nPlease share payment details and available time slots.`
                     )}`}
                     target="_blank"
                     rel="noreferrer"

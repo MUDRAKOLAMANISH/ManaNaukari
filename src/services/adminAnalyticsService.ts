@@ -1,5 +1,12 @@
 import { supabase } from '../lib/supabase';
 import { AnalyticsOverview, DailyMetricPoint, TopViewedJobMetric } from '../types/database.types';
+import {
+  getISTStartOfToday,
+  getISTStartOfWeek,
+  getISTStartOfMonth,
+  getISTDateString,
+  parseToUtcMs,
+} from '../utils/dateUtils';
 
 export const adminAnalyticsService = {
   /**
@@ -8,16 +15,10 @@ export const adminAnalyticsService = {
   async getOverview(): Promise<AnalyticsOverview> {
     const now = new Date();
     
-    // Boundary calculations in UTC ISO
-    const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString();
-    
-    const sevenDaysAgo = new Date();
-    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
-    const sevenDaysAgoIso = sevenDaysAgo.toISOString();
-
-    const thirtyDaysAgo = new Date();
-    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-    const thirtyDaysAgoIso = thirtyDaysAgo.toISOString();
+    // Boundary calculations in Asia/Kolkata (IST) ISO
+    const startOfTodayIso = getISTStartOfToday(now).toISOString();
+    const startOfWeekIso = getISTStartOfWeek(now).toISOString();
+    const startOfMonthIso = getISTStartOfMonth(now).toISOString();
 
     let tablesReady = true;
     let tableErrorMessage: string | null = null;
@@ -67,7 +68,7 @@ export const adminAnalyticsService = {
     try {
       const [totalAppsRes, todayAppsRes, recentAppsRes, visProfilesRes] = await Promise.all([
         supabase.from('applicants').select('id', { count: 'exact', head: true }),
-        supabase.from('applicants').select('id', { count: 'exact', head: true }).gte('created_at', startOfToday),
+        supabase.from('applicants').select('id', { count: 'exact', head: true }).gte('created_at', startOfTodayIso),
         supabase.from('applicants').select('id, created_at, job_id').gte('created_at', fourteenDaysAgoIso()),
         supabase.from('visitor_profiles').select('id', { count: 'exact', head: true }),
       ]);
@@ -107,7 +108,9 @@ export const adminAnalyticsService = {
         const weekUniqueSet = new Set<string>();
         const monthUniqueSet = new Set<string>();
 
-        const todayDateStr = new Date().toISOString().split('T')[0];
+        const todayDateStr = getISTDateString(now) || new Date().toISOString().split('T')[0];
+        const weekStartDateStr = getISTDateString(startOfWeekIso) || '';
+        const monthStartDateStr = getISTDateString(startOfMonthIso) || '';
 
         // Process visitor_analytics rows
         rows.forEach((row: any) => {
@@ -118,16 +121,16 @@ export const adminAnalyticsService = {
           recentVisitorsList.push(row);
 
           const rawDate = row.visited_at || row.timestamp;
-          const visitDate = row.visit_date || (rawDate ? new Date(rawDate).toISOString().split('T')[0] : null);
+          const visitDate = row.visit_date || (rawDate ? getISTDateString(rawDate) : null);
 
           if (rawDate) {
-            if (rawDate >= startOfToday || visitDate === todayDateStr) todayUniqueSet.add(vid);
-            if (rawDate >= sevenDaysAgoIso) weekUniqueSet.add(vid);
-            if (rawDate >= thirtyDaysAgoIso) monthUniqueSet.add(vid);
+            if (rawDate >= startOfTodayIso || visitDate === todayDateStr) todayUniqueSet.add(vid);
+            if (rawDate >= startOfWeekIso) weekUniqueSet.add(vid);
+            if (rawDate >= startOfMonthIso) monthUniqueSet.add(vid);
           } else if (visitDate) {
             if (visitDate === todayDateStr) todayUniqueSet.add(vid);
-            if (visitDate >= sevenDaysAgoIso.split('T')[0]) weekUniqueSet.add(vid);
-            if (visitDate >= thirtyDaysAgoIso.split('T')[0]) monthUniqueSet.add(vid);
+            if (weekStartDateStr && visitDate >= weekStartDateStr) weekUniqueSet.add(vid);
+            if (monthStartDateStr && visitDate >= monthStartDateStr) monthUniqueSet.add(vid);
           }
         });
 
@@ -138,12 +141,12 @@ export const adminAnalyticsService = {
 
           totalUniqueSet.add(vid);
           const rawDate = jv.viewed_at || jv.created_at;
-          const visitDate = rawDate ? new Date(rawDate).toISOString().split('T')[0] : null;
+          const visitDate = rawDate ? getISTDateString(rawDate) : null;
 
           if (rawDate) {
-            if (rawDate >= startOfToday || visitDate === todayDateStr) todayUniqueSet.add(vid);
-            if (rawDate >= sevenDaysAgoIso) weekUniqueSet.add(vid);
-            if (rawDate >= thirtyDaysAgoIso) monthUniqueSet.add(vid);
+            if (rawDate >= startOfTodayIso || visitDate === todayDateStr) todayUniqueSet.add(vid);
+            if (rawDate >= startOfWeekIso) weekUniqueSet.add(vid);
+            if (rawDate >= startOfMonthIso) monthUniqueSet.add(vid);
           }
 
           recentVisitorsList.push({ visitor_id: vid, visited_at: rawDate, visit_date: visitDate || undefined });
@@ -155,9 +158,9 @@ export const adminAnalyticsService = {
           totalUniqueSet.add(vid);
           const rawDate = vp.created_at;
           if (rawDate) {
-            if (rawDate >= startOfToday) todayUniqueSet.add(vid);
-            if (rawDate >= sevenDaysAgoIso) weekUniqueSet.add(vid);
-            if (rawDate >= thirtyDaysAgoIso) monthUniqueSet.add(vid);
+            if (rawDate >= startOfTodayIso) todayUniqueSet.add(vid);
+            if (rawDate >= startOfWeekIso) weekUniqueSet.add(vid);
+            if (rawDate >= startOfMonthIso) monthUniqueSet.add(vid);
           }
         });
 
@@ -219,7 +222,7 @@ export const adminAnalyticsService = {
       const dayUniqueVisitors = new Set<string>();
       recentVisitorsList.forEach((v) => {
         const rawDate = v.visited_at;
-        const vDate = v.visit_date || (rawDate ? new Date(rawDate).toISOString().split('T')[0] : null);
+        const vDate = v.visit_date || (rawDate ? getISTDateString(rawDate) : null);
         if (vDate === dateKey && v.visitor_id) {
           dayUniqueVisitors.add(v.visitor_id);
         }
@@ -231,7 +234,7 @@ export const adminAnalyticsService = {
     const applicationsByDay = generateDailySeries(7, (dateKey) => {
       return recentApplicantsList.filter((a) => {
         if (!a.created_at) return false;
-        const itemDate = new Date(a.created_at).toISOString().split('T')[0];
+        const itemDate = getISTDateString(a.created_at);
         return itemDate === dateKey;
       }).length;
     });
@@ -462,18 +465,20 @@ function fourteenDaysAgoIso(): string {
 }
 
 /**
- * Helper to build continuous daily dates array for charts
+ * Helper to build continuous daily dates array for charts (in Asia/Kolkata timezone)
  */
 function generateDailySeries(days: number, countFn: (dateKey: string, index: number) => number): DailyMetricPoint[] {
   const result: DailyMetricPoint[] = [];
   const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  const now = new Date();
 
   for (let i = days - 1; i >= 0; i--) {
-    const d = new Date();
-    d.setDate(d.getDate() - i);
-    const dateKey = d.toISOString().split('T')[0];
-    const month = monthNames[d.getMonth()];
-    const day = d.getDate();
+    const d = new Date(now.getTime() - i * 24 * 60 * 60 * 1000);
+    const dateKey = getISTDateString(d) || d.toISOString().split('T')[0];
+    const utcMs = parseToUtcMs(d) || d.getTime();
+    const istDate = new Date(utcMs + 5.5 * 3600 * 1000);
+    const month = monthNames[istDate.getUTCMonth()];
+    const day = istDate.getUTCDate();
     const label = `${month} ${day}`;
     const idx = (days - 1) - i;
     

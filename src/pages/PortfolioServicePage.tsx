@@ -5,7 +5,7 @@ import {
   FileCheck, Star, Users, PhoneCall, X, CheckCircle2
 } from 'lucide-react';
 import { PORTFOLIO_PLANS, PortfolioPlan, PortfolioServiceCard } from '../components/home/PortfolioServiceCard';
-import { OFFICIAL_LINKS } from '../constants/links';
+import { OFFICIAL_LINKS, MANACARRIER_WHATSAPP_NUMBER } from '../constants/links';
 
 interface PortfolioServicePageProps {
   onNavigate: (path: string) => void;
@@ -36,9 +36,9 @@ export const PortfolioServicePage: React.FC<PortfolioServicePageProps> = ({ onNa
 
       // Open WhatsApp directly with prefilled message
       const text = encodeURIComponent(
-        `Hi Manish / ManaCarrier Team!\nI would like to order the *${selectedPlan?.name || 'Developer Portfolio'}* package (${selectedPlan?.price || ''}).\n\nName: ${candidateName}\nRole: ${candidateRole}\nEmail: ${candidateEmail}\nGitHub: ${candidateGithub || 'None'}\n\nPlease share the next steps!`
+        `Hi Manish / ManaCarrier Team!\nI would like to order the *${selectedPlan?.name || 'Developer Portfolio'}* package (${selectedPlan?.price || ''}).\n\nName: ${candidateName}\nRole: ${candidateRole}\nEmail: ${candidateEmail}\nPhone: ${candidatePhone}\nGitHub: ${candidateGithub || 'None'}\n\nPlease share the next steps!`
       );
-      window.open(`https://wa.me/91${candidatePhone.replace(/[^0-9]/g, '')}?text=${text}`, '_blank');
+      window.open(`https://wa.me/${MANACARRIER_WHATSAPP_NUMBER}?text=${text}`, '_blank');
     }, 700);
   };
 
